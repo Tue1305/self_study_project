@@ -2,205 +2,56 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Spring Boot JWT App</title>
+    <title>Sign In</title>
     <style>
-        * {
-            box-sizing: border-box;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-        }
-        body {
-            background-color: #f4f6f9;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            margin: 0;
-        }
-        .card {
-            background: #ffffff;
-            padding: 30px;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-            width: 100%;
-            max-width: 450px;
-        }
-        h2 {
-            margin-top: 0;
-            color: #333;
-            font-size: 1.25rem;
-            border-bottom: 2px solid #eef2f5;
-            padding-bottom: 10px;
-        }
-        .form-group {
-            margin-bottom: 15px;
-        }
-        label {
-            display: block;
-            margin-bottom: 5px;
-            color: #666;
-            font-size: 0.9rem;
-        }
-        input {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            font-size: 0.95rem;
-        }
-        button {
-            width: 100%;
-            padding: 10px;
-            border: none;
-            border-radius: 4px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-        .btn-primary {
-            background-color: #0066cc;
-            color: white;
-        }
-        .btn-primary:hover {
-            background-color: #0052a3;
-        }
-        .btn-secondary {
-            background-color: #28a745;
-            color: white;
-            margin-top: 10px;
-        }
-        .btn-secondary:hover {
-            background-color: #218838;
-        }
-        .btn-danger {
-            background-color: #dc3545;
-            color: white;
-            margin-top: 10px;
-        }
-        .hidden {
-            display: none;
-        }
-        pre {
-            background: #1e1e1e;
-            color: #4ec9b0;
-            padding: 15px;
-            border-radius: 4px;
-            overflow-x: auto;
-            max-height: 200px;
-            font-size: 0.85rem;
-        }
+        body { font-family: Arial, sans-serif; margin: 40px; background-color: #f9f9f9; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); max-width: 400px; margin: 0 auto; }
+        input, button { padding: 10px; margin: 8px 0; width: 100%; box-sizing: border-box; }
+        button { background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background-color: #0056b3; }
     </style>
 </head>
 <body>
 
 <div class="card">
-    <!-- LOGIN SECTION -->
-    <div id="login-section">
-        <h2>Authentication</h2>
-        <div class="form-group">
-            <label for="username">Username</label>
-            <input type="text" id="username" value="user" placeholder="Enter username">
-        </div>
-        <div class="form-group">
-            <label for="password">Password</label>
-            <input type="password" id="password" value="password" placeholder="Enter password">
-        </div>
-        <button class="btn-primary" onclick="login()">Sign In</button>
-    </div>
-
-    <!-- DASHBOARD SECTION (Shown after login) -->
-    <div id="dashboard-section" class="hidden">
-        <h2>Dashboard</h2>
-        <p>Status: <strong style="color: green;">Authenticated</strong></p>
-        <button class="btn-secondary" onclick="fetchProtectedData()">Fetch Protected Data</button>
-        <button class="btn-danger" onclick="logout()">Logout</button>
-    </div>
-
-    <!-- RESPONSE OUTPUT -->
-    <h2>Console Output</h2>
-    <pre id="output">Waiting for action...</pre>
+    <h2>Sign In</h2>
+    <input type="text" id="username" placeholder="Username" value="user">
+    <input type="password" id="password" placeholder="Password" value="password">
+    <button onclick="login()">Sign In</button>
+    <p id="errorMsg" style="color: red;"></p>
 </div>
 
 <script>
-    const API_URL = ''; // Relative path since html is hosted on the same server
-
-    // Log in and save JWT to localStorage
-    async function login() {
-        const username = document.getElementById('username').value;
-        const password = document.getElementById('password').value;
-
-        try {
-            const response = await fetch(`${API_URL}/api/auth/login`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password })
-            });
-
-            const data = await response.json();
-
-            if (response.ok && data.accessToken) {
-                localStorage.setItem('jwtToken', data.accessToken);
-                updateUI(true);
-                logOutput('Login successful!\nReceived JWT Token:\n' + data.accessToken);
-            } else {
-                logOutput('Login Failed: ' + JSON.stringify(data, null, 2));
-            }
-        } catch (error) {
-            logOutput('Error: ' + error.message);
-        }
+    // Redirect immediately if user is already logged in
+    if (localStorage.getItem("accessToken")) {
+        window.location.href = "/dashboard.html";
     }
 
-    // Fetch data using the Bearer Token
-    async function fetchProtectedData() {
-        const token = localStorage.getItem('jwtToken');
-        if (!token) {
-            alert('No token found. Please log in first.');
-            return;
-        }
+    async function login() {
+        const usernameInput = document.getElementById("username").value;
+        const passwordInput = document.getElementById("password").value;
 
         try {
-            const response = await fetch(`${API_URL}/api/books`, {
-                method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                }
+            const response = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: usernameInput, password: passwordInput })
             });
 
             if (response.ok) {
                 const data = await response.json();
-                logOutput('Protected Resource Response (200 OK):\n' + JSON.stringify(data, null, 2));
+                localStorage.setItem("accessToken", data.token);
+                localStorage.setItem("currentUser", usernameInput);
+
+                // REDIRECT TO DASHBOARD PAGE
+                window.location.href = "/dashboard.html";
             } else {
-                logOutput(`Access Denied (${response.status}): Unauthorized access or expired token.`);
+                document.getElementById("errorMsg").innerText = "Invalid credentials!";
             }
-        } catch (error) {
-            logOutput('Error: ' + error.message);
+        } catch (err) {
+            console.error(err);
         }
     }
-
-    // Clear token and update view
-    function logout() {
-        localStorage.removeItem('jwtToken');
-        updateUI(false);
-        logOutput('Logged out successfully.');
-    }
-
-    // UI Helper Functions
-    function updateUI(isLoggedIn) {
-        document.getElementById('login-section').classList.toggle('hidden', isLoggedIn);
-        document.getElementById('dashboard-section').classList.toggle('hidden', !isLoggedIn);
-    }
-
-    function logOutput(text) {
-        document.getElementById('output').innerText = text;
-    }
-
-    // Auto check if user is already logged in on page refresh
-    if (localStorage.getItem('jwtToken')) {
-        updateUI(true);
-        logOutput('Session restored from stored JWT token.');
-    }
 </script>
-
 </body>
 </html>

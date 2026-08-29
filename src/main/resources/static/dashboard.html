@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>User Dashboard</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; background-color: #f9f9f9; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); max-width: 600px; margin: 0 auto; }
+        button { background-color: #dc3545; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; }
+        button:hover { background-color: #c82333; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th { background-color: #f2f2f2; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>User Dashboard</h2>
+    <p>Welcome back, <strong id="loggedInUser"></strong>!</p>
+    <button onclick="logout()">Logout</button>
+
+    <h3>Registered Users</h3>
+    <table>
+        <thead>
+        <tr>
+            <th>ID</th>
+            <th>Username</th>
+        </tr>
+        </thead>
+        <tbody id="userTableBody"></tbody>
+    </table>
+</div>
+
+<script>
+    // Check for token on load; redirect back to login if missing
+    window.onload = function() {
+        const token = localStorage.getItem("accessToken");
+        if (!token) {
+            window.location.href = "/index.html";
+            return;
+        }
+        document.getElementById("loggedInUser").innerText = localStorage.getItem("currentUser") || "User";
+        fetchUsers(token);
+    };
+
+    async function fetchUsers(token) {
+        try {
+            const response = await fetch('/api/users', {
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+
+            if (response.ok) {
+                const users = await response.json();
+                const tableBody = document.getElementById('userTableBody');
+                tableBody.innerHTML = '';
+                users.forEach(user => {
+                    tableBody.innerHTML += `<tr><td>${user.id}</td><td>${user.username}</td></tr>`;
+                });
+            } else if (response.status === 401 || response.status === 403) {
+                logout(); // Token expired or invalid
+            }
+        } catch (err) {
+            console.error(err);
+        }
+    }
+
+    function logout() {
+        localStorage.clear();
+        window.location.href = "/index.html";
+    }
+</script>
+</body>
+</html>

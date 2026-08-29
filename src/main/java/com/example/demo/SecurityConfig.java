@@ -44,7 +44,7 @@ public class SecurityConfig {
         http
                 .csrf(AbstractHttpConfigurer::disable) // Disables CSRF for REST APIs
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/", "/index.html", "/favicon.ico", "/api/auth/**").permitAll() // Permits public access to login
+                        .requestMatchers("/", "/dashboard.html", "/index.html", "/favicon.ico", "/api/auth/**").permitAll() // Permits public access to login
                         .anyRequest().authenticated()
                 );
         return http.build();

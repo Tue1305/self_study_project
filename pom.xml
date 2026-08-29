@@ -19,6 +19,17 @@
 	</properties>
 
 	<dependencies>
+		<!-- Spring Data JPA and H2 Database -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-jpa</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>com.h2database</groupId>
+			<artifactId>h2</artifactId>
+			<scope>runtime</scope>
+		</dependency>
+
 		<!-- Web REST APIs -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>

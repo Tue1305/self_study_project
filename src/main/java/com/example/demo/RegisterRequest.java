@@ -1,30 +1,16 @@
 package com.example.demo;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import jakarta.persistence.*;
-
-@Entity
-@Table(name = "users")
-public class UserEntity {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    @Column(unique = true, nullable = false)
+public class RegisterRequest {
     private String username;
-
-    @JsonIgnore
     private String password;
 
-    public UserEntity() {}
+    public RegisterRequest() {}
 
-    public UserEntity(String username, String password) {
+    public RegisterRequest(String username, String password) {
         this.username = username;
         this.password = password;
     }
 
-    public Long getId() { return id; }
     public String getUsername() { return username; }
     public void setUsername(String username) { this.username = username; }
 

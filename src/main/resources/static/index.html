@@ -2,55 +2,141 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Sign In</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NailArt Studio - Subscription Plans</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 40px; background-color: #f9f9f9; }
-        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); max-width: 400px; margin: 0 auto; }
-        input, button { padding: 10px; margin: 8px 0; width: 100%; box-sizing: border-box; }
-        button { background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
-        button:hover { background-color: #0056b3; }
+        :root {
+            --primary: #e91e63;
+            --dark: #2c3e50;
+            --light: #f8f9fa;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--light);
+            color: var(--dark);
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 50px;
+            background: #fff;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+
+        .logo { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
+        .auth-btns button {
+            margin-left: 10px;
+            padding: 8px 16px;
+            border-radius: 4px;
+            border: 1px solid var(--primary);
+            cursor: pointer;
+        }
+        .btn-login { background: transparent; color: var(--primary); }
+        .btn-signup { background: var(--primary); color: #fff; }
+
+        .hero { text-align: center; padding: 50px 20px; }
+
+        .pricing-container {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            max-width: 1100px;
+            margin: 0 auto 50px auto;
+            padding: 0 20px;
+        }
+
+        .card {
+            background: #fff;
+            border-radius: 8px;
+            padding: 30px;
+            flex: 1;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: transform 0.2s;
+        }
+
+        .card:hover { transform: translateY(-5px); }
+        .card.popular { border: 2px solid var(--primary); }
+
+        .price { font-size: 2rem; color: var(--primary); margin: 15px 0; }
+        .features { list-style: none; padding: 0; text-align: left; margin-bottom: 25px; }
+        .features li { padding: 8px 0; border-bottom: 1px solid #eee; }
+
+        .btn-plan {
+            width: 100%;
+            padding: 10px;
+            background: var(--dark);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
 
-<div class="card">
-    <h2>Sign In</h2>
-    <input type="text" id="username" placeholder="Username" value="user">
-    <input type="password" id="password" placeholder="Password" value="password">
-    <button onclick="login()">Sign In</button>
-    <p id="errorMsg" style="color: red;"></p>
+<header>
+    <div class="logo">NailArt Studio</div>
+    <div class="auth-btns">
+        <button class="btn-login" onclick="location.href='/login.html'">Login</button>
+        <button class="btn-signup" onclick="location.href='/signup.html'">Sign Up</button>
+    </div>
+</header>
+
+<section class="hero">
+    <h1>Select Your Nail Care Subscription</h1>
+    <p>Unlimited style, monthly fresh sets, and premium care.</p>
+</section>
+
+<div class="pricing-container">
+    <!-- Basic Package -->
+    <div class="card">
+        <h3>Basic</h3>
+        <div class="price">$29<span>/mo</span></div>
+        <ul class="features">
+            <li>✔ 1 Full Gel Set per Month</li>
+            <li>✔ Standard Nail Art</li>
+            <li>✔ Free Removal</li>
+        </ul>
+        <button class="btn-plan" onclick="selectPlan('Basic')">Choose Basic</button>
+    </div>
+
+    <!-- Professional Package -->
+    <div class="card popular">
+        <h3>Professional</h3>
+        <div class="price">$59<span>/mo</span></div>
+        <ul class="features">
+            <li>✔ 2 Full Sets or Fills per Month</li>
+            <li>✔ Custom 3D & Premium Art</li>
+            <li>✔ Priority Booking Window</li>
+            <li>✔ Complimentary Cuticle Care</li>
+        </ul>
+        <button class="btn-plan" style="background: var(--primary);" onclick="selectPlan('Professional')">Choose Pro</button>
+    </div>
+
+    <!-- Ultimate Package -->
+    <div class="card">
+        <h3>Ultimate</h3>
+        <div class="price">$99<span>/mo</span></div>
+        <ul class="features">
+            <li>✔ Unlimited Fills & Maintenance</li>
+            <li>✔ Any Luxury Nail Art & Jewels</li>
+            <li>✔ VIP Emergency Repairs</li>
+            <li>✔ Free Monthly Hand Spa Treatment</li>
+        </ul>
+        <button class="btn-plan" onclick="selectPlan('Ultimate')">Choose Ultimate</button>
+    </div>
 </div>
 
 <script>
-    // Redirect immediately if user is already logged in
-    if (localStorage.getItem("accessToken")) {
-        window.location.href = "/dashboard.html";
-    }
-
-    async function login() {
-        const usernameInput = document.getElementById("username").value;
-        const passwordInput = document.getElementById("password").value;
-
-        try {
-            const response = await fetch('/api/auth/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username: usernameInput, password: passwordInput })
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                localStorage.setItem("accessToken", data.token);
-                localStorage.setItem("currentUser", usernameInput);
-
-                // REDIRECT TO DASHBOARD PAGE
-                window.location.href = "/dashboard.html";
-            } else {
-                document.getElementById("errorMsg").innerText = "Invalid credentials!";
-            }
-        } catch (err) {
-            console.error(err);
-        }
+    function selectPlan(planName) {
+        localStorage.setItem('selectedPlan', planName);
+        window.location.href = '/signup.html';
     }
 </script>
 </body>

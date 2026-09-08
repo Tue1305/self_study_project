@@ -2,72 +2,228 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>User Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Dashboard - NailArt Studio</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 40px; background-color: #f9f9f9; }
-        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); max-width: 600px; margin: 0 auto; }
-        button { background-color: #dc3545; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; }
-        button:hover { background-color: #c82333; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-        th { background-color: #f2f2f2; }
+        :root {
+            --primary: #e91e63;
+            --dark: #2c3e50;
+            --light: #f8f9fa;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--light);
+            color: var(--dark);
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 40px;
+            background: #fff;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+
+        .logo { font-size: 1.4rem; font-weight: bold; color: var(--primary); }
+        .btn-logout {
+            background: transparent;
+            border: 1px solid var(--primary);
+            color: var(--primary);
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 40px auto;
+            padding: 0 20px;
+        }
+
+        .welcome-card {
+            background: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+            margin-bottom: 25px;
+        }
+
+        .welcome-card h1 {
+            margin: 0 0 10px 0;
+            color: var(--dark);
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .card {
+            background: #fff;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+        }
+
+        .card h3 {
+            margin-top: 0;
+            color: var(--primary);
+            border-bottom: 2px solid #fce4ec;
+            padding-bottom: 10px;
+        }
+
+        .info-group {
+            margin-bottom: 15px;
+        }
+
+        .info-label {
+            font-size: 12px;
+            color: #777;
+            text-transform: uppercase;
+            font-weight: bold;
+        }
+
+        .info-value {
+            font-size: 16px;
+            font-weight: 600;
+            margin-top: 4px;
+        }
+
+        .badge-plan {
+            display: inline-block;
+            background: #fce4ec;
+            color: var(--primary);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .btn-action {
+            display: inline-block;
+            margin-top: 15px;
+            padding: 10px 18px;
+            background: var(--dark);
+            color: #fff;
+            text-decoration: none;
+            border-radius: 4px;
+            font-size: 14px;
+        }
     </style>
 </head>
 <body>
 
-<div class="card">
-    <h2>User Dashboard</h2>
-    <p>Welcome back, <strong id="loggedInUser"></strong>!</p>
-    <button onclick="logout()">Logout</button>
+<header>
+    <div class="logo">NailArt Studio</div>
+    <button class="btn-logout" onclick="handleLogout()">Log Out</button>
+</header>
 
-    <h3>Registered Users</h3>
-    <table>
-        <thead>
-        <tr>
-            <th>ID</th>
-            <th>Username</th>
-        </tr>
-        </thead>
-        <tbody id="userTableBody"></tbody>
-    </table>
+<div class="container">
+    <!-- Welcome Header -->
+    <div class="welcome-card">
+        <h1>Welcome back, <span id="welcomeUser">User</span>!</h1>
+        <p>Manage your active membership, appointments, and account details here.</p>
+    </div>
+
+    <div class="dashboard-grid">
+        <!-- Active Subscription Card -->
+        <div class="card">
+            <h3>Subscription Status</h3>
+
+            <div class="info-group">
+                <div class="info-label">Current Plan</div>
+                <div class="info-value">
+                    <span id="planDisplay" class="badge-plan">No Active Subscription</span>
+                </div>
+            </div>
+
+            <div class="info-group">
+                <div class="info-label">Status</div>
+                <div class="info-value" id="statusDisplay" style="color: #4CAF50;">Active</div>
+            </div>
+
+            <a href="/subscription-plans.html" class="btn-action" id="planActionBtn">Change Plan</a>
+        </div>
+
+        <!-- Account Information Card -->
+        <div class="card">
+            <h3>Account Information</h3>
+
+            <div class="info-group">
+                <div class="info-label">Username</div>
+                <div class="info-value" id="usernameDisplay">---</div>
+            </div>
+
+            <div class="info-group">
+                <div class="info-label">Authentication Method</div>
+                <div class="info-value">JWT Secure Session</div>
+            </div>
+
+            <div class="info-group">
+                <div class="info-label">Member Since</div>
+                <div class="info-value" id="memberSince">Today</div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script>
-    // Check for token on load; redirect back to login if missing
-    window.onload = function() {
-        const token = localStorage.getItem("accessToken");
-        if (!token) {
-            window.location.href = "/index.html";
-            return;
-        }
-        document.getElementById("loggedInUser").innerText = localStorage.getItem("currentUser") || "User";
-        fetchUsers(token);
-    };
+    // Check for JWT on page load
+    const token = localStorage.getItem('accessToken');
+    if (!token) {
+        // Redirect to login if unauthorized
+        window.location.href = '/login.html';
+    } else {
+        initDashboard(token);
+    }
 
-    async function fetchUsers(token) {
+    function parseJwt(token) {
         try {
-            const response = await fetch('/api/users', {
-                headers: { 'Authorization': 'Bearer ' + token }
-            });
-
-            if (response.ok) {
-                const users = await response.json();
-                const tableBody = document.getElementById('userTableBody');
-                tableBody.innerHTML = '';
-                users.forEach(user => {
-                    tableBody.innerHTML += `<tr><td>${user.id}</td><td>${user.username}</td></tr>`;
-                });
-            } else if (response.status === 401 || response.status === 403) {
-                logout(); // Token expired or invalid
-            }
-        } catch (err) {
-            console.error(err);
+            const base64Url = token.split('.')[1];
+            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+            return JSON.parse(window.atob(base64));
+        } catch (e) {
+            return null;
         }
     }
 
-    function logout() {
-        localStorage.clear();
-        window.location.href = "/index.html";
+    function initDashboard(jwtToken) {
+        // 1. Extract Username from JWT payload
+        const decoded = parseJwt(jwtToken);
+        const username = decoded && decoded.sub ? decoded.sub : 'Valued Client';
+
+        document.getElementById('welcomeUser').innerText = username;
+        document.getElementById('usernameDisplay').innerText = username;
+
+        // 2. Read Subscription from localStorage
+        const savedPlan = localStorage.getItem('selectedPlan');
+        const planDisplay = document.getElementById('planDisplay');
+        const planActionBtn = document.getElementById('planActionBtn');
+        const statusDisplay = document.getElementById('statusDisplay');
+
+        if (savedPlan) {
+            planDisplay.innerText = `${savedPlan} Package`;
+            planActionBtn.innerText = 'Upgrade / Change Tier';
+        } else {
+            planDisplay.innerText = 'No Active Plan';
+            planDisplay.style.background = '#eee';
+            planDisplay.style.color = '#666';
+            statusDisplay.innerText = 'Inactive';
+            statusDisplay.style.color = '#e53935';
+            planActionBtn.innerText = 'Select a Plan';
+        }
+    }
+
+    function handleLogout() {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('selectedPlan');
+        window.location.href = '/login.html';
     }
 </script>
 </body>

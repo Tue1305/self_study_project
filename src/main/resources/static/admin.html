@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - NailArt Studio</title>
+    <style>
+        :root {
+            --primary: #e91e63;
+            --dark: #2c3e50;
+            --light: #f8f9fa;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--light);
+            color: var(--dark);
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 40px;
+            background: #fff;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+
+        .logo { font-size: 1.4rem; font-weight: bold; color: var(--primary); }
+        .btn-logout {
+            background: transparent;
+            border: 1px solid var(--primary);
+            color: var(--primary);
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 40px auto;
+            padding: 0 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #fff;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        th, td {
+            padding: 15px 20px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        th {
+            background-color: var(--dark);
+            color: #fff;
+        }
+
+        .badge {
+            padding: 5px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .badge-active { background: #e8f5e9; color: #2e7d32; }
+        .badge-inactive { background: #ffebee; color: #c62828; }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="logo">Admin Portal</div>
+    <button class="btn-logout" onclick="handleLogout()">Log Out</button>
+</header>
+
+<div class="container">
+    <h2>Registered Users & Subscriptions</h2>
+    <table>
+        <thead>
+        <tr>
+            <th>User ID</th>
+            <th>Username</th>
+            <th>Subscription Tier</th>
+            <th>Status</th>
+        </tr>
+        </thead>
+        <tbody id="userTableBody">
+        <!-- User rows injected dynamically -->
+        </tbody>
+    </table>
+</div>
+
+<script>
+    const token = localStorage.getItem('accessToken');
+    if (!token) {
+        window.location.href = '/login.html';
+    } else {
+        loadUsers();
+    }
+
+    async function loadUsers() {
+        try {
+            const response = await fetch('/api/auth/admin/users', {
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+
+            if (response.ok) {
+                const users = await response.json();
+                const tableBody = document.getElementById('userTableBody');
+                tableBody.innerHTML = '';
+
+                users.forEach(user => {
+                    // Check if subscription info is saved locally or in DB
+                    const savedPlan = localStorage.getItem('selectedPlan') || 'None';
+                    const isActive = savedPlan !== 'None';
+
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                            <td>${user.id || 'N/A'}</td>
+                            <td>${user.username}</td>
+                            <td>${savedPlan}</td>
+                            <td>
+                                <span class="badge ${isActive ? 'badge-active' : 'badge-inactive'}">
+                                    ${isActive ? 'Active' : 'Inactive'}
+                                </span>
+                            </td>
+                        `;
+                    tableBody.appendChild(row);
+                });
+            } else {
+                alert('Failed to fetch users or unauthorized.');
+            }
+        } catch (err) {
+            console.error(err);
+        }
+    }
+
+    function handleLogout() {
+        localStorage.removeItem('accessToken');
+        window.location.href = '/login.html';
+    }
+</script>
+</body>
+</html>

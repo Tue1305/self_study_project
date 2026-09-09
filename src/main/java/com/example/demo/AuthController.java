@@ -41,7 +41,7 @@ public class AuthController {
 
             SecurityContextHolder.getContext().setAuthentication(authentication);
 
-            // Extract UserDetails to pass to JwtUtil
+            // Obtain UserDetails to pass to JwtUtil
             UserDetails userDetails = (UserDetails) authentication.getPrincipal();
             String jwt = jwtUtil.generateToken(userDetails);
 

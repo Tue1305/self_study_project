@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nail Gallery & Catalog - NailArt Studio</title>
+    <style>
+        :root {
+            --primary: #e91e63;
+            --dark: #2c3e50;
+            --light: #f8f9fa;
+            --gray: #666;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--light);
+            color: var(--dark);
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 40px;
+            background: #fff;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+
+        .logo { font-size: 1.4rem; font-weight: bold; color: var(--primary); }
+
+        .nav-links a {
+            margin-left: 20px;
+            color: var(--dark);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .nav-links a:hover { color: var(--primary); }
+
+        .container {
+            max-width: 1200px;
+            margin: 40px auto;
+            padding: 0 20px;
+        }
+
+        .page-title {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .page-title h1 {
+            color: var(--dark);
+            margin-bottom: 10px;
+        }
+
+        /* Flex Gallery Container */
+        .flex-gallery {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 25px;
+            justify-content: center;
+        }
+
+        /* Individual Product Card */
+        .product-card {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            width: 280px;
+            flex: 1 1 280px; /* Flex grow, shrink, and basis */
+            max-width: 350px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .product-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+        }
+
+        /* Image Container */
+        .product-image-container {
+            width: 100%;
+            height: 240px;
+            background-color: #eee;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .product-image-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover; /* Keeps image proportions clean */
+            transition: transform 0.3s ease;
+        }
+
+        .product-card:hover .product-image-container img {
+            transform: scale(1.05);
+        }
+
+        /* Product Details */
+        .product-info {
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+        }
+
+        .product-category {
+            font-size: 12px;
+            text-transform: uppercase;
+            color: var(--primary);
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .product-title {
+            font-size: 1.1rem;
+            margin: 0 0 10px 0;
+            color: var(--dark);
+        }
+
+        .product-price {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: var(--dark);
+            margin-bottom: 15px;
+        }
+
+        .btn-select {
+            margin-top: auto;
+            width: 100%;
+            padding: 10px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            text-align: center;
+            transition: background 0.2s ease;
+        }
+
+        .btn-select:hover {
+            background: #d81b60;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="logo">NailArt Studio</div>
+    <div class="nav-links">
+        <a href="/dashboard.html">Dashboard</a>
+        <a href="/subscription-plans.html">Subscription</a>
+        <a href="#" onclick="handleLogout()">Log Out</a>
+    </div>
+</header>
+
+<div class="container">
+    <div class="page-title">
+        <h1>Nail Design Catalog</h1>
+        <p>Explore our trending styles and custom press-on collections.</p>
+    </div>
+
+    <!-- Flexbox Gallery -->
+    <div class="flex-gallery">
+
+        <!-- Card 1 -->
+        <div class="product-card">
+            <div class="product-image-container">
+                <!-- ADD YOUR IMAGE PATH HERE (e.g., src="/images/nail1.jpg") -->
+                <img src="https://via.placeholder.com/350x240?text=Add+Nail+Image+1" alt="Classic French Tip">
+            </div>
+            <div class="product-info">
+                <div class="product-category">Classic Series</div>
+                <h3 class="product-title">Classic Minimalist French</h3>
+                <div class="product-price">$25.00</div>
+                <button class="btn-select" onclick="selectProduct('Classic Minimalist French')">Book Style</button>
+            </div>
+        </div>
+
+        <!-- Card 2 -->
+        <div class="product-card">
+            <div class="product-image-container">
+                <!-- ADD YOUR IMAGE PATH HERE -->
+                <img src="https://via.placeholder.com/350x240?text=Add+Nail+Image+2" alt="Glaze Chrome">
+            </div>
+            <div class="product-info">
+                <div class="product-category">Trending</div>
+                <h3 class="product-title">Pearl Glazed Chrome</h3>
+                <div class="product-price">$35.00</div>
+                <button class="btn-select" onclick="selectProduct('Pearl Glazed Chrome')">Book Style</button>
+            </div>
+        </div>
+
+        <!-- Card 3 -->
+        <div class="product-card">
+            <div class="product-image-container">
+                <!-- ADD YOUR IMAGE PATH HERE -->
+                <img src="https://via.placeholder.com/350x240?text=Add+Nail+Image+3" alt="Floral Art">
+            </div>
+            <div class="product-info">
+                <div class="product-category">Custom Art</div>
+                <h3 class="product-title">Hand-Painted Floral Set</h3>
+                <div class="product-price">$45.00</div>
+                <button class="btn-select" onclick="selectProduct('Hand-Painted Floral Set')">Book Style</button>
+            </div>
+        </div>
+
+        <!-- Card 4 -->
+        <div class="product-card">
+            <div class="product-image-container">
+                <!-- ADD YOUR IMAGE PATH HERE -->
+                <img src="https://via.placeholder.com/350x240?text=Add+Nail+Image+4" alt="Ombre Velvet">
+            </div>
+            <div class="product-info">
+                <div class="product-category">Luxury</div>
+                <h3 class="product-title">Velvet Magnetic Ombre</h3>
+                <div class="product-price">$50.00</div>
+                <button class="btn-select" onclick="selectProduct('Velvet Magnetic Ombre')">Book Style</button>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    // Check for JWT on load
+    const token = localStorage.getItem('accessToken');
+    if (!token) {
+        window.location.href = '/login.html';
+    }
+
+    function selectProduct(productName) {
+        alert(`Selected: ${productName}. Proceeding to booking...`);
+        // You can link this to your subscription or booking workflow
+    }
+
+    function handleLogout() {
+        localStorage.removeItem('accessToken');
+        window.location.href = '/login.html';
+    }
+</script>
+</body>
+</html>

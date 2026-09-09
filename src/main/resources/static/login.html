@@ -131,17 +131,15 @@
             const response = await fetch('/api/auth/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password })
+                body: JSON.stringify({
+                    username: usernameInput,
+                    password: passwordInput })
             });
 
             if (response.ok) {
                 const data = await response.json();
-
-                // Save the JWT token returned from Spring Boot
-                localStorage.setItem('accessToken', data.accessToken);
-
-                // Navigate to protected dashboard
-                window.location.href = '/dashboard.html';
+                localStorage.setItem('accessToken', data.accessToken);// Save the JWT token returned from Spring Boot
+                window.location.href = '/dashboard.html';  // Navigate to protected dashboard
             } else {
                 errorMsg.innerText = 'Invalid username or password.';
             }

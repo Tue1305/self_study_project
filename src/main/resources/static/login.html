@@ -132,18 +132,23 @@
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    username: usernameInput,
-                    password: passwordInput })
+                    username: username,
+                    password: password })
             });
 
             if (response.ok) {
                 const data = await response.json();
-                localStorage.setItem('accessToken', data.accessToken);// Save the JWT token returned from Spring Boot
-                window.location.href = '/dashboard.html';  // Navigate to protected dashboard
+                // Store token supporting both field names
+                const token = data.accessToken || data.token;
+                localStorage.setItem('accessToken', token);
+
+                // Force navigation to protected dashboard
+                window.location.assign('/dashboard.html');
             } else {
                 errorMsg.innerText = 'Invalid username or password.';
             }
         } catch (err) {
+            console.error('Login process error:', err);
             errorMsg.innerText = 'Unable to connect to the server.';
         }
     }

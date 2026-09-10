@@ -23,13 +23,4 @@ public class ApplicationConfig {
                 .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
     }
 
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
-
-    @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
-        return config.getAuthenticationManager();
-    }
 }

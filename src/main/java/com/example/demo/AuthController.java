@@ -11,6 +11,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -49,7 +50,12 @@ public class AuthController {
 
         } catch (BadCredentialsException e) {
             // Return explicit 401 Unauthorized instead of a generic 403 Forbidden on wrong password
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid username or password");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("message","Invalid username or password"));
+        } catch (Exception e) {
+            // Fallback for null pointers or missing beans
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("message", "An unexpected error occurred: " + e.getMessage()));
         }
     }
     @PostMapping("/register")

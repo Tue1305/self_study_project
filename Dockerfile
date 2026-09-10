@@ -1,14 +1,19 @@
-# Use official lightweight Java Runtime
-FROM eclipse-temurin:17-jre-alpine
+# Stage 1: Build the app
+FROM maven:3.9-eclipse-temurin-17-alpine AS builder
+WORKDIR /app
+COPY pom.xml .
+COPY src ./src
+RUN mvn clean package -DskipTests
 
-# Set working directory inside container
+# Stage 2: Create runtime container
+FROM eclipse-temurin:17-jdk-alpine
 WORKDIR /app
 
-# Copy executable jar from target folder into container
-COPY target/*.jar app.jar
+# Copy the generated JAR
+COPY --from=builder /app/target/*.jar app.jar
 
-# Expose Spring Boot port
+# Explicitly copy static resources into the container directory
+COPY src/main/resources/static /app/static
+
 EXPOSE 8080
-
-# Run application
 ENTRYPOINT ["java", "-jar", "app.jar"]

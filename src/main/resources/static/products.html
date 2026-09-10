@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nail Gallery & Catalog - NailArt Studio</title>
+    <title>Nail Gallery & Catalog - Jenny Nail Studio</title>
     <style>
         :root {
             --primary: #e91e63;
@@ -86,19 +86,21 @@
         /* Image Container */
         .product-image-container {
             width: 100%;
-            height: 240px;
-            background-color: #eee;
+            height: 240px; /* Explicit height */
+            overflow: hidden;
+            background-color: #f8f9fa;
             display: flex;
             align-items: center;
             justify-content: center;
-            overflow: hidden;
         }
 
         .product-image-container img {
             width: 100%;
             height: 100%;
-            object-fit: cover; /* Keeps image proportions clean */
-            transition: transform 0.3s ease;
+            object-fit: cover; /* Prevents image distortion */
+            display: block !important;
+            opacity: 1 !important;
+            visibility: visible !important;
         }
 
         .product-card:hover .product-image-container img {
@@ -157,11 +159,11 @@
 <body>
 
 <header>
-    <div class="logo">NailArt Studio</div>
+    <div class="logo">Jenny Nail Studio</div>
     <div class="nav-links">
-        <a href="/dashboard.html">Dashboard</a>
-        <a href="/subscription-plans.html">Subscription</a>
-        <a href="#" onclick="handleLogout()">Log Out</a>
+        <a href="/login.html">Log in</a>
+        <a href="/signup.html">Sign up</a>
+        <a href="/index.html">Subscription</a>
     </div>
 </header>
 
@@ -177,8 +179,7 @@
         <!-- Card 1 -->
         <div class="product-card">
             <div class="product-image-container">
-                <!-- ADD YOUR IMAGE PATH HERE (e.g., src="/images/nail1.jpg") -->
-                <img src="https://via.placeholder.com/350x240?text=Add+Nail+Image+1" alt="Classic French Tip">
+                <img src="/nail_collection/nail1.png" alt="Nail1">
             </div>
             <div class="product-info">
                 <div class="product-category">Classic Series</div>
@@ -191,8 +192,7 @@
         <!-- Card 2 -->
         <div class="product-card">
             <div class="product-image-container">
-                <!-- ADD YOUR IMAGE PATH HERE -->
-                <img src="https://via.placeholder.com/350x240?text=Add+Nail+Image+2" alt="Glaze Chrome">
+                <img src="/nail_collection/nail2.png" alt="Nail2">
             </div>
             <div class="product-info">
                 <div class="product-category">Trending</div>
@@ -205,8 +205,7 @@
         <!-- Card 3 -->
         <div class="product-card">
             <div class="product-image-container">
-                <!-- ADD YOUR IMAGE PATH HERE -->
-                <img src="https://via.placeholder.com/350x240?text=Add+Nail+Image+3" alt="Floral Art">
+                <img src="/nail_collection/nail3.png" alt="Nail3">
             </div>
             <div class="product-info">
                 <div class="product-category">Custom Art</div>
@@ -216,38 +215,35 @@
             </div>
         </div>
 
-        <!-- Card 4 -->
-        <div class="product-card">
-            <div class="product-image-container">
-                <!-- ADD YOUR IMAGE PATH HERE -->
-                <img src="https://via.placeholder.com/350x240?text=Add+Nail+Image+4" alt="Ombre Velvet">
-            </div>
-            <div class="product-info">
-                <div class="product-category">Luxury</div>
-                <h3 class="product-title">Velvet Magnetic Ombre</h3>
-                <div class="product-price">$50.00</div>
-                <button class="btn-select" onclick="selectProduct('Velvet Magnetic Ombre')">Book Style</button>
-            </div>
-        </div>
+<!--        &lt;!&ndash; Card 4 &ndash;&gt;-->
+<!--        <div class="product-card">-->
+<!--            <div class="product-image-container">-->
+<!--                &lt;!&ndash; ADD YOUR IMAGE PATH HERE &ndash;&gt;-->
+<!--                <img src="https://via.placeholder.com/350x240?text=Add+Nail+Image+4" alt="Ombre Velvet">-->
+<!--            </div>-->
+<!--            <div class="product-info">-->
+<!--                <div class="product-category">Luxury</div>-->
+<!--                <h3 class="product-title">Velvet Magnetic Ombre</h3>-->
+<!--                <div class="product-price">$50.00</div>-->
+<!--                <button class="btn-select" onclick="selectProduct('Velvet Magnetic Ombre')">Book Style</button>-->
+<!--            </div>-->
+<!--        </div>-->
 
     </div>
 </div>
 
 <script>
-    // Check for JWT on load
-    const token = localStorage.getItem('accessToken');
-    if (!token) {
-        window.location.href = '/login.html';
-    }
-
     function selectProduct(productName) {
-        alert(`Selected: ${productName}. Proceeding to booking...`);
-        // You can link this to your subscription or booking workflow
-    }
+        localStorage.setItem('selectedDesign', productName);
 
-    function handleLogout() {
-        localStorage.removeItem('accessToken');
-        window.location.href = '/login.html';
+        const token = localStorage.getItem('accessToken');
+        if (token) {
+            // Logged in -> go to dashboard to view booking
+            window.location.href = '/dashboard.html';
+        } else {
+            // Not logged in -> prompt login or subscription
+            window.location.href = '/login.html';
+        }
     }
 </script>
 </body>

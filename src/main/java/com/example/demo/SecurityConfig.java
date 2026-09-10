@@ -27,7 +27,12 @@ public class SecurityConfig {
                 .cors(Customizer.withDefaults()) // Ensure CORS pre-flight requests are permitted
                 // Set session management to stateless for JWT APIs
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-
+                .exceptionHandling(exception -> exception
+                        .authenticationEntryPoint((request, response, authException) -> {
+                            // Redirect Unauthenticated Users to login.html
+                            response.sendRedirect("/login.html");
+                        })
+                )
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 "/",
@@ -36,12 +41,17 @@ public class SecurityConfig {
                                 "/signup.html",
                                 "/admin.html",
                                 "/login.html",
-                                "/dashboard.html",
-                                "/products.html",
+//                                "/dashboard.html",
+                                "/products.html", // Public catalog
                                 "/favicon.ico",
                                 "/*.css",
                                 "/*.js",
-                                "/error"
+                                "/error",
+                                "/nail_collection/**",
+                                "/static/**", // Permitting image sub-folder
+                                "/*.png",
+                                "/*.jpg",
+                                "/*.jpeg"
                         ).permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
                         .anyRequest().authenticated()

@@ -3,12 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>User Dashboard - NailArt Studio</title>
+    <title>Work Portfolio - NailArt Studio</title>
     <style>
         :root {
             --primary: #e91e63;
+            --primary-hover: #d81b60;
             --dark: #2c3e50;
             --light: #f8f9fa;
+            --gray: #666;
+            --card-shadow: 0 4px 15px rgba(0,0,0,0.08);
         }
 
         body {
@@ -19,211 +22,325 @@
             color: var(--dark);
         }
 
+        /* Navigation Header */
         header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 15px 40px;
+            padding: 18px 40px;
             background: #fff;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            position: sticky;
+            top: 0;
+            z-index: 100;
         }
 
-        .logo { font-size: 1.4rem; font-weight: bold; color: var(--primary); }
-        .btn-logout {
-            background: transparent;
-            border: 1px solid var(--primary);
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
             color: var(--primary);
-            padding: 8px 16px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: bold;
+            letter-spacing: -0.5px;
         }
 
+        .nav-links a {
+            margin-left: 24px;
+            color: var(--dark);
+            text-decoration: none;
+            font-weight: 600;
+            transition: color 0.2s ease;
+        }
+
+        .nav-links a:hover { color: var(--primary); }
+
+        .btn-book {
+            background: var(--primary);
+            color: #fff !important;
+            padding: 8px 18px;
+            border-radius: 20px;
+            transition: background 0.2s ease !important;
+        }
+
+        .btn-book:hover { background: var(--primary-hover) !important; }
+
+        /* Main Container */
         .container {
-            max-width: 900px;
+            max-width: 1200px;
             margin: 40px auto;
             padding: 0 20px;
         }
 
-        .welcome-card {
-            background: #fff;
-            padding: 30px;
-            border-radius: 8px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
-            margin-bottom: 25px;
+        .hero-banner {
+            text-align: center;
+            margin-bottom: 40px;
         }
 
-        .welcome-card h1 {
-            margin: 0 0 10px 0;
+        .hero-banner h1 {
+            font-size: 2.2rem;
+            margin-bottom: 8px;
             color: var(--dark);
         }
 
-        .dashboard-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
+        .hero-banner p {
+            color: var(--gray);
+            font-size: 1.1rem;
+            margin: 0;
         }
 
-        .card {
+        /* Filter Controls */
+        .filter-container {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 35px;
+            flex-wrap: wrap;
+        }
+
+        .filter-btn {
             background: #fff;
-            padding: 25px;
-            border-radius: 8px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
-        }
-
-        .card h3 {
-            margin-top: 0;
-            color: var(--primary);
-            border-bottom: 2px solid #fce4ec;
-            padding-bottom: 10px;
-        }
-
-        .info-group {
-            margin-bottom: 15px;
-        }
-
-        .info-label {
-            font-size: 12px;
-            color: #777;
-            text-transform: uppercase;
-            font-weight: bold;
-        }
-
-        .info-value {
-            font-size: 16px;
-            font-weight: 600;
-            margin-top: 4px;
-        }
-
-        .badge-plan {
-            display: inline-block;
-            background: #fce4ec;
-            color: var(--primary);
-            padding: 6px 12px;
+            border: 1px solid #ddd;
+            padding: 8px 20px;
             border-radius: 20px;
-            font-weight: bold;
-            font-size: 14px;
+            font-weight: 600;
+            color: var(--gray);
+            cursor: pointer;
+            transition: all 0.2s ease;
         }
 
-        .btn-action {
-            display: inline-block;
-            margin-top: 15px;
-            padding: 10px 18px;
-            background: var(--dark);
+        .filter-btn:hover, .filter-btn.active {
+            background: var(--primary);
             color: #fff;
-            text-decoration: none;
-            border-radius: 4px;
-            font-size: 14px;
+            border-color: var(--primary);
+        }
+
+        /* Flexbox Showcase Gallery */
+        .showcase-gallery {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 25px;
+            justify-content: center;
+        }
+
+        /* Individual Card Item */
+        .gallery-card {
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: var(--card-shadow);
+            width: 280px;
+            flex: 1 1 280px;
+            max-width: 360px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transition: transform 0.25s ease, box-shadow 0.25s ease;
+        }
+
+        .gallery-card:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.12);
+        }
+
+        .image-wrapper {
+            position: relative;
+            width: 100%;
+            height: 280px;
+            background-color: #eee;
+            overflow: hidden;
+        }
+
+        .image-wrapper img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.35s ease;
+        }
+
+        .gallery-card:hover .image-wrapper img {
+            transform: scale(1.06);
+        }
+
+        .tag-badge {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: rgba(0,0,0,0.65);
+            color: #fff;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            backdrop-filter: blur(4px);
+        }
+
+        .card-body {
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+        }
+
+        .card-title {
+            font-size: 1.15rem;
+            margin: 0 0 8px 0;
+            color: var(--dark);
+            font-weight: 700;
+        }
+
+        .card-desc {
+            font-size: 0.9rem;
+            color: var(--gray);
+            margin: 0 0 15px 0;
+            line-height: 1.4;
+        }
+
+        .card-footer {
+            margin-top: auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-top: 1px solid #eee;
+            padding-top: 12px;
+        }
+
+        .tech-credit {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        .time-spent {
+            font-size: 0.8rem;
+            color: #888;
         }
     </style>
 </head>
 <body>
-
-<header>
-    <div class="logo">NailArt Studio</div>
-    <button class="btn-logout" onclick="handleLogout()">Log Out</button>
-</header>
-
-<div class="container">
-    <!-- Welcome Header -->
-    <div class="welcome-card">
-        <h1>Welcome back, <span id="welcomeUser">User</span>!</h1>
-        <p>Manage your active membership, appointments, and account details here.</p>
-    </div>
-
-    <div class="dashboard-grid">
-        <!-- Active Subscription Card -->
-        <div class="card">
-            <h3>Subscription Status</h3>
-
-            <div class="info-group">
-                <div class="info-label">Current Plan</div>
-                <div class="info-value">
-                    <span id="planDisplay" class="badge-plan">No Active Subscription</span>
-                </div>
-            </div>
-
-            <div class="info-group">
-                <div class="info-label">Status</div>
-                <div class="info-value" id="statusDisplay" style="color: #4CAF50;">Active</div>
-            </div>
-
-            <a href="/subscription-plans.html" class="btn-action" id="planActionBtn">Change Plan</a>
-        </div>
-
-        <!-- Account Information Card -->
-        <div class="card">
-            <h3>Account Information</h3>
-
-            <div class="info-group">
-                <div class="info-label">Username</div>
-                <div class="info-value" id="usernameDisplay">---</div>
-            </div>
-
-            <div class="info-group">
-                <div class="info-label">Authentication Method</div>
-                <div class="info-value">JWT Secure Session</div>
-            </div>
-
-            <div class="info-group">
-                <div class="info-label">Member Since</div>
-                <div class="info-value" id="memberSince">Today</div>
-            </div>
-        </div>
-    </div>
-</div>
-
 <script>
-    // Check for JWT on page load
+    // Guard: Require login for dashboard access
     const token = localStorage.getItem('accessToken');
     if (!token) {
-        // Redirect to login if unauthorized
         window.location.href = '/login.html';
-    } else {
-        initDashboard(token);
-    }
-
-    function parseJwt(token) {
-        try {
-            const base64Url = token.split('.')[1];
-            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-            return JSON.parse(window.atob(base64));
-        } catch (e) {
-            return null;
-        }
-    }
-
-    function initDashboard(jwtToken) {
-        // 1. Extract Username from JWT payload
-        const decoded = parseJwt(jwtToken);
-        const username = decoded && decoded.sub ? decoded.sub : 'Valued Client';
-
-        document.getElementById('welcomeUser').innerText = username;
-        document.getElementById('usernameDisplay').innerText = username;
-
-        // 2. Read Subscription from localStorage
-        const savedPlan = localStorage.getItem('selectedPlan');
-        const planDisplay = document.getElementById('planDisplay');
-        const planActionBtn = document.getElementById('planActionBtn');
-        const statusDisplay = document.getElementById('statusDisplay');
-
-        if (savedPlan) {
-            planDisplay.innerText = `${savedPlan} Package`;
-            planActionBtn.innerText = 'Upgrade / Change Tier';
-        } else {
-            planDisplay.innerText = 'No Active Plan';
-            planDisplay.style.background = '#eee';
-            planDisplay.style.color = '#666';
-            statusDisplay.innerText = 'Inactive';
-            statusDisplay.style.color = '#e53935';
-            planActionBtn.innerText = 'Select a Plan';
-        }
     }
 
     function handleLogout() {
         localStorage.removeItem('accessToken');
-        localStorage.removeItem('selectedPlan');
         window.location.href = '/login.html';
+    }
+</script>
+<header>
+    <div class="logo">NailArt Studio</div>
+    <div class="nav-links">
+        <a href="/dashboard.html">Showcase</a>
+        <a href="/products.html">Products</a>
+        <a href="/subscription-plans.html" class="btn-book">View Subscription Plans</a>
+    </div>
+</header>
+
+<div class="container">
+    <div class="hero-banner">
+        <h1>Recent Work & Client Creations</h1>
+        <p>Explore recent sets completed by our resident nail technician.</p>
+    </div>
+
+    <!-- Category Filters -->
+    <div class="filter-container">
+        <button class="filter-btn active" onclick="filterGallery('all')">All Sets</button>
+        <button class="filter-btn" onclick="filterGallery('gel')">Gel & Gel-X</button>
+        <button class="filter-btn" onclick="filterGallery('acrylic')">Acrylic Sets</button>
+        <button class="filter-btn" onclick="filterGallery('art')">Custom Art</button>
+    </div>
+
+    <!-- Showcase Gallery -->
+    <div class="showcase-gallery" id="galleryGrid">
+
+        <!-- Card 1 -->
+        <div class="gallery-card" data-category="gel">
+            <div class="image-wrapper">
+                <!-- Replace src with your image path (e.g., /images/set1.jpg) -->
+                <img src="https://via.placeholder.com/360x280?text=Short+Almond+Chrome" alt="Almond Chrome Set">
+                <span class="tag-badge">Gel-X</span>
+            </div>
+            <div class="card-body">
+                <h3 class="card-title">Short Almond Chrome</h3>
+                <p class="card-desc">Milky white base with iridescent pearl chrome dust finish.</p>
+                <div class="card-footer">
+                    <span class="tech-credit">Tech: @NailArtistry</span>
+                    <span class="time-spent">1 hr 15 mins</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 2 -->
+        <div class="gallery-card" data-category="art">
+            <div class="image-wrapper">
+                <img src="https://via.placeholder.com/360x280?text=Handpainted+Botanical" alt="Botanical Art">
+                <span class="tag-badge">Custom Art</span>
+            </div>
+            <div class="card-body">
+                <h3 class="card-title">Hand-Painted Botanical</h3>
+                <p class="card-desc">Matte nude background with fine line leaf detail and gold foil highlights.</p>
+                <div class="card-footer">
+                    <span class="tech-credit">Tech: @NailArtistry</span>
+                    <span class="time-spent">1 hr 45 mins</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 3 -->
+        <div class="gallery-card" data-category="acrylic">
+            <div class="image-wrapper">
+                <img src="https://via.placeholder.com/360x280?text=Coffin+Ombre+French" alt="Ombre French">
+                <span class="tag-badge">Acrylic</span>
+            </div>
+            <div class="card-body">
+                <h3 class="card-title">Coffin French Ombre</h3>
+                <p class="card-desc">Classic pink-and-white gradient extended coffin sculpt.</p>
+                <div class="card-footer">
+                    <span class="tech-credit">Tech: @NailArtistry</span>
+                    <span class="time-spent">1 hr 30 mins</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 4 -->
+        <div class="gallery-card" data-category="art">
+            <div class="image-wrapper">
+                <img src="https://via.placeholder.com/360x280?text=3D+Y2K+Jelly+Set" alt="3D Jelly Nails">
+                <span class="tag-badge">Custom Art</span>
+            </div>
+            <div class="card-body">
+                <h3 class="card-title">3D Y2K Jelly Sculpt</h3>
+                <p class="card-desc">Translucent pink jelly base layered with raised 3D gel swirls and charms.</p>
+                <div class="card-footer">
+                    <span class="tech-credit">Tech: @NailArtistry</span>
+                    <span class="time-spent">2 hrs</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    // Interactive Category Filter Logic (Client-Side, No Auth Required)
+    function filterGallery(category) {
+        const cards = document.querySelectorAll('.gallery-card');
+        const buttons = document.querySelectorAll('.filter-btn');
+
+        // Update active button state
+        buttons.forEach(btn => btn.classList.remove('active'));
+        event.target.classList.add('active');
+
+        // Filter cards
+        cards.forEach(card => {
+            const cardCategory = card.getAttribute('data-category');
+            if (category === 'all' || cardCategory === category) {
+                card.style.display = 'flex';
+            } else {
+                card.style.display = 'none';
+            }
+        });
     }
 </script>
 </body>

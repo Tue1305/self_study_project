@@ -48,6 +48,7 @@ public class SecurityConfig {
                                 "/login.html",
                                 "/dashboard.html",
                                 "/products.html", // Public catalog
+                                "/services.html",
                                 "/favicon.ico",
                                 "/*.css",
                                 "/*.js",

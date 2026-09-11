@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Services & Pricing - Jenny's Nail Studio</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico?v=2">
+    <style>
+        :root {
+            --primary: #e91e63;
+            --primary-hover: #d81b60;
+            --dark: #2c3e50;
+            --light: #f8f9fa;
+            --gray: #666;
+            --border: #eee;
+            --card-shadow: 0 4px 15px rgba(0,0,0,0.06);
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--light);
+            color: var(--dark);
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 18px 40px;
+            background: #fff;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .nav-links a {
+            margin-left: 24px;
+            color: var(--dark);
+            text-decoration: none;
+            font-weight: 600;
+            transition: color 0.2s;
+        }
+
+        .nav-links a:hover { color: var(--primary); }
+
+        .btn-book {
+            background: var(--primary);
+            color: #fff !important;
+            padding: 8px 18px;
+            border-radius: 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 40px auto;
+            padding: 0 20px;
+        }
+
+        .hero-banner {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .hero-banner h1 {
+            font-size: 2.2rem;
+            margin-bottom: 8px;
+        }
+
+        .hero-banner p {
+            color: var(--gray);
+            font-size: 1.1rem;
+        }
+
+        .service-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 25px;
+            margin-bottom: 40px;
+        }
+
+        .service-card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: var(--card-shadow);
+            border: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .service-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+        }
+
+        .service-title {
+            font-size: 1.2rem;
+            font-weight: 700;
+            margin: 0;
+        }
+
+        .service-desc {
+            color: var(--gray);
+            font-size: 0.95rem;
+            line-height: 1.4;
+            margin-bottom: 20px;
+        }
+
+        .category-title {
+            font-size: 1.4rem;
+            font-weight: 700;
+            margin: 40px 0 20px 0;
+            padding-bottom: 8px;
+            border-bottom: 2px solid var(--primary);
+            display: inline-block;
+        }
+
+        /* Extras Section */
+        .addons-card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: var(--card-shadow);
+            border: 1px solid var(--border);
+        }
+
+        .addon-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px dashed var(--border);
+        }
+
+        .addon-item:last-child {
+            border-bottom: none;
+        }
+
+        .addon-name {
+            font-weight: 600;
+        }
+
+        .addon-price {
+            color: var(--primary);
+            font-weight: 700;
+        }
+    </style>
+</head>
+<body>
+<header>
+    <div class="logo">Jenny's Nail Studio</div>
+    <div class="nav-links">
+        <a href="/login.html">Log in</a>
+        <a href="/signup.html">Sign up</a>
+        <a href="/index.html" class="btn-book">Subscription Plans</a>
+    </div>
+</header>
+
+<div class="container">
+    <div class="hero-banner">
+        <h1>Services & Pricing Menu</h1>
+        <p>Professional nail care, extensions, and custom hand-painted art.</p>
+    </div>
+
+    <div class="category-title">Main Services</div>
+    <div class="service-grid">
+
+        <!-- Bio Gel Extension -->
+        <div class="service-card">
+            <div>
+                <div class="service-header">
+                    <h3 class="service-title">Bio Full Set Extension</h3>
+                </div>
+                <p class="service-desc">Full set extension created longer using tips and high-quality bio gel sculpting.</p>
+            </div>
+        </div>
+
+        <!-- Bio Refill -->
+        <div class="service-card">
+            <div>
+                <div class="service-header">
+                    <h3 class="service-title">Bio Refill</h3>
+                </div>
+                <p class="service-desc">Maintenance fill for existing bio gel sets to restore structure and shine.</p>
+            </div>
+        </div>
+
+        <!-- Acrylic Full Set -->
+        <div class="service-card">
+            <div>
+                <div class="service-header">
+                    <h3 class="service-title">Acrylic Full Set</h3>
+                </div>
+                <p class="service-desc">Classic full acrylic set structured for enhanced durability and length.</p>
+            </div>
+        </div>
+
+        <!-- Acrylic Refill -->
+        <div class="service-card">
+            <div>
+                <div class="service-header">
+                    <h3 class="service-title">Acrylic Refill</h3>
+                </div>
+                <p class="service-desc">In-fill maintenance service for acrylic extensions as your natural nails grow.</p>
+            </div>
+        </div>
+
+        <!-- Manicure -->
+        <div class="service-card">
+            <div>
+                <div class="service-header">
+                    <h3 class="service-title">Shellac Manicure</h3>
+                </div>
+                <p class="service-desc">Complete natural nail care including nail trimming, detailed cuticle cleaning, and shellac polish application.</p>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Extras / Add-ons -->
+    <div class="category-title">Add-ons & Extras</div>
+    <div class="addons-card">
+        <div class="addon-item">
+            <span class="addon-name">Removal</span>
+            <span class="addon-price">$5</span>
+        </div>
+        <div class="addon-item">
+            <span class="addon-name">Trim Cuticle Extra</span>
+            <span class="addon-price">$10</span>
+        </div>
+        <div class="addon-item">
+            <span class="addon-name">Length: Medium</span>
+            <span class="addon-price">+$5</span>
+        </div>
+        <div class="addon-item">
+            <span class="addon-name">Length: Extra Long</span>
+            <span class="addon-price">+$10</span>
+        </div>
+        <div class="addon-item">
+            <span class="addon-name">Custom Nail Design</span>
+            <span class="addon-price">$10 & up</span>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>

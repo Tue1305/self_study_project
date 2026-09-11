@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Work Portfolio - NailArt Studio</title>
+    <title>Work Portfolio - Jenny's Nail Studio</title>
+    <!-- Favicon Tag -->
+    <link rel="icon" type="image/x-icon" href="/favicon.ico?=v2">
     <style>
         :root {
             --primary: #e91e63;
@@ -228,11 +230,11 @@
     }
 </script>
 <header>
-    <div class="logo">NailArt Studio</div>
+    <div class="logo">Jenny Nail Studio</div>
     <div class="nav-links">
-        <a href="/dashboard.html">Showcase</a>
-        <a href="/products.html">Products</a>
-        <a href="/subscription-plans.html" class="btn-book">View Subscription Plans</a>
+        <a href="/login.html">Log in</a>
+        <a href="/signup.html">Sign up</a>
+        <a href="/index.html" class="btn-book">View Subscription Plans</a>
     </div>
 </header>
 
@@ -245,7 +247,7 @@
     <!-- Category Filters -->
     <div class="filter-container">
         <button class="filter-btn active" onclick="filterGallery('all')">All Sets</button>
-        <button class="filter-btn" onclick="filterGallery('gel')">Gel & Gel-X</button>
+        <button class="filter-btn" onclick="filterGallery('gel')">Bio Gel</button>
         <button class="filter-btn" onclick="filterGallery('acrylic')">Acrylic Sets</button>
         <button class="filter-btn" onclick="filterGallery('art')">Custom Art</button>
     </div>
@@ -257,7 +259,7 @@
         <div class="gallery-card" data-category="gel">
             <div class="image-wrapper">
                 <!-- Replace src with your image path (e.g., /images/set1.jpg) -->
-                <img src="https://via.placeholder.com/360x280?text=Short+Almond+Chrome" alt="Almond Chrome Set">
+                <img src="/nail_collection/nail4.png" alt="Almond Chrome Set">
                 <span class="tag-badge">Gel-X</span>
             </div>
             <div class="card-body">
@@ -273,7 +275,7 @@
         <!-- Card 2 -->
         <div class="gallery-card" data-category="art">
             <div class="image-wrapper">
-                <img src="https://via.placeholder.com/360x280?text=Handpainted+Botanical" alt="Botanical Art">
+                <img src="/nail_collection/nail5.png" alt="Botanical Art">
                 <span class="tag-badge">Custom Art</span>
             </div>
             <div class="card-body">
@@ -289,7 +291,7 @@
         <!-- Card 3 -->
         <div class="gallery-card" data-category="acrylic">
             <div class="image-wrapper">
-                <img src="https://via.placeholder.com/360x280?text=Coffin+Ombre+French" alt="Ombre French">
+                <img src="/nail_collection/nail6.png" alt="Ombre French">
                 <span class="tag-badge">Acrylic</span>
             </div>
             <div class="card-body">
@@ -305,7 +307,135 @@
         <!-- Card 4 -->
         <div class="gallery-card" data-category="art">
             <div class="image-wrapper">
-                <img src="https://via.placeholder.com/360x280?text=3D+Y2K+Jelly+Set" alt="3D Jelly Nails">
+                <img src="/nail_collection/nail7.png" alt="3D Jelly Nails">
+                <span class="tag-badge">Custom Art</span>
+            </div>
+            <div class="card-body">
+                <h3 class="card-title">3D Y2K Jelly Sculpt</h3>
+                <p class="card-desc">Translucent pink jelly base layered with raised 3D gel swirls and charms.</p>
+                <div class="card-footer">
+                    <span class="tech-credit">Tech: @NailArtistry</span>
+                    <span class="time-spent">2 hrs</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 5 -->
+        <div class="gallery-card" data-category="art">
+            <div class="image-wrapper">
+                <img src="/nail_collection/nail8.png" alt="3D Jelly Nails">
+                <span class="tag-badge">Custom Art</span>
+            </div>
+            <div class="card-body">
+                <h3 class="card-title">3D Y2K Jelly Sculpt</h3>
+                <p class="card-desc">Translucent pink jelly base layered with raised 3D gel swirls and charms.</p>
+                <div class="card-footer">
+                    <span class="tech-credit">Tech: @NailArtistry</span>
+                    <span class="time-spent">2 hrs</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 6 -->
+        <div class="gallery-card" data-category="art">
+            <div class="image-wrapper">
+                <img src="/nail_collection/nail1.png" alt="3D Jelly Nails">
+                <span class="tag-badge">Custom Art</span>
+            </div>
+            <div class="card-body">
+                <h3 class="card-title">3D Y2K Jelly Sculpt</h3>
+                <p class="card-desc">Translucent pink jelly base layered with raised 3D gel swirls and charms.</p>
+                <div class="card-footer">
+                    <span class="tech-credit">Tech: @NailArtistry</span>
+                    <span class="time-spent">2 hrs</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 7 -->
+        <div class="gallery-card" data-category="art">
+            <div class="image-wrapper">
+                <img src="/nail_collection/nail10.png" alt="3D Jelly Nails">
+                <span class="tag-badge">Custom Art</span>
+            </div>
+            <div class="card-body">
+                <h3 class="card-title">3D Y2K Jelly Sculpt</h3>
+                <p class="card-desc">Translucent pink jelly base layered with raised 3D gel swirls and charms.</p>
+                <div class="card-footer">
+                    <span class="tech-credit">Tech: @NailArtistry</span>
+                    <span class="time-spent">2 hrs</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 8 -->
+        <div class="gallery-card" data-category="art">
+            <div class="image-wrapper">
+                <img src="/nail_collection/nail11.png" alt="3D Jelly Nails">
+                <span class="tag-badge">Custom Art</span>
+            </div>
+            <div class="card-body">
+                <h3 class="card-title">3D Y2K Jelly Sculpt</h3>
+                <p class="card-desc">Translucent pink jelly base layered with raised 3D gel swirls and charms.</p>
+                <div class="card-footer">
+                    <span class="tech-credit">Tech: @NailArtistry</span>
+                    <span class="time-spent">2 hrs</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 9 -->
+        <div class="gallery-card" data-category="art">
+            <div class="image-wrapper">
+                <img src="/nail_collection/nail12.png" alt="3D Jelly Nails">
+                <span class="tag-badge">Custom Art</span>
+            </div>
+            <div class="card-body">
+                <h3 class="card-title">3D Y2K Jelly Sculpt</h3>
+                <p class="card-desc">Translucent pink jelly base layered with raised 3D gel swirls and charms.</p>
+                <div class="card-footer">
+                    <span class="tech-credit">Tech: @NailArtistry</span>
+                    <span class="time-spent">2 hrs</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 10 -->
+        <div class="gallery-card" data-category="art">
+            <div class="image-wrapper">
+                <img src="/nail_collection/nail13.png" alt="3D Jelly Nails">
+                <span class="tag-badge">Custom Art</span>
+            </div>
+            <div class="card-body">
+                <h3 class="card-title">3D Y2K Jelly Sculpt</h3>
+                <p class="card-desc">Translucent pink jelly base layered with raised 3D gel swirls and charms.</p>
+                <div class="card-footer">
+                    <span class="tech-credit">Tech: @NailArtistry</span>
+                    <span class="time-spent">2 hrs</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 11 -->
+        <div class="gallery-card" data-category="art">
+            <div class="image-wrapper">
+                <img src="/nail_collection/nail2.png" alt="3D Jelly Nails">
+                <span class="tag-badge">Custom Art</span>
+            </div>
+            <div class="card-body">
+                <h3 class="card-title">3D Y2K Jelly Sculpt</h3>
+                <p class="card-desc">Translucent pink jelly base layered with raised 3D gel swirls and charms.</p>
+                <div class="card-footer">
+                    <span class="tech-credit">Tech: @NailArtistry</span>
+                    <span class="time-spent">2 hrs</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 12 -->
+        <div class="gallery-card" data-category="art">
+            <div class="image-wrapper">
+                <img src="/nail_collection/nail3.png" alt="3D Jelly Nails">
                 <span class="tag-badge">Custom Art</span>
             </div>
             <div class="card-body">

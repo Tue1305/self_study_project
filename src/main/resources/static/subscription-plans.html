@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Subscription Plans - Jenny's Nail Studio</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico?v=2">
+    <style>
+        :root {
+            --primary: #e91e63;
+            --primary-hover: #d81b60;
+            --dark: #2c3e50;
+            --light: #f8f9fa;
+            --gray: #666;
+            --border: #eee;
+            --card-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--light);
+            color: var(--dark);
+        }
+
+        /* Sticky Header */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 18px 40px;
+            background: #fff;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary);
+            text-decoration: none;
+        }
+
+        .nav-links a {
+            margin-left: 24px;
+            color: var(--dark);
+            text-decoration: none;
+            font-weight: 600;
+            transition: color 0.2s ease;
+        }
+
+        .nav-links a:hover { color: var(--primary); }
+
+        .btn-book {
+            background: var(--primary);
+            color: #fff !important;
+            padding: 8px 18px;
+            border-radius: 20px;
+        }
+
+        /* Container */
+        .container {
+            max-width: 1100px;
+            margin: 40px auto;
+            padding: 0 20px;
+        }
+
+        .hero-banner {
+            text-align: center;
+            margin-bottom: 50px;
+        }
+
+        .hero-banner h1 {
+            font-size: 2.2rem;
+            margin-bottom: 8px;
+            color: var(--dark);
+        }
+
+        .hero-banner p {
+            color: var(--gray);
+            font-size: 1.1rem;
+            margin: 0;
+        }
+
+        /* Plans Grid */
+        .plans-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            align-items: stretch;
+        }
+
+        .plan-card {
+            background: #fff;
+            border-radius: 16px;
+            padding: 35px 25px;
+            box-shadow: var(--card-shadow);
+            border: 2px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            transition: transform 0.25s ease, box-shadow 0.25s ease;
+        }
+
+        .plan-card:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 12px 30px rgba(0,0,0,0.12);
+        }
+
+        /* Highlight Featured VIP Plan */
+        .plan-card.featured {
+            border-color: var(--primary);
+        }
+
+        .popular-badge {
+            position: absolute;
+            top: -14px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--primary);
+            color: #fff;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            padding: 4px 16px;
+            border-radius: 12px;
+            letter-spacing: 0.5px;
+        }
+
+        .plan-name {
+            font-size: 1.4rem;
+            font-weight: 700;
+            margin: 0 0 10px 0;
+            text-align: center;
+        }
+
+        .plan-price {
+            text-align: center;
+            font-size: 2.5rem;
+            font-weight: 800;
+            color: var(--dark);
+            margin-bottom: 20px;
+        }
+
+        .plan-price span {
+            font-size: 1rem;
+            color: var(--gray);
+            font-weight: 600;
+        }
+
+        .plan-features {
+            list-style: none;
+            padding: 0;
+            margin: 0 0 30px 0;
+            flex-grow: 1;
+        }
+
+        .plan-features li {
+            padding: 10px 0;
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 0.95rem;
+            color: var(--gray);
+            display: flex;
+            align-items: center;
+        }
+
+        .plan-features li::before {
+            content: "✓";
+            color: var(--primary);
+            font-weight: bold;
+            margin-right: 10px;
+        }
+
+        .plan-btn {
+            display: block;
+            width: 100%;
+            text-align: center;
+            padding: 12px 0;
+            border-radius: 25px;
+            text-decoration: none;
+            font-weight: 700;
+            transition: all 0.2s ease;
+            box-sizing: border-box;
+            border: none;
+            cursor: pointer;
+        }
+
+        .btn-outline {
+            border: 2px solid var(--primary);
+            color: var(--primary);
+            background: transparent;
+        }
+
+        .btn-outline:hover {
+            background: var(--primary);
+            color: #fff;
+        }
+
+        .btn-solid {
+            background: var(--primary);
+            color: #fff;
+        }
+
+        .btn-solid:hover {
+            background: var(--primary-hover);
+        }
+    </style>
+</head>
+<body>
+
+<script>
+    // Guard: Require login for subscription plans page
+    const token = localStorage.getItem('accessToken');
+    if (!token) {
+        window.location.href = '/login.html';
+    }
+</script>
+
+<header>
+    <a href="/" class="logo">NailArt Studio</a>
+    <div class="nav-links">
+        <a href="/dashboard.html">Showcase</a>
+        <a href="/services.html">Services</a>
+        <a href="/subscription-plans.html" class="btn-book">Subscription Plans</a>
+    </div>
+</header>
+
+<div class="container">
+    <div class="hero-banner">
+        <h1>Client Membership & Subscription Plans</h1>
+        <p>Enjoy exclusive monthly savings, priority booking, and free refills.</p>
+    </div>
+
+    <div class="plans-grid">
+
+        <!-- Basic Plan -->
+        <div class="plan-card">
+            <h3 class="plan-name">Classic Care</h3>
+            <div class="plan-price">$45 <span>/ month</span></div>
+            <ul class="plan-features">
+                <li>1 Shellac Manicure per month</li>
+                <li>Free Removal with any service</li>
+                <li>10% off custom nail art</li>
+                <li>Standard booking window</li>
+            </ul>
+            <button class="plan-btn btn-outline" onclick="selectPlan('Classic Care')">Select Plan</button>
+        </div>
+
+        <!-- Featured VIP Plan -->
+        <div class="plan-card featured">
+            <span class="popular-badge">Most Popular</span>
+            <h3 class="plan-name">Bio / Acrylic VIP</h3>
+            <div class="plan-price">$75 <span>/ month</span></div>
+            <ul class="plan-features">
+                <li>2 Refills per month (Bio or Acrylic)</li>
+                <li>Free Medium Length Upgrade</li>
+                <li>Free Cuticle Trim Add-on</li>
+                <li>15% off custom nail design</li>
+                <li>Priority booking access</li>
+            </ul>
+            <button class="plan-btn btn-solid" onclick="selectPlan('Bio / Acrylic VIP')">Select VIP Plan</button>
+        </div>
+
+        <!-- Platinum Unlimited Plan -->
+        <div class="plan-card">
+            <h3 class="plan-name">NailArt Platinum</h3>
+            <div class="plan-price">$120 <span>/ month</span></div>
+            <ul class="plan-features">
+                <li>1 Full Set Extension per month</li>
+                <li>Unlimited Refills & Removals</li>
+                <li>Free Length Upgrade (Extra Long)</li>
+                <li>Free Custom Art on every set</li>
+                <li>VIP Priority Calendar Access</li>
+            </ul>
+            <button class="plan-btn btn-outline" onclick="selectPlan('NailArt Platinum')">Select Platinum</button>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    function selectPlan(planName) {
+        alert('You selected the ' + planName + ' plan! Subscription checkout integration coming soon.');
+    }
+</script>
+
+</body>
+</html>

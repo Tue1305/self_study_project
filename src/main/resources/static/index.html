@@ -3,12 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Jenny's Nail Studio - Subscription Plans</title>
+    <title>Jenny's Nail Studio - Custom Nail Sculpting & Artistry</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico?v=2">
     <style>
         :root {
             --primary: #e91e63;
+            --primary-hover: #d81b60;
             --dark: #2c3e50;
             --light: #f8f9fa;
+            --gray: #666;
+            --card-shadow: 0 4px 15px rgba(0,0,0,0.08);
         }
 
         body {
@@ -19,125 +23,279 @@
             color: var(--dark);
         }
 
+        /* Header Layout */
         header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 20px 50px;
+            padding: 18px 40px;
             background: #fff;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            position: sticky;
+            top: 0;
+            z-index: 100;
         }
 
-        .logo { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
-        .auth-btns button {
-            margin-left: 10px;
-            padding: 8px 16px;
-            border-radius: 4px;
-            border: 1px solid var(--primary);
-            cursor: pointer;
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
         }
-        .btn-login { background: transparent; color: var(--primary); }
-        .btn-signup { background: var(--primary); color: #fff; }
 
-        .hero { text-align: center; padding: 50px 20px; }
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary);
+            text-decoration: none;
+        }
 
-        .pricing-container {
+        /* User Greeting Badge on Top Left */
+        .user-badge {
+            display: none; /* Shown dynamically via JS */
+            align-items: center;
+            gap: 8px;
+            background: #fff0f5;
+            color: var(--primary);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            border: 1px solid #f8bbd0;
+        }
+
+        .user-badge .icon {
+            font-size: 1.1rem;
+        }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .nav-links a {
+            color: var(--dark);
+            text-decoration: none;
+            font-weight: 600;
+            transition: color 0.2s ease;
+        }
+
+        .nav-links a:hover { color: var(--primary); }
+
+        .btn-primary {
+            background: var(--primary);
+            color: #fff !important;
+            padding: 10px 22px;
+            border-radius: 20px;
+            transition: background 0.2s ease !important;
+        }
+
+        .btn-primary:hover { background: var(--primary-hover) !important; }
+
+        .btn-secondary {
+            border: 2px solid var(--primary);
+            color: var(--primary) !important;
+            padding: 8px 20px;
+            border-radius: 20px;
+            transition: all 0.2s ease !important;
+        }
+
+        .btn-secondary:hover {
+            background: var(--primary);
+            color: #fff !important;
+        }
+
+        /* Hero Section */
+        .hero {
+            padding: 80px 20px;
+            text-align: center;
+            background: #fff;
+            border-bottom: 1px solid #eee;
+        }
+
+        .hero h1 {
+            font-size: 2.8rem;
+            margin-bottom: 16px;
+            color: var(--dark);
+        }
+
+        .hero p {
+            font-size: 1.2rem;
+            color: var(--gray);
+            max-width: 600px;
+            margin: 0 auto 32px auto;
+            line-height: 1.5;
+        }
+
+        .hero-actions {
             display: flex;
             justify-content: center;
-            gap: 20px;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .container {
             max-width: 1100px;
-            margin: 0 auto 50px auto;
+            margin: 50px auto;
             padding: 0 20px;
         }
 
-        .card {
-            background: #fff;
-            border-radius: 8px;
-            padding: 30px;
-            flex: 1;
+        .section-title {
             text-align: center;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            transition: transform 0.2s;
+            font-size: 1.8rem;
+            margin-bottom: 30px;
         }
 
-        .card:hover { transform: translateY(-5px); }
-        .card.popular { border: 2px solid var(--primary); }
+        .teaser-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 24px;
+        }
 
-        .price { font-size: 2rem; color: var(--primary); margin: 15px 0; }
-        .features { list-style: none; padding: 0; text-align: left; margin-bottom: 25px; }
-        .features li { padding: 8px 0; border-bottom: 1px solid #eee; }
+        .teaser-card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: var(--card-shadow);
+            border: 1px solid #eee;
+            text-align: center;
+        }
 
-        .btn-plan {
-            width: 100%;
-            padding: 10px;
-            background: var(--dark);
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
+        .teaser-card h3 {
+            color: var(--primary);
+            margin-top: 0;
+        }
+
+        .teaser-card p {
+            color: var(--gray);
+            font-size: 0.95rem;
         }
     </style>
 </head>
 <body>
 
 <header>
-    <div class="logo">Jenny's Nail Studio </div>
-    <div class="auth-btns">
-        <button class="btn-login" onclick="location.href='/login.html'">Login</button>
-        <button class="btn-signup" onclick="location.href='/signup.html'">Sign Up</button>
+    <div class="header-left">
+        <a href="/" class="logo">NailArt Studio</a>
+        <!-- User Badge shown next to logo when logged in -->
+        <div class="user-badge" id="userBadge">
+            <span class="icon">✨</span>
+            <span id="usernameDisplay">Client</span>
+        </div>
+    </div>
+
+    <div class="nav-links" id="authNav">
+        <!-- Injected via JavaScript -->
     </div>
 </header>
 
+<!-- Hero Banner -->
 <section class="hero">
-    <h1>Select Your Nail Care Subscription</h1>
-    <p>Unlimited style, monthly fresh sets, and premium care.</p>
+    <h1 id="heroHeading">Custom Nail Extensions & Hand-Painted Artistry</h1>
+    <p id="heroSubheading">Elevate your personal style with professional Bio Gel, Acrylic sculpting, and high-shine Shellac manicures.</p>
+
+    <div class="hero-actions" id="heroAction">
+        <!-- Injected via JavaScript -->
+    </div>
 </section>
 
-<div class="pricing-container">
-    <!-- Basic Package -->
-    <div class="card">
-        <h3>Basic</h3>
-        <div class="price">$29<span>/mo</span></div>
-        <ul class="features">
-            <li>✔ 1 Full Gel Set per Month</li>
-            <li>✔ Standard Nail Art</li>
-            <li>✔ Free Removal</li>
-        </ul>
-        <button class="btn-plan" onclick="selectPlan('Basic')">Choose Basic</button>
-    </div>
+<div class="container">
+    <h2 class="section-title">Popular Services Overview</h2>
 
-    <!-- Professional Package -->
-    <div class="card popular">
-        <h3>Professional</h3>
-        <div class="price">$59<span>/mo</span></div>
-        <ul class="features">
-            <li>✔ 2 Full Sets or Fills per Month</li>
-            <li>✔ Custom 3D & Premium Art</li>
-            <li>✔ Priority Booking Window</li>
-            <li>✔ Complimentary Cuticle Care</li>
-        </ul>
-        <button class="btn-plan" style="background: var(--primary);" onclick="selectPlan('Professional')">Choose Pro</button>
-    </div>
-
-    <!-- Ultimate Package -->
-    <div class="card">
-        <h3>Ultimate</h3>
-        <div class="price">$99<span>/mo</span></div>
-        <ul class="features">
-            <li>✔ Unlimited Fills & Maintenance</li>
-            <li>✔ Any Luxury Nail Art & Jewels</li>
-            <li>✔ VIP Emergency Repairs</li>
-            <li>✔ Free Monthly Hand Spa Treatment</li>
-        </ul>
-        <button class="btn-plan" onclick="selectPlan('Ultimate')">Choose Ultimate</button>
+    <div class="teaser-grid">
+        <div class="teaser-card">
+            <h3>Bio Gel Full Set</h3>
+            <p>Durable extensions crafted with tips and high-quality sculpting gel for maximum strength.</p>
+        </div>
+        <div class="teaser-card">
+            <h3>Acrylic Extensions</h3>
+            <p>Classic full set extensions tailored to your preferred length and shape.</p>
+        </div>
+        <div class="teaser-card">
+            <h3>Shellac Manicure</h3>
+            <p>Nail trimming, detailed cuticle cleanup, and long-lasting glossy shellac finish.</p>
+        </div>
     </div>
 </div>
 
 <script>
-    function selectPlan(planName) {
-        localStorage.setItem('selectedPlan', planName);
-        window.location.href = '/signup.html';
+    // Utility to decode JWT token payload without external libraries
+    function parseJwt(token) {
+        try {
+            const base64Url = token.split('.')[1];
+            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+            const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+                return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+            }).join(''));
+
+            return JSON.parse(jsonPayload);
+        } catch (e) {
+            return null;
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const token = localStorage.getItem('accessToken');
+        const username = localStorage.getItem('username'); // Fallback or direct storage
+
+        const authNav = document.getElementById('authNav');
+        const heroAction = document.getElementById('heroAction');
+        const userBadge = document.getElementById('userBadge');
+        const usernameDisplay = document.getElementById('usernameDisplay');
+        const heroHeading = document.getElementById('heroHeading');
+
+        if (token) {
+            // Retrieve username from stored localStorage or parse from JWT 'sub' claim
+            let activeUser = username;
+            if (!activeUser) {
+                const decodedToken = parseJwt(token);
+                activeUser = decodedToken ? (decodedToken.sub || decodedToken.username) : 'Client';
+            }
+
+            // Display Username in Header
+            usernameDisplay.textContent = activeUser;
+            userBadge.style.display = 'flex';
+
+            // Personalize Hero Header
+            heroHeading.textContent = `Welcome back, ${activeUser}!`;
+
+            // Logged-in Navigation Links
+            authNav.innerHTML = `
+                <a href="/dashboard.html">Showcase</a>
+                <a href="/services.html">Services</a>
+                <a href="/subscription-plans.html">Subscriptions</a>
+                <a href="#" onclick="handleLogout()" class="btn-secondary">Logout</a>
+            `;
+
+            // Logged-in Hero Actions
+            heroAction.innerHTML = `
+                <a href="/dashboard.html" class="btn-primary">View Client Showcase</a>
+                <a href="/services.html" class="btn-secondary">View Services & Pricing</a>
+            `;
+        } else {
+            // Guest View
+            userBadge.style.display = 'none';
+
+            authNav.innerHTML = `
+                <a href="/services.html">Services</a>
+                <a href="/login.html">Log In</a>
+                <a href="/signup.html">Sign Up</a>
+                <a href="/subscription-plans.html" class="btn-primary">Subscriptions</a>
+            `;
+
+            heroAction.innerHTML = `
+                <a href="/services.html" class="btn-primary">Explore Services & Menu</a>
+                <a href="/login.html" class="btn-secondary">Client Log In</a>
+            `;
+        }
+    });
+
+    function handleLogout() {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('username');
+        window.location.reload();
     }
 </script>
+
 </body>
 </html>

@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Profile - NailArt Studio</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico?v=2">
+    <style>
+        :root {
+            --primary: #e91e63;
+            --primary-hover: #d81b60;
+            --dark: #2c3e50;
+            --light: #f8f9fa;
+            --gray: #666;
+            --border: #eee;
+            --card-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--light);
+            color: var(--dark);
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 18px 40px;
+            background: #fff;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary);
+            text-decoration: none;
+        }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .nav-links a {
+            color: var(--dark);
+            text-decoration: none;
+            font-weight: 600;
+            transition: color 0.2s;
+        }
+
+        .nav-links a:hover { color: var(--primary); }
+
+        .btn-outline {
+            border: 2px solid var(--primary);
+            color: var(--primary) !important;
+            padding: 6px 16px;
+            border-radius: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 0 20px;
+        }
+
+        .profile-card {
+            background: #fff;
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: var(--card-shadow);
+            border: 1px solid var(--border);
+            margin-bottom: 24px;
+        }
+
+        .profile-header {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 24px;
+        }
+
+        .avatar-circle {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            background: #fce4ec;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            font-weight: bold;
+        }
+
+        .user-meta h2 {
+            margin: 0 0 4px 0;
+            font-size: 1.5rem;
+        }
+
+        .role-badge {
+            display: inline-block;
+            background: #e3f2fd;
+            color: #1976d2;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 20px;
+        }
+
+        .info-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .info-label {
+            font-size: 0.85rem;
+            color: var(--gray);
+            margin-bottom: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .info-value {
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        /* Subscription Box */
+        .sub-box {
+            background: linear-gradient(135deg, #fff0f5 0%, #fff 100%);
+            border: 2px solid #f8bbd0;
+            border-radius: 12px;
+            padding: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .status-pill {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            margin-top: 6px;
+        }
+
+        .status-active { background: #e8f5e9; color: #2e7d32; }
+        .status-inactive { background: #ffebee; color: #c62828; }
+
+        .btn-upgrade {
+            background: var(--primary);
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 20px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+
+        .btn-upgrade:hover { background: var(--primary-hover); }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="header-left">
+        <a href="/" class="logo">Jenny's Nail Studio</a>
+        <!-- User Badge shown next to logo when logged in -->
+        <div class="user-badge" id="userBadge">
+            <span class="icon">✨</span>
+            <span id="usernameDisplay">Client</span>
+        </div>
+    </div>
+    <div class="nav-links">
+        <a href="/dashboard.html">Showcase</a>
+        <a href="/services.html">Services</a>
+        <a href="/subscription-plans.html">Subscriptions</a>
+        <a href="/profile.html" style="color: var(--primary);">Profile</a>
+        <a href="#" onclick="handleLogout()" class="btn-outline">Logout</a>
+    </div>
+</header>
+
+<div class="container">
+
+    <!-- Account Details Card -->
+    <div class="profile-card">
+        <div class="profile-header">
+            <div class="avatar-circle" id="avatarLetter">U</div>
+            <div class="user-meta">
+                <h2 id="profileUsername">Loading...</h2>
+                <span class="role-badge" id="profileRole">CLIENT</span>
+            </div>
+        </div>
+
+        <div class="info-grid">
+            <div class="info-item">
+                <span class="info-label">Account Status</span>
+                <span class="info-value" style="color: #2e7d32;">Active</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Preferred Studio</span>
+                <span class="info-value">NailArt Studio Main</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Subscription Card -->
+    <div class="profile-card">
+        <h3 style="margin-top: 0; margin-bottom: 20px;">Active Membership</h3>
+        <div class="sub-box">
+            <div>
+                <span class="info-label">Current Tier</span>
+                <div class="info-value" id="subPlanName" style="font-size: 1.3rem; color: var(--primary);">Loading...</div>
+                <div id="subStatusBadge" class="status-pill status-inactive">INACTIVE</div>
+            </div>
+            <a href="/subscription-plans.html" class="btn-upgrade">Manage / Upgrade Plan</a>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    const token = localStorage.getItem('accessToken');
+    if (!token) {
+        window.location.href = '/login.html';
+    }
+
+    async function loadUserProfile() {
+        try {
+            const response = await fetch('/api/subscriptions/current', {
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+
+            const storedUser = localStorage.getItem('username') || 'Client';
+
+            document.getElementById('profileUsername').textContent = storedUser;
+            document.getElementById('avatarLetter').textContent = storedUser.charAt(0).toUpperCase();
+
+            if (response.ok) {
+                const data = await response.json();
+                const plan = data.subscriptionPlan || 'None';
+                const status = data.subscriptionStatus || 'INACTIVE';
+
+                document.getElementById('subPlanName').textContent = plan;
+
+                const badge = document.getElementById('subStatusBadge');
+                badge.textContent = status;
+                badge.className = 'status-pill ' + (status === 'ACTIVE' ? 'status-active' : 'status-inactive');
+            }
+        } catch (err) {
+            console.error('Error fetching profile details:', err);
+        }
+    }
+
+    function handleLogout() {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('username');
+        window.location.href = '/login.html';
+    }
+
+    loadUserProfile();
+</script>
+
+</body>
+</html>

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Work Portfolio - Jenny's Nail Studio</title>
     <!-- Favicon Tag -->
-    <link rel="icon" type="image/x-icon" href="/favicon.ico?=v2">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico?v=2">
     <style>
         :root {
             --primary: #e91e63;
@@ -37,15 +37,45 @@
             z-index: 100;
         }
 
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
         .logo {
             font-size: 1.5rem;
             font-weight: 700;
             color: var(--primary);
             letter-spacing: -0.5px;
+            text-decoration: none;
+        }
+
+        /* User Badge on Top Left */
+        .user-badge {
+            display: none; /* Shown dynamically via JavaScript */
+            align-items: center;
+            gap: 8px;
+            background: #fff0f5;
+            color: var(--primary);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            border: 1px solid #f8bbd0;
+        }
+
+        .user-badge .icon {
+            font-size: 1.1rem;
+        }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 20px;
         }
 
         .nav-links a {
-            margin-left: 24px;
             color: var(--dark);
             text-decoration: none;
             font-weight: 600;
@@ -63,6 +93,19 @@
         }
 
         .btn-book:hover { background: var(--primary-hover) !important; }
+
+        .btn-outline {
+            border: 2px solid var(--primary);
+            color: var(--primary) !important;
+            padding: 6px 16px;
+            border-radius: 20px;
+            transition: all 0.2s ease;
+        }
+
+        .btn-outline:hover {
+            background: var(--primary);
+            color: #fff !important;
+        }
 
         /* Main Container */
         .container {
@@ -218,38 +261,33 @@
     </style>
 </head>
 <body>
-<script>
-    // Guard: Require login for dashboard access
-    const token = localStorage.getItem('accessToken');
-    if (!token) {
-        window.location.href = '/login.html';
-    }
-    function handleLogout() {
-        localStorage.removeItem('accessToken');
-        window.location.href = '/login.html';
-    }
-</script>
+
 <header>
-    <div class="logo">Jenny Nail Studio</div>
-    <div class="nav-links">
-        <a href="/login.html">Log in</a>
-        <a href="/signup.html">Sign up</a>
-        <a href="/index.html" class="btn-book">View Subscription Plans</a>
+    <div class="header-left">
+        <a href="/" class="logo">Jenny's Nail Studio</a>
+        <!-- User Badge shown next to logo when logged in -->
+        <div class="user-badge" id="userBadge">
+            <span class="icon">✨</span>
+            <span id="usernameDisplay">Client</span>
+        </div>
+    </div>
+    <div class="nav-links" id="authNav">
+        <!-- Injected dynamically via JavaScript -->
     </div>
 </header>
 
 <div class="container">
     <div class="hero-banner">
-        <h1>Recent Work & Client Creations</h1>
+        <h1 id="heroTitle">Recent Work & Client Creations</h1>
         <p>Explore recent sets completed by our resident nail technician.</p>
     </div>
 
     <!-- Category Filters -->
     <div class="filter-container">
-        <button class="filter-btn active" onclick="filterGallery('all')">All Sets</button>
-        <button class="filter-btn" onclick="filterGallery('gel')">Bio Gel</button>
-        <button class="filter-btn" onclick="filterGallery('acrylic')">Acrylic Sets</button>
-        <button class="filter-btn" onclick="filterGallery('art')">Custom Art</button>
+        <button class="filter-btn active" onclick="filterGallery(event, 'all')">All Sets</button>
+        <button class="filter-btn" onclick="filterGallery(event, 'gel')">Bio Gel</button>
+        <button class="filter-btn" onclick="filterGallery(event, 'acrylic')">Acrylic Sets</button>
+        <button class="filter-btn" onclick="filterGallery(event, 'art')">Custom Art</button>
     </div>
 
     <!-- Showcase Gallery -->
@@ -258,7 +296,6 @@
         <!-- Card 1 -->
         <div class="gallery-card" data-category="gel">
             <div class="image-wrapper">
-                <!-- Replace src with your image path (e.g., /images/set1.jpg) -->
                 <img src="/nail_collection/nail4.png" alt="Almond Chrome Set">
                 <span class="tag-badge">Gel-X</span>
             </div>
@@ -452,16 +489,73 @@
 </div>
 
 <script>
-    // Interactive Category Filter Logic (Client-Side, No Auth Required)
-    function filterGallery(category) {
+    // Helper function to decode JWT claims safely
+    function parseJwt(token) {
+        try {
+            const base64Url = token.split('.')[1];
+            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+            const jsonPayload = decodeURIComponent(atob(base64).split('').map(c => {
+                return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+            }).join(''));
+            return JSON.parse(jsonPayload);
+        } catch (e) {
+            return null;
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const token = localStorage.getItem('accessToken');
+        const storedUser = localStorage.getItem('username');
+        const userBadge = document.getElementById('userBadge');
+        const usernameDisplay = document.getElementById('usernameDisplay');
+        const authNav = document.getElementById('authNav');
+
+        if (token) {
+            // Retrieve username from localStorage or fallback to parsing the JWT token subject
+            let activeUser = storedUser;
+            if (!activeUser) {
+                const decodedToken = parseJwt(token);
+                activeUser = decodedToken ? (decodedToken.sub || decodedToken.username) : 'Client';
+            }
+
+            // Display User Badge
+            usernameDisplay.textContent = activeUser;
+            userBadge.style.display = 'flex';
+
+            // Populate Logged-In Header Links
+            authNav.innerHTML = `
+                <a href="/dashboard.html" style="color: var(--primary);">Showcase</a>
+                <a href="/services.html">Services</a>
+                <a href="/subscription-plans.html">Subscriptions</a>
+                <a href="/profile.html">Profile</a>
+                <a href="#" onclick="handleLogout()" class="btn-outline">Logout</a>
+            `;
+        } else {
+            // Guest Header Links
+            userBadge.style.display = 'none';
+            authNav.innerHTML = `
+                <a href="/services.html">Services</a>
+                <a href="/subscription-plans.html">Subscriptions</a>
+                <a href="/login.html">Log in</a>
+                <a href="/signup.html" class="btn-book">Sign up</a>
+            `;
+        }
+    });
+
+    function handleLogout() {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('username');
+        window.location.href = '/login.html';
+    }
+
+    // Category Filter Logic
+    function filterGallery(evt, category) {
         const cards = document.querySelectorAll('.gallery-card');
         const buttons = document.querySelectorAll('.filter-btn');
 
-        // Update active button state
         buttons.forEach(btn => btn.classList.remove('active'));
-        event.target.classList.add('active');
+        evt.target.classList.add('active');
 
-        // Filter cards
         cards.forEach(card => {
             const cardCategory = card.getAttribute('data-category');
             if (category === 'all' || cardCategory === category) {

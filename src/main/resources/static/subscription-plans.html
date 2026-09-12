@@ -210,21 +210,17 @@
     </style>
 </head>
 <body>
-
-<script>
-    // Guard: Require login for subscription plans page
-    const token = localStorage.getItem('accessToken');
-    if (!token) {
-        window.location.href = '/login.html';
-    }
-</script>
-
 <header>
-    <a href="/" class="logo">NailArt Studio</a>
-    <div class="nav-links">
-        <a href="/dashboard.html">Showcase</a>
-        <a href="/services.html">Services</a>
-        <a href="/subscription-plans.html" class="btn-book">Subscription Plans</a>
+    <div class="header-left">
+        <a href="/" class="logo">Jenny's Nail Studio</a>
+        <!-- User Badge shown next to logo when logged in -->
+        <div class="user-badge" id="userBadge">
+            <span class="icon">✨</span>
+            <span id="usernameDisplay">Client</span>
+        </div>
+    </div>
+    <div class="nav-links" id="authNav">
+        <!-- Dynamically filled based on login status -->
     </div>
 </header>
 
@@ -282,8 +278,84 @@
 </div>
 
 <script>
-    function selectPlan(planName) {
-        alert('You selected the ' + planName + ' plan! Subscription checkout integration coming soon.');
+    const token = localStorage.getItem('accessToken');
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const authNav = document.getElementById('authNav');
+
+        if (token) {
+            // Logged-in navigation
+            authNav.innerHTML = `
+                <a href="/dashboard.html">Showcase</a>
+                <a href="/services.html">Services</a>
+                <a href="/subscription-plans.html" style="color: var(--primary);">Subscriptions</a>
+                <a href="#" onclick="handleLogout()" class="btn-outline" style="padding: 6px 16px;">Logout</a>
+            `;
+            loadCurrentSubscription();
+        } else {
+            // Guest navigation
+            authNav.innerHTML = `
+                <a href="/services.html">Services</a>
+                <a href="/subscription-plans.html" style="color: var(--primary);">Subscriptions</a>
+                <a href="/login.html">Log In</a>
+                <a href="/signup.html" class="btn-book">Sign Up</a>
+            `;
+        }
+    });
+
+    // Check if logged-in user already has an active subscription
+    async function loadCurrentSubscription() {
+        try {
+            const response = await fetch('/api/subscriptions/current', {
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                if (data.subscriptionStatus === 'ACTIVE') {
+                    console.log('Active plan:', data.subscriptionPlan);
+                }
+            }
+        } catch (err) {
+            console.error('Failed to load subscription status:', err);
+        }
+    }
+
+    // Handle button click for both guests and logged-in users
+    async function selectPlan(planName) {
+        if (!token) {
+            alert(`Please log in or create an account to subscribe to the ${planName} plan.`);
+            window.location.href = '/login.html';
+            return;
+        }
+
+        if (!confirm(`Confirm subscription to ${planName}?`)) return;
+
+        try {
+            const response = await fetch('/api/subscriptions/subscribe', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + token
+                },
+                body: JSON.stringify({ planName: planName })
+            });
+
+            if (response.ok) {
+                alert(`🎉 Success! You are now subscribed to ${planName}.`);
+                window.location.reload();
+            } else {
+                alert('Failed to update subscription. Please try again.');
+            }
+        } catch (err) {
+            console.error('Subscription error:', err);
+        }
+    }
+
+    function handleLogout() {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('username');
+        window.location.reload();
     }
 </script>
 

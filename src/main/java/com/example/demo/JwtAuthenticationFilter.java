@@ -35,7 +35,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 || path.startsWith("/nail_collection/") // <--- BYPASS FILTER FOR IMAGES
                 || path.equals("/")
                 || path.equals("/error")
-                || path.equals("/index.html")
+                || path.equals("/templates/customers/index.html")
                 || path.equals("/signup.html")
                 || path.equals("/login.html")
                 || path.equals("/admin.html")

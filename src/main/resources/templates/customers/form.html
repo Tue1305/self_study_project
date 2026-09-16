@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title th:text="${customer.id == null ? 'Add Customer' : 'Edit Customer'}">Customer Form</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+</head>
+<body class="container mt-4" style="max-width: 600px;">
+
+<h2 th:text="${customer.id == null ? 'Add New Customer' : 'Edit Customer'}" class="mb-4">Customer Form</h2>
+
+<form th:action="@{/templates/customers}" th:object="${customer}" method="post">
+    <!-- Hidden input to hold ID when editing -->
+    <input type="hidden" th:field="*{id}" />
+
+    <div class="mb-3">
+        <label class="form-label">Full Name:</label>
+        <input type="text" th:field="*{name}" class="form-control" required />
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Email:</label>
+        <input type="email" th:field="*{email}" class="form-control" required />
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Phone:</label>
+        <input type="text" th:field="*{phone}" class="form-control" />
+    </div>
+
+    <button type="submit" class="btn btn-success">Save</button>
+    <a th:href="@{/templates/customers}" class="btn btn-secondary">Cancel</a>
+</form>
+
+</body>
+</html>

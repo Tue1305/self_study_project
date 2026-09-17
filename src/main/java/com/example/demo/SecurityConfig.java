@@ -41,7 +41,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 "/",
-                                "/templates/customers/index.html",
+                                "/customers/**",
+                                "/templates/customers/**",
                                 "/profile.html",
                                 "/subscription-plans.html",
                                 "/signup.html",

@@ -29,6 +29,8 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
+                .formLogin(AbstractHttpConfigurer::disable) // Critical: stop Spring from intercepting /login[cite: 5]
+                .httpBasic(AbstractHttpConfigurer::disable)
                 .cors(Customizer.withDefaults()) // Ensure CORS pre-flight requests are permitted
                 // Set session management to stateless for JWT APIs
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -41,25 +43,27 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 "/",
-                                "/customers/**",
-                                "/templates/customers/**",
+                                "/index.html",
+                                "/login.html",
+                                "/signup.html",
                                 "/profile.html",
                                 "/subscription-plans.html",
-                                "/signup.html",
                                 "/admin.html",
-                                "/login.html",
                                 "/dashboard.html",
-                                "/products.html", // Public catalog
+                                "/products.html",
                                 "/services.html",
                                 "/favicon.ico",
                                 "/*.css",
                                 "/*.js",
                                 "/error",
                                 "/nail_collection/**",
-                                "/static/**", // Permitting image sub-folder
+                                "/static/**",
                                 "/*.png",
                                 "/*.jpg",
-                                "/*.jpeg"
+                                "/*.jpeg",
+                                "/login",
+                                "/customers/**",
+                                "/templates/customers/**"
                         ).permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
                         .anyRequest().authenticated()

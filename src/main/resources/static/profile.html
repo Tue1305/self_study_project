@@ -183,7 +183,7 @@
 <script>
     const token = localStorage.getItem('accessToken');
     if (!token) {
-        window.location.href = '/login.html';
+        window.location.href = './login.html';
     }
 
     function showAlert(message, type = 'success') {
@@ -312,7 +312,7 @@
     function handleLogout() {
         localStorage.removeItem('accessToken');
         localStorage.removeItem('username');
-        window.location.href = '/login.html';
+        window.location.href = './login.html';
     }
 
     loadUserProfile();

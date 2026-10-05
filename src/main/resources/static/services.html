@@ -14,6 +14,7 @@
         :root {
             --bs-primary-pink: #e91e63;
             --bs-primary-pink-hover: #d81b60;
+            --dark-navy: #1e293b;
         }
         .text-pink { color: var(--bs-primary-pink) !important; }
         .bg-pink { background-color: var(--bs-primary-pink) !important; }
@@ -45,6 +46,74 @@
             transform: translateY(-1px);
             background-color: #f8d7da !important; /* Slightly darker shade on hover */
             box-shadow: 0 2px 5px rgba(233, 30, 99, 0.15);
+        }
+
+        /* Section Title Underline */
+        .section-title {
+            color: var(--dark-navy);
+            font-weight: 700;
+            font-size: 1.5rem;
+            position: relative;
+            display: inline-block;
+            margin-bottom: 1.5rem;
+        }
+        .section-title::after {
+            content: '';
+            position: absolute;
+            bottom: -8px;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background-color: var(--bs-primary-pink);
+            border-radius: 2px;
+        }
+
+        /* Main Service Cards */
+        .service-card {
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            background-color: #ffffff;
+        }
+        .service-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+        }
+        .service-card .card-title {
+            color: var(--dark-navy);
+            font-weight: 700;
+            font-size: 1.15rem;
+        }
+        .service-card .card-text {
+            color: #64748b;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        /* Add-ons List Card */
+        .addons-card {
+            border: none;
+            border-radius: 16px;
+            box-shadow: 0 4px 18px rgba(0, 0, 0, 0.05);
+            background-color: #ffffff;
+        }
+        .addon-item {
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px dashed #e2e8f0;
+        }
+        .addon-item:last-child {
+            border-bottom: none;
+        }
+        .addon-title {
+            color: var(--dark-navy);
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+        .addon-price {
+            color: var(--bs-primary-pink);
+            font-weight: 700;
+            font-size: 1rem;
         }
     </style>
 </head>
@@ -81,24 +150,87 @@
 <!-- Main Content Container -->
 <main class="container my-5 flex-grow-1">
     <div class="text-center mb-5">
-        <h1 class="display-6 fw-bold text-dark mb-2">Our Nail Services</h1>
+        <h1 class="display-6 fw-bold text-dark mb-2">Services & Pricing Menu</h1>
         <p class="lead text-muted mx-auto" style="max-width: 650px;">Choose from our signature manicures, custom gel extensions, and creative nail artistry.</p>
     </div>
 
     <!-- Services Grid Placeholder -->
-    <div class="row row-cols-1 row-cols-md-3 g-4">
-        <div class="col">
-            <div class="card h-100 border-0 shadow-sm rounded-4 p-4">
-                <h3 class="h5 fw-bold text-dark">Gel Manicure</h3>
-                <p class="text-muted small">Long-lasting gel polish with cuticle care and nail shaping.</p>
-                <div class="mt-auto d-flex justify-content-between align-items-center">
-                    <span class="fw-bold fs-5 text-pink">$45</span>
-                    <a href="/subscription-plans.html" class="btn btn-sm btn-pink rounded-pill px-3">Book Service</a>
+    <!-- SECTION 1: MAIN SERVICES -->
+    <div class="mb-5">
+        <h2 class="section-title">Main Services</h2>
+        <div class="row row-cols-1 row-cols-md-3 g-4">
+
+            <div class="col">
+                <div class="card h-100 p-4 service-card">
+                    <h3 class="card-title mb-3">Bio Full Set Extension</h3>
+                    <p class="card-text mb-0">Full set extension created longer using tips and high-quality bio gel sculpting.</p>
                 </div>
             </div>
+
+            <div class="col">
+                <div class="card h-100 p-4 service-card">
+                    <h3 class="card-title mb-3">Bio Refill</h3>
+                    <p class="card-text mb-0">Maintenance fill for existing bio gel sets to restore structure and shine.</p>
+                </div>
+            </div>
+
+            <div class="col">
+                <div class="card h-100 p-4 service-card">
+                    <h3 class="card-title mb-3">Acrylic Full Set</h3>
+                    <p class="card-text mb-0">Classic full acrylic set structured for enhanced durability and length.</p>
+                </div>
+            </div>
+
+            <div class="col">
+                <div class="card h-100 p-4 service-card">
+                    <h3 class="card-title mb-3">Acrylic Refill</h3>
+                    <p class="card-text mb-0">In-fill maintenance service for acrylic extensions as your natural nails grow.</p>
+                </div>
+            </div>
+
+            <div class="col">
+                <div class="card h-100 p-4 service-card">
+                    <h3 class="card-title mb-3">Shellac Manicure</h3>
+                    <p class="card-text mb-0">Complete natural nail care including nail trimming, detailed cuticle cleaning, and shellac polish application.</p>
+                </div>
+            </div>
+
         </div>
-        <!-- Add additional service cards as needed -->
     </div>
+
+    <!-- SECTION 2: ADD-ONS & EXTRAS -->
+    <div>
+        <h2 class="section-title">Add-ons &amp; Extras</h2>
+        <div class="card addons-card">
+
+            <div class="addon-item d-flex justify-content-between align-items-center">
+                <span class="addon-title">Removal</span>
+                <span class="addon-price">$5</span>
+            </div>
+
+            <div class="addon-item d-flex justify-content-between align-items-center">
+                <span class="addon-title">Trim Cuticle Extra</span>
+                <span class="addon-price">$10</span>
+            </div>
+
+            <div class="addon-item d-flex justify-content-between align-items-center">
+                <span class="addon-title">Length: Medium</span>
+                <span class="addon-price">$5</span>
+            </div>
+
+            <div class="addon-item d-flex justify-content-between align-items-center">
+                <span class="addon-title">Length: Extra Long</span>
+                <span class="addon-price">$10</span>
+            </div>
+
+            <div class="addon-item d-flex justify-content-between align-items-center">
+                <span class="addon-title">Custom Nail Design</span>
+                <span class="addon-price">$10 &amp; up</span>
+            </div>
+
+        </div>
+    </div>
+
 </main>
 
 <!-- Footer -->
@@ -130,9 +262,9 @@
 
             // 2. Render Logged-In Navigation Links
             authNav.innerHTML = `
-                    <a href="/dashboard.html" class="nav-link fw-semibold text-dark">Showcase</a>
-                    <a href="/services.html" class="nav-link fw-semibold text-pink active">Services</a>
-                    <a href="/subscription-plans.html" class="nav-link fw-semibold text-dark">Subscriptions</a>
+                    <a href="./dashboard.html" class="nav-link fw-semibold text-dark">Showcase</a>
+                    <a href="./services.html" class="nav-link fw-semibold text-pink active">Services</a>
+                    <a href="./subscription-plans.html" class="nav-link fw-semibold text-dark">Subscriptions</a>
                     <a href="#" onclick="handleLogout()" class="btn btn-outline-pink rounded-pill px-3 py-1 btn-sm ms-lg-2">Logout</a>
                 `;
         } else {
@@ -144,10 +276,9 @@
 
             // 2. Render Guest Navigation Links
             authNav.innerHTML = `
-                    <a href="/services.html" class="nav-link fw-semibold text-pink active">Services</a>
-                    <a href="/subscription-plans.html" class="nav-link fw-semibold text-dark">Subscriptions</a>
-                    <a href="/login.html" class="nav-link fw-semibold text-dark">Log In</a>
-                    <a href="/signup.html" class="btn btn-pink rounded-pill px-3 py-1 btn-sm ms-lg-2">Sign Up</a>
+                    <a href="./signup.html" class="nav-link fw-semibold text-dark">Sign up</a>
+                    <a href="./login.html" class="nav-link fw-semibold text-dark">Log In</a>
+                    <a href="./subscription-plans.html" class="btn btn-pink rounded-pill px-4 py-2 fw-semibold">Subscription Plans</a>
                 `;
         }
     });

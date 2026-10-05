@@ -83,7 +83,7 @@
 <script>
     const token = localStorage.getItem('accessToken');
     if (!token) {
-        window.location.href = '/login.html';
+        window.location.href = './login.html';
     } else {
         loadUsers();
     }
@@ -128,7 +128,7 @@
 
     function handleLogout() {
         localStorage.removeItem('accessToken');
-        window.location.href = '/index.html';
+        window.location.href = './index.html';
     }
 </script>
 </body>

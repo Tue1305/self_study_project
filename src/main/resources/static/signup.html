@@ -92,7 +92,7 @@
         <!-- Card Footer -->
         <div class="text-center border-top mt-4 pt-3 text-muted small">
             Already have an account?
-            <a href="/login.html" class="text-pink fw-semibold text-decoration-none ms-1">Log In</a>
+            <a href="./login.html" class="text-pink fw-semibold text-decoration-none ms-1">Log In</a>
         </div>
 
     </div>
@@ -137,9 +137,9 @@
                 if (loginRes.ok) {
                     const data = await loginRes.json();
                     localStorage.setItem('accessToken', data.accessToken);
-                    window.location.href = '/dashboard.html';
+                    window.location.href = './dashboard.html';
                 } else {
-                    window.location.href = '/login.html';
+                    window.location.href = './login.html';
                 }
             } else {
                 const text = await response.text();

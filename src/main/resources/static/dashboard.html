@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Work Portfolio - Jenny's Nail Studio</title>
     <!-- Favicon Tag -->
-    <link rel="icon" type="image/x-icon" href="/favicon.ico?v=2">
+    <link rel="icon" type="image/x-icon" href="favicon.ico?v=2">
     <!-- Bootstrap 5.3 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Bootstrap Icons -->
@@ -33,6 +33,18 @@
         .btn-outline-pink:hover {
             background-color: var(--bs-primary-pink);
             color: #fff;
+        }
+
+        /* Clickable User Badge Styling */
+        .user-badge-link {
+            text-decoration: none;
+            transition: all 0.2s ease-in-out;
+            cursor: pointer;
+        }
+        .user-badge-link:hover {
+            transform: translateY(-1px);
+            background-color: #f8d7da !important;
+            box-shadow: 0 2px 5px rgba(233, 30, 99, 0.15);
         }
 
         /* Card Hover Effects */
@@ -68,12 +80,15 @@
 <header class="navbar navbar-expand-lg bg-white shadow-sm sticky-top px-3 px-lg-4">
     <div class="container-fluid">
         <div class="d-flex align-items-center gap-3">
-            <a href="/" class="navbar-brand fw-bold text-pink fs-4 mb-0">Jenny's Nail Studio</a>
-            <!-- User Badge shown next to logo when logged in -->
-            <div class="badge bg-danger-subtle text-pink border border-danger-subtle rounded-pill px-3 py-2 fs-6 d-none align-items-center gap-1" id="userBadge">
-                <i class="bi bi-stars"></i>
+            <a href="index.html" class="navbar-brand fw-bold text-pink fs-4 mb-0">Jenny's Nail Studio</a>
+            <!-- Clickable User Badge shown next to logo when logged in -->
+            <a href="profile.html"
+               id="userBadge"
+               class="badge bg-danger-subtle text-pink border border-danger-subtle rounded-pill px-3 py-2 fs-6 d-none align-items-center gap-1 user-badge-link"
+               title="Click to view and edit profile settings">
+                <i class="bi bi-person-fill"></i>
                 <span id="usernameDisplay">Client</span>
-            </div>
+            </a>
         </div>
 
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
@@ -111,7 +126,7 @@
         <div class="col gallery-card" data-category="gel">
             <div class="card h-100 border-0 shadow-sm rounded-3 overflow-hidden">
                 <div class="image-wrapper position-relative bg-secondary-subtle">
-                    <img src="/nail_collection/nail4.png" class="card-img-top w-100 h-100 object-fit-cover" alt="Almond Chrome Set">
+                    <img src="nail_collection/nail4.png" class="card-img-top w-100 h-100 object-fit-cover" alt="Almond Chrome Set">
                     <span class="badge bg-dark bg-opacity-75 text-white position-absolute top-0 end-0 m-3 px-2 py-1 rounded-pill text-uppercase">Gel-X</span>
                 </div>
                 <div class="card-body d-flex flex-column p-4">
@@ -129,7 +144,7 @@
         <div class="col gallery-card" data-category="art">
             <div class="card h-100 border-0 shadow-sm rounded-3 overflow-hidden">
                 <div class="image-wrapper position-relative bg-secondary-subtle">
-                    <img src="/nail_collection/nail5.png" class="card-img-top w-100 h-100 object-fit-cover" alt="Botanical Art">
+                    <img src="nail_collection/nail5.png" class="card-img-top w-100 h-100 object-fit-cover" alt="Botanical Art">
                     <span class="badge bg-dark bg-opacity-75 text-white position-absolute top-0 end-0 m-3 px-2 py-1 rounded-pill text-uppercase">Custom Art</span>
                 </div>
                 <div class="card-body d-flex flex-column p-4">
@@ -147,7 +162,7 @@
         <div class="col gallery-card" data-category="acrylic">
             <div class="card h-100 border-0 shadow-sm rounded-3 overflow-hidden">
                 <div class="image-wrapper position-relative bg-secondary-subtle">
-                    <img src="/nail_collection/nail6.png" class="card-img-top w-100 h-100 object-fit-cover" alt="Ombre French">
+                    <img src="nail_collection/nail6.png" class="card-img-top w-100 h-100 object-fit-cover" alt="Ombre French">
                     <span class="badge bg-dark bg-opacity-75 text-white position-absolute top-0 end-0 m-3 px-2 py-1 rounded-pill text-uppercase">Acrylic</span>
                 </div>
                 <div class="card-body d-flex flex-column p-4">
@@ -165,7 +180,7 @@
         <div class="col gallery-card" data-category="art">
             <div class="card h-100 border-0 shadow-sm rounded-3 overflow-hidden">
                 <div class="image-wrapper position-relative bg-secondary-subtle">
-                    <img src="/nail_collection/nail7.png" class="card-img-top w-100 h-100 object-fit-cover" alt="3D Jelly Nails">
+                    <img src="nail_collection/nail7.png" class="card-img-top w-100 h-100 object-fit-cover" alt="3D Jelly Nails">
                     <span class="badge bg-dark bg-opacity-75 text-white position-absolute top-0 end-0 m-3 px-2 py-1 rounded-pill text-uppercase">Custom Art</span>
                 </div>
                 <div class="card-body d-flex flex-column p-4">
@@ -183,7 +198,7 @@
         <div class="col gallery-card" data-category="art">
             <div class="card h-100 border-0 shadow-sm rounded-3 overflow-hidden">
                 <div class="image-wrapper position-relative bg-secondary-subtle">
-                    <img src="/nail_collection/nail8.png" class="card-img-top w-100 h-100 object-fit-cover" alt="3D Jelly Nails">
+                    <img src="nail_collection/nail8.png" class="card-img-top w-100 h-100 object-fit-cover" alt="3D Jelly Nails">
                     <span class="badge bg-dark bg-opacity-75 text-white position-absolute top-0 end-0 m-3 px-2 py-1 rounded-pill text-uppercase">Custom Art</span>
                 </div>
                 <div class="card-body d-flex flex-column p-4">
@@ -201,7 +216,7 @@
         <div class="col gallery-card" data-category="art">
             <div class="card h-100 border-0 shadow-sm rounded-3 overflow-hidden">
                 <div class="image-wrapper position-relative bg-secondary-subtle">
-                    <img src="/nail_collection/nail1.png" class="card-img-top w-100 h-100 object-fit-cover" alt="3D Jelly Nails">
+                    <img src="nail_collection/nail1.png" class="card-img-top w-100 h-100 object-fit-cover" alt="3D Jelly Nails">
                     <span class="badge bg-dark bg-opacity-75 text-white position-absolute top-0 end-0 m-3 px-2 py-1 rounded-pill text-uppercase">Custom Art</span>
                 </div>
                 <div class="card-body d-flex flex-column p-4">
@@ -219,7 +234,7 @@
         <div class="col gallery-card" data-category="art">
             <div class="card h-100 border-0 shadow-sm rounded-3 overflow-hidden">
                 <div class="image-wrapper position-relative bg-secondary-subtle">
-                    <img src="/nail_collection/nail10.png" class="card-img-top w-100 h-100 object-fit-cover" alt="3D Jelly Nails">
+                    <img src="nail_collection/nail10.png" class="card-img-top w-100 h-100 object-fit-cover" alt="3D Jelly Nails">
                     <span class="badge bg-dark bg-opacity-75 text-white position-absolute top-0 end-0 m-3 px-2 py-1 rounded-pill text-uppercase">Custom Art</span>
                 </div>
                 <div class="card-body d-flex flex-column p-4">
@@ -237,7 +252,7 @@
         <div class="col gallery-card" data-category="art">
             <div class="card h-100 border-0 shadow-sm rounded-3 overflow-hidden">
                 <div class="image-wrapper position-relative bg-secondary-subtle">
-                    <img src="/nail_collection/nail11.png" class="card-img-top w-100 h-100 object-fit-cover" alt="3D Jelly Nails">
+                    <img src="nail_collection/nail11.png" class="card-img-top w-100 h-100 object-fit-cover" alt="3D Jelly Nails">
                     <span class="badge bg-dark bg-opacity-75 text-white position-absolute top-0 end-0 m-3 px-2 py-1 rounded-pill text-uppercase">Custom Art</span>
                 </div>
                 <div class="card-body d-flex flex-column p-4">
@@ -255,7 +270,7 @@
         <div class="col gallery-card" data-category="art">
             <div class="card h-100 border-0 shadow-sm rounded-3 overflow-hidden">
                 <div class="image-wrapper position-relative bg-secondary-subtle">
-                    <img src="/nail_collection/nail12.png" class="card-img-top w-100 h-100 object-fit-cover" alt="3D Jelly Nails">
+                    <img src="nail_collection/nail12.png" class="card-img-top w-100 h-100 object-fit-cover" alt="3D Jelly Nails">
                     <span class="badge bg-dark bg-opacity-75 text-white position-absolute top-0 end-0 m-3 px-2 py-1 rounded-pill text-uppercase">Custom Art</span>
                 </div>
                 <div class="card-body d-flex flex-column p-4">
@@ -273,7 +288,7 @@
         <div class="col gallery-card" data-category="art">
             <div class="card h-100 border-0 shadow-sm rounded-3 overflow-hidden">
                 <div class="image-wrapper position-relative bg-secondary-subtle">
-                    <img src="/nail_collection/nail13.png" class="card-img-top w-100 h-100 object-fit-cover" alt="3D Jelly Nails">
+                    <img src="nail_collection/nail13.png" class="card-img-top w-100 h-100 object-fit-cover" alt="3D Jelly Nails">
                     <span class="badge bg-dark bg-opacity-75 text-white position-absolute top-0 end-0 m-3 px-2 py-1 rounded-pill text-uppercase">Custom Art</span>
                 </div>
                 <div class="card-body d-flex flex-column p-4">
@@ -291,7 +306,7 @@
         <div class="col gallery-card" data-category="art">
             <div class="card h-100 border-0 shadow-sm rounded-3 overflow-hidden">
                 <div class="image-wrapper position-relative bg-secondary-subtle">
-                    <img src="/nail_collection/nail2.png" class="card-img-top w-100 h-100 object-fit-cover" alt="3D Jelly Nails">
+                    <img src="nail_collection/nail2.png" class="card-img-top w-100 h-100 object-fit-cover" alt="3D Jelly Nails">
                     <span class="badge bg-dark bg-opacity-75 text-white position-absolute top-0 end-0 m-3 px-2 py-1 rounded-pill text-uppercase">Custom Art</span>
                 </div>
                 <div class="card-body d-flex flex-column p-4">
@@ -309,7 +324,7 @@
         <div class="col gallery-card" data-category="art">
             <div class="card h-100 border-0 shadow-sm rounded-3 overflow-hidden">
                 <div class="image-wrapper position-relative bg-secondary-subtle">
-                    <img src="/nail_collection/nail3.png" class="card-img-top w-100 h-100 object-fit-cover" alt="3D Jelly Nails">
+                    <img src="nail_collection/nail3.png" class="card-img-top w-100 h-100 object-fit-cover" alt="3D Jelly Nails">
                     <span class="badge bg-dark bg-opacity-75 text-white position-absolute top-0 end-0 m-3 px-2 py-1 rounded-pill text-uppercase">Custom Art</span>
                 </div>
                 <div class="card-body d-flex flex-column p-4">
@@ -350,18 +365,6 @@
             return null;
         }
     }
-    document.addEventListener('DOMContentLoaded', () => {
-        const token = localStorage.getItem('accessToken');
-        const username = localStorage.getItem('username');
-        const userBadge = document.getElementById('userBadge');
-        const usernameDisplay = document.getElementById('usernameDisplay');
-
-        if (token && username && userBadge && usernameDisplay) {
-            usernameDisplay.textContent = username;
-            userBadge.classList.remove('d-none');
-            userBadge.classList.add('d-inline-flex');
-        }
-    });
 
     document.addEventListener('DOMContentLoaded', () => {
         const token = localStorage.getItem('accessToken');
@@ -371,7 +374,6 @@
         const authNav = document.getElementById('authNav');
 
         if (token) {
-            // Retrieve username from localStorage or fallback to parsing the JWT token subject
             let activeUser = storedUser;
             if (!activeUser) {
                 const decodedToken = parseJwt(token);
@@ -379,35 +381,43 @@
             }
 
             // Display User Badge
-            usernameDisplay.textContent = activeUser;
-            userBadge.classList.remove('d-none');
-            userBadge.classList.add('d-inline-flex');
+            if (userBadge && usernameDisplay) {
+                usernameDisplay.textContent = activeUser;
+                userBadge.classList.remove('d-none');
+                userBadge.classList.add('d-inline-flex');
+            }
 
-            // Populate Logged-In Header Links
-            authNav.innerHTML = `
-                    <a href="/dashboard.html" class="nav-link fw-semibold text-pink active">Showcase</a>
-                    <a href="/services.html" class="nav-link fw-semibold text-dark">Services</a>
-                    <a href="/subscription-plans.html" class="nav-link fw-semibold text-dark">Subscriptions</a>
-                    <a href="/profile.html" class="nav-link fw-semibold text-dark">Profile</a>
-                    <a href="#" onclick="handleLogout()" class="btn btn-outline-pink rounded-pill px-3 py-1 btn-sm">Logout</a>
+            // Logged-In Header Links (Only Subscription Plans is a pink button)
+            if (authNav) {
+                authNav.innerHTML = `
+                    <a href="./dashboard.html" class="nav-link fw-semibold text-dark">Showcase</a>
+                    <a href="./services.html" class="nav-link fw-semibold text-dark">Services</a>
+                    <a href="./profile.html" class="nav-link fw-semibold text-dark">Profile</a>
+                    <a href="#" onclick="handleLogout()" class="nav-link fw-semibold text-dark">Logout</a>
+                    <a href="subscription-plans.html" class="btn btn-pink rounded-pill px-4 py-2 fw-semibold">Subscription Plans</a>
                 `;
+            }
         } else {
-            // Guest Header Links
-            userBadge.classList.add('d-none');
-            userBadge.classList.remove('d-inline-flex');
-            authNav.innerHTML = `
-                    <a href="/services.html" class="nav-link fw-semibold text-dark">Services</a>
-                    <a href="/subscription-plans.html" class="nav-link fw-semibold text-dark">Subscriptions</a>
-                    <a href="/login.html" class="nav-link fw-semibold text-dark">Log in</a>
-                    <a href="/signup.html" class="btn btn-pink rounded-pill px-3 py-1 btn-sm">Sign up</a>
+            // Guest Header Links (Only Subscription Plans is a pink button)
+            if (userBadge) {
+                userBadge.classList.add('d-none');
+                userBadge.classList.remove('d-inline-flex');
+            }
+            if (authNav) {
+                authNav.innerHTML = `
+                    <a href="./services.html" class="nav-link fw-semibold text-dark">Services</a>
+                    <a href="./login.html" class="nav-link fw-semibold text-dark">Log in</a>
+                    <a href="./signup.html" class="nav-link fw-semibold text-dark">Sign up</a>
+                    <a href="./subscription-plans.html" class="btn btn-pink rounded-pill px-4 py-2 fw-semibold">Subscription Plans</a>
                 `;
+            }
         }
     });
 
     function handleLogout() {
         localStorage.removeItem('accessToken');
         localStorage.removeItem('username');
-        window.location.href = '/login.html';
+        window.location.href = './login.html';
     }
 
     // Category Filter Logic

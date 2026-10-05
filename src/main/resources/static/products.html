@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nail Gallery & Catalog - Jenny Nail Studio</title>
+    <title>Nail Gallery & Catalog - Jenny's Nail Studio</title>
     <!-- Favicon Tag -->
     <link rel="icon" type="image/x-icon" href="/favicon.ico?v=2">
     <!-- Bootstrap 5.3 CSS -->
@@ -82,9 +82,7 @@
 
         <div class="collapse navbar-collapse" id="navbarNav">
             <div class="navbar-nav ms-auto align-items-lg-center gap-2 gap-lg-3 pt-3 pt-lg-0" id="authNav">
-                <a href="/login.html" class="nav-link fw-semibold text-dark">Log in</a>
-                <a href="/signup.html" class="nav-link fw-semibold text-dark">Sign up</a>
-                <a href="/index.html" class="btn btn-pink rounded-pill px-3 py-1 btn-sm ms-lg-2">Subscription</a>
+                <!-- Injected dynamically via JavaScript -->
             </div>
         </div>
     </div>
@@ -104,7 +102,7 @@
         <div class="col d-flex">
             <div class="card h-100 border-0 shadow-sm rounded-4 product-card overflow-hidden w-100">
                 <div class="product-image-container">
-                    <img src="/nail_collection/nail1.png" alt="Classic Minimalist French" class="img-fluid">
+                    <img src="./nail_collection/nail1.png" alt="Classic Minimalist French" class="img-fluid">
                 </div>
                 <div class="card-body d-flex flex-column p-4">
                     <span class="text-pink text-uppercase fw-bold fs-7 mb-1" style="letter-spacing: 0.5px;">Classic Series</span>
@@ -121,7 +119,7 @@
         <div class="col d-flex">
             <div class="card h-100 border-0 shadow-sm rounded-4 product-card overflow-hidden w-100">
                 <div class="product-image-container">
-                    <img src="/nail_collection/nail2.png" alt="Pearl Glazed Chrome" class="img-fluid">
+                    <img src="./nail_collection/nail2.png" alt="Pearl Glazed Chrome" class="img-fluid">
                 </div>
                 <div class="card-body d-flex flex-column p-4">
                     <span class="text-pink text-uppercase fw-bold fs-7 mb-1" style="letter-spacing: 0.5px;">Trending</span>
@@ -138,7 +136,7 @@
         <div class="col d-flex">
             <div class="card h-100 border-0 shadow-sm rounded-4 product-card overflow-hidden w-100">
                 <div class="product-image-container">
-                    <img src="/nail_collection/nail3.png" alt="Hand-Painted Floral Set" class="img-fluid">
+                    <img src="./nail_collection/nail3.png" alt="Hand-Painted Floral Set" class="img-fluid">
                 </div>
                 <div class="card-body d-flex flex-column p-4">
                     <span class="text-pink text-uppercase fw-bold fs-7 mb-1" style="letter-spacing: 0.5px;">Custom Art</span>
@@ -165,198 +163,79 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
-    function selectProduct(productName) {
-        localStorage.setItem('selectedDesign', productName);
+    // Utility to decode JWT token payload without external libraries
+    function parseJwt(token) {
+        try {
+            const base64Url = token.split('.')[1];
+            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+            const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+                return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+            }).join(''));
 
-        const token = localStorage.getItem('accessToken');
-        if (token) {
-            // Logged in -> go to dashboard to view booking
-            window.location.href = '/dashboard.html';
-        } else {
-            // Not logged in -> prompt login or subscription
-            window.location.href = '/login.html';
+            return JSON.parse(jsonPayload);
+        } catch (e) {
+            return null;
         }
     }
-</script>
-</body>
-</html><!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nail Gallery & Catalog - Jenny Nail Studio</title>
-    <!-- Favicon Tag -->
-    <link rel="icon" type="image/x-icon" href="/favicon.ico?v=2">
-    <!-- Bootstrap 5.3 CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Bootstrap Icons -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
-    <style>
-        :root {
-            --bs-primary-pink: #e91e63;
-            --bs-primary-pink-hover: #d81b60;
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const token = localStorage.getItem('accessToken');
+        const username = localStorage.getItem('username');
+
+        const authNav = document.getElementById('authNav');
+        const userBadge = document.getElementById('userBadge');
+        const usernameDisplay = document.getElementById('usernameDisplay');
+
+        if (token) {
+            let activeUser = username;
+            if (!activeUser) {
+                const decodedToken = parseJwt(token);
+                activeUser = decodedToken ? (decodedToken.sub || decodedToken.username) : 'Client';
+            }
+
+            // Display Username Badge
+            usernameDisplay.textContent = activeUser;
+            userBadge.classList.remove('d-none');
+            userBadge.classList.add('d-inline-flex');
+
+            // Logged-in Navigation Links
+            authNav.innerHTML = `
+                <a href="./dashboard.html" class="nav-link fw-semibold text-dark">Showcase</a>
+                <a href="./services.html" class="nav-link fw-semibold text-dark">Services</a>
+                <a href="#" onclick="handleLogout()" class="nav-link fw-semibold text-dark">Logout</a>
+                <a href="./subscription-plans.html" class="btn btn-pink rounded-pill px-4 py-2 fw-semibold">Subscription Plans</a>
+            `;
+        } else {
+            // Guest Navigation Links
+            userBadge.classList.add('d-none');
+            userBadge.classList.remove('d-inline-flex');
+
+            authNav.innerHTML = `
+                <a href="./services.html" class="nav-link fw-semibold text-dark">Services</a>
+                <a href="./login.html" class="nav-link fw-semibold text-dark">Log in</a>
+                <a href="./signup.html" class="nav-link fw-semibold text-dark">Sign up</a>
+                <a href="./subscription-plans.html" class="btn btn-pink rounded-pill px-4 py-2 fw-semibold">Subscription Plans</a>
+            `;
         }
-        .text-pink { color: var(--bs-primary-pink) !important; }
-        .bg-pink { background-color: var(--bs-primary-pink) !important; }
-        .btn-pink {
-            background-color: var(--bs-primary-pink);
-            color: #fff;
-            border: none;
-        }
-        .btn-pink:hover {
-            background-color: var(--bs-primary-pink-hover);
-            color: #fff;
-        }
-        .btn-outline-pink {
-            color: var(--bs-primary-pink);
-            border-color: var(--bs-primary-pink);
-        }
-        .btn-outline-pink:hover {
-            background-color: var(--bs-primary-pink);
-            color: #fff;
-        }
+    });
 
-        /* Card Hover & Image Effects */
-        .product-card {
-            transition: transform 0.25s ease, box-shadow 0.25s ease;
-        }
-        .product-card:hover {
-            transform: translateY(-6px);
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.12) !important;
-        }
-
-        .product-image-container {
-            height: 240px;
-            overflow: hidden;
-            background-color: #f8f9fa;
-        }
-
-        .product-image-container img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            transition: transform 0.3s ease;
-        }
-
-        .product-card:hover .product-image-container img {
-            transform: scale(1.05);
-        }
-    </style>
-</head>
-<body class="bg-light d-flex flex-column min-vh-100">
-
-<!-- Navigation Header -->
-<header class="navbar navbar-expand-lg bg-white shadow-sm sticky-top px-3 px-lg-4">
-    <div class="container-fluid">
-        <div class="d-flex align-items-center gap-3">
-            <a href="/" class="navbar-brand fw-bold text-pink fs-4 mb-0">Jenny's Nail Studio</a>
-            <!-- User Badge shown next to logo when logged in -->
-            <div class="badge bg-danger-subtle text-pink border border-danger-subtle rounded-pill px-3 py-2 fs-6 d-none align-items-center gap-1" id="userBadge">
-                <i class="bi bi-stars"></i>
-                <span id="usernameDisplay">Client</span>
-            </div>
-        </div>
-
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-            <span class="navbar-toggler-icon"></span>
-        </button>
-
-        <div class="collapse navbar-collapse" id="navbarNav">
-            <div class="navbar-nav ms-auto align-items-lg-center gap-2 gap-lg-3 pt-3 pt-lg-0" id="authNav">
-                <a href="/login.html" class="nav-link fw-semibold text-dark">Log in</a>
-                <a href="/signup.html" class="nav-link fw-semibold text-dark">Sign up</a>
-                <a href="/index.html" class="btn btn-pink rounded-pill px-3 py-1 btn-sm ms-lg-2">Subscription</a>
-            </div>
-        </div>
-    </div>
-</header>
-
-<!-- Main Content Container -->
-<main class="container my-5 flex-grow-1">
-    <div class="text-center mb-5">
-        <h1 class="display-6 fw-bold text-dark mb-2">Nail Design Catalog</h1>
-        <p class="lead text-muted mx-auto" style="max-width: 600px;">Explore our trending styles and custom press-on collections.</p>
-    </div>
-
-    <!-- Responsive Card Grid -->
-    <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 g-4 justify-content-center">
-
-        <!-- Card 1 -->
-        <div class="col d-flex">
-            <div class="card h-100 border-0 shadow-sm rounded-4 product-card overflow-hidden w-100">
-                <div class="product-image-container">
-                    <img src="/nail_collection/nail1.png" alt="Classic Minimalist French" class="img-fluid">
-                </div>
-                <div class="card-body d-flex flex-column p-4">
-                    <span class="text-pink text-uppercase fw-bold fs-7 mb-1" style="letter-spacing: 0.5px;">Classic Series</span>
-                    <h3 class="card-title h5 fw-bold text-dark mb-2">Classic Minimalist French</h3>
-                    <div class="fs-5 fw-bold text-dark mb-4">$25.00</div>
-                    <button class="btn btn-pink rounded-3 py-2 fw-bold w-100 mt-auto" onclick="selectProduct('Classic Minimalist French')">
-                        Book Style
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Card 2 -->
-        <div class="col d-flex">
-            <div class="card h-100 border-0 shadow-sm rounded-4 product-card overflow-hidden w-100">
-                <div class="product-image-container">
-                    <img src="/nail_collection/nail2.png" alt="Pearl Glazed Chrome" class="img-fluid">
-                </div>
-                <div class="card-body d-flex flex-column p-4">
-                    <span class="text-pink text-uppercase fw-bold fs-7 mb-1" style="letter-spacing: 0.5px;">Trending</span>
-                    <h3 class="card-title h5 fw-bold text-dark mb-2">Pearl Glazed Chrome</h3>
-                    <div class="fs-5 fw-bold text-dark mb-4">$35.00</div>
-                    <button class="btn btn-pink rounded-3 py-2 fw-bold w-100 mt-auto" onclick="selectProduct('Pearl Glazed Chrome')">
-                        Book Style
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Card 3 -->
-        <div class="col d-flex">
-            <div class="card h-100 border-0 shadow-sm rounded-4 product-card overflow-hidden w-100">
-                <div class="product-image-container">
-                    <img src="/nail_collection/nail3.png" alt="Hand-Painted Floral Set" class="img-fluid">
-                </div>
-                <div class="card-body d-flex flex-column p-4">
-                    <span class="text-pink text-uppercase fw-bold fs-7 mb-1" style="letter-spacing: 0.5px;">Custom Art</span>
-                    <h3 class="card-title h5 fw-bold text-dark mb-2">Hand-Painted Floral Set</h3>
-                    <div class="fs-5 fw-bold text-dark mb-4">$45.00</div>
-                    <button class="btn btn-pink rounded-3 py-2 fw-bold w-100 mt-auto" onclick="selectProduct('Hand-Painted Floral Set')">
-                        Book Style
-                    </button>
-                </div>
-            </div>
-        </div>
-
-    </div>
-</main>
-
-<!-- Footer -->
-<footer class="bg-white border-top text-center py-3 mt-auto">
-    <div class="container">
-        <small class="text-muted">&copy; Jenny's Nail Studio — Custom Nail Sculpting & Artistry</small>
-    </div>
-</footer>
-
-<!-- Bootstrap 5.3 JavaScript Bundle -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-
-<script>
     function selectProduct(productName) {
         localStorage.setItem('selectedDesign', productName);
 
         const token = localStorage.getItem('accessToken');
         if (token) {
             // Logged in -> go to dashboard to view booking
-            window.location.href = '/dashboard.html';
+            window.location.href = './dashboard.html';
         } else {
-            // Not logged in -> prompt login or subscription
-            window.location.href = '/login.html';
+            // Not logged in -> prompt login
+            window.location.href = './login.html';
         }
+    }
+
+    function handleLogout() {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('username');
+        window.location.reload();
     }
 </script>
 </body>

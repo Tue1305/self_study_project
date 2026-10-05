@@ -82,7 +82,7 @@
 
     <div class="text-center mt-4 pt-3 border-top">
         <span class="text-muted small">Don't have an account?</span>
-        <a href="/signup.html" class="text-pink fw-semibold small text-decoration-none ms-1">Sign Up</a>
+        <a href="./signup.html" class="text-pink fw-semibold small text-decoration-none ms-1">Sign Up</a>
     </div>
 </div>
 
@@ -120,7 +120,7 @@
                 localStorage.setItem('accessToken', token);
 
                 // Force navigation to protected dashboard
-                window.location.assign('/index.html');
+                window.location.assign('./index.html');
             } else {
                 errorMsg.innerText = 'Invalid username or password.';
             }

@@ -181,34 +181,34 @@
             // Personalize Hero Header
             heroHeading.textContent = `Welcome back, ${activeUser}!`;
 
-            // Logged-in Navigation Links
+            // Logged-in Navigation Links (Only Subscription Plans is pink button)
             authNav.innerHTML = `
-                    <a href="/dashboard.html" class="nav-link fw-semibold text-dark">Showcase</a>
-                    <a href="/services.html" class="nav-link fw-semibold text-dark">Services</a>
-                    <a href="/subscription-plans.html" class="nav-link fw-semibold text-dark">Subscriptions</a>
-                    <a href="#" onclick="handleLogout()" class="btn btn-outline-pink rounded-pill px-3 py-1 btn-sm ms-lg-2">Logout</a>
+                    <a href="./dashboard.html" class="nav-link fw-semibold text-dark">Showcase</a>
+                    <a href="./services.html" class="nav-link fw-semibold text-dark">Services</a>
+                    <a href="#" onclick="handleLogout()" class="nav-link fw-semibold text-dark">Logout</a>
+                    <a href="./subscription-plans.html" class="btn btn-pink rounded-pill px-4 py-2 fw-semibold">Subscription Plans</a>
                 `;
 
             // Logged-in Hero Actions
             heroAction.innerHTML = `
-                    <a href="/dashboard.html" class="btn btn-pink rounded-pill px-4 py-2 fs-6">View Client Showcase</a>
-                    <a href="/services.html" class="btn btn-outline-pink rounded-pill px-4 py-2 fs-6">View Services & Pricing</a>
+                    <a href="./dashboard.html" class="btn btn-pink rounded-pill px-4 py-2 fs-6">View Client Showcase</a>
+                    <a href="./services.html" class="btn btn-outline-pink rounded-pill px-4 py-2 fs-6">View Services & Pricing</a>
                 `;
         } else {
-            // Guest View
+            // Guest View (Only Subscription Plans is pink button)
             userBadge.classList.add('d-none');
             userBadge.classList.remove('d-inline-flex');
 
             authNav.innerHTML = `
-                    <a href="/services.html" class="nav-link fw-semibold text-dark">Services</a>
-                    <a href="/login.html" class="nav-link fw-semibold text-dark">Log In</a>
-                    <a href="/signup.html" class="nav-link fw-semibold text-dark">Sign Up</a>
-                    <a href="/subscription-plans.html" class="btn btn-pink rounded-pill px-3 py-1 btn-sm ms-lg-2">Subscriptions</a>
+                    <a href="./services.html" class="nav-link fw-semibold text-dark">Service</a>
+                    <a href="./login.html" class="nav-link fw-semibold text-dark">Log in</a>
+                    <a href="./signup.html" class="nav-link fw-semibold text-dark">Sign up</a>
+                    <a href="./subscription-plans.html" class="btn btn-pink rounded-pill px-4 py-2 fw-semibold">Subscription Plans</a>
                 `;
 
             heroAction.innerHTML = `
-                    <a href="/services.html" class="btn btn-pink rounded-pill px-4 py-2 fs-6">Explore Services & Menu</a>
-                    <a href="/login.html" class="btn btn-outline-pink rounded-pill px-4 py-2 fs-6">Client Log In</a>
+                    <a href="./dashboard.html" class="btn btn-pink rounded-pill px-4 py-2 fs-6">Explore Recent Work & Client Creations</a>
+                    <a href="./login.html" class="btn btn-outline-pink rounded-pill px-4 py-2 fs-6">Client Log In</a>
                 `;
         }
     });

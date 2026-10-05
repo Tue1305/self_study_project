@@ -5,138 +5,108 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sign Up - Jenny's Nail Studio</title>
     <!-- Favicon Tag -->
-    <link rel="icon" type="image/x-icon" href="/favicon.ico?=v2">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico?v=2">
+    <!-- Bootstrap 5.3 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <style>
         :root {
-            --primary: #e91e63;
-            --dark: #2c3e50;
-            --light: #f8f9fa;
+            --bs-primary-pink: #e91e63;
+            --bs-primary-pink-hover: #d81b60;
         }
-
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: var(--light);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-        }
-
-        .signup-card {
-            background: #fff;
-            padding: 40px;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-            width: 100%;
-            max-width: 380px;
-        }
-
-        .signup-card h2 {
-            margin-top: 0;
-            color: var(--dark);
-            text-align: center;
-        }
-
-        .plan-badge {
-            background: #fce4ec;
-            color: var(--primary);
-            padding: 8px;
-            border-radius: 4px;
-            text-align: center;
-            font-weight: bold;
-            margin-bottom: 20px;
-            font-size: 14px;
-        }
-
-        .form-group {
-            margin-bottom: 15px;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 5px;
-            color: #666;
-            font-size: 14px;
-        }
-
-        .form-group input {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            box-sizing: border-box;
-        }
-
-        .btn-submit {
-            width: 100%;
-            padding: 12px;
-            background: var(--primary);
-            color: white;
+        .text-pink { color: var(--bs-primary-pink) !important; }
+        .bg-pink { background-color: var(--bs-primary-pink) !important; }
+        .btn-pink {
+            background-color: var(--bs-primary-pink);
+            color: #fff;
             border: none;
-            border-radius: 4px;
-            font-size: 16px;
-            cursor: pointer;
-            margin-top: 10px;
+        }
+        .btn-pink:hover {
+            background-color: var(--bs-primary-pink-hover);
+            color: #fff;
         }
 
-        .btn-submit:hover {
-            background: #d81b60;
+        /* Input focus outline */
+        .form-control:focus {
+            border-color: #f48fb1;
+            box-shadow: 0 0 0 0.25rem rgba(233, 30, 99, 0.25);
         }
 
-        .footer-text {
-            text-align: center;
-            margin-top: 20px;
-            font-size: 14px;
-            color: #666;
+        /* Card Hover Effect */
+        .signup-card {
+            transition: box-shadow 0.25s ease;
         }
-
-        .footer-text a {
-            color: var(--primary);
-            text-decoration: none;
-        }
-
-        #errorMsg {
-            color: #e53935;
-            font-size: 14px;
-            text-align: center;
-            margin-top: 10px;
+        .signup-card:hover {
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1) !important;
         }
     </style>
 </head>
-<body>
+<body class="bg-light d-flex flex-column min-vh-100 justify-content-center align-items-center py-5">
 
-<div class="signup-card">
-    <h2>Create Your Account</h2>
-    <div id="planDisplay" class="plan-badge" style="display: none;"></div>
+<!-- Container wrapper for card width -->
+<div class="container" style="max-width: 420px;">
+    <div class="card border-0 shadow-sm rounded-4 p-4 signup-card">
 
-    <form id="signupForm" onsubmit="handleSignup(event)">
-        <div class="form-group">
-            <label for="username">Username</label>
-            <input type="text" id="username" required autocomplete="username">
+        <!-- Logo Header -->
+        <div class="text-center mb-4">
+            <a href="/" class="fw-bold text-pink fs-3 text-decoration-none d-inline-block mb-1">
+                Jenny's Nail Studio
+            </a>
+            <h1 class="h4 fw-bold text-dark mb-0">Create Your Account</h1>
         </div>
 
-        <div class="form-group">
-            <label for="password">Password</label>
-            <input type="password" id="password" required autocomplete="new-password">
+        <!-- Dynamic Selected Plan Badge -->
+        <div id="planDisplay" class="badge bg-danger-subtle text-pink border border-danger-subtle rounded-3 p-3 w-100 mb-4 text-wrap fs-6 fw-semibold" style="display: none;"></div>
+
+        <!-- Sign Up Form -->
+        <form id="signupForm" onsubmit="handleSignup(event)">
+            <div class="mb-3">
+                <label for="username" class="form-label text-secondary fw-semibold small">Username</label>
+                <div class="input-group">
+                        <span class="input-group-text bg-white text-muted border-end-0">
+                            <i class="bi bi-person"></i>
+                        </span>
+                    <input type="text" id="username" class="form-control border-start-0 ps-0" required autocomplete="username" placeholder="Choose a username">
+                </div>
+            </div>
+
+            <div class="mb-4">
+                <label for="password" class="form-label text-secondary fw-semibold small">Password</label>
+                <div class="input-group">
+                        <span class="input-group-text bg-white text-muted border-end-0">
+                            <i class="bi bi-lock"></i>
+                        </span>
+                    <input type="password" id="password" class="form-control border-start-0 ps-0" required autocomplete="new-password" placeholder="Create a password">
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-pink w-100 rounded-3 py-2 fw-semibold fs-6 shadow-sm">
+                Sign Up &amp; Continue <i class="bi bi-arrow-right ms-1"></i>
+            </button>
+        </form>
+
+        <!-- Error Feedback Message -->
+        <p id="errorMsg" class="text-danger text-center small mt-3 mb-0 fw-semibold"></p>
+
+        <!-- Card Footer -->
+        <div class="text-center border-top mt-4 pt-3 text-muted small">
+            Already have an account?
+            <a href="/login.html" class="text-pink fw-semibold text-decoration-none ms-1">Log In</a>
         </div>
 
-        <button type="submit" class="btn-submit">Sign Up & Continue</button>
-    </form>
-
-    <p id="errorMsg"></p>
-
-    <div class="footer-text">
-        Already have an account? <a href="/login.html">Log In</a>
     </div>
 </div>
+
+<!-- Bootstrap 5.3 JavaScript Bundle -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
     // Display selected plan if coming from subscription page
     const selectedPlan = localStorage.getItem('selectedPlan');
     if (selectedPlan) {
         const badge = document.getElementById('planDisplay');
-        badge.innerText = `Selected Subscription: ${selectedPlan}`;
+        badge.innerHTML = `<i class="bi bi-stars me-1"></i> Selected Subscription: <strong>${selectedPlan}</strong>`;
         badge.style.display = 'block';
     }
 
@@ -180,6 +150,5 @@
         }
     }
 </script>
-
 </body>
 </html>

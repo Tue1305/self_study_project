@@ -4,219 +4,140 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Jenny's Nail Studio - Custom Nail Sculpting & Artistry</title>
+    <!-- Favicon -->
     <link rel="icon" type="image/x-icon" href="/favicon.ico?v=2">
+    <!-- Bootstrap 5.3 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <style>
         :root {
-            --primary: #e91e63;
-            --primary-hover: #d81b60;
-            --dark: #2c3e50;
-            --light: #f8f9fa;
-            --gray: #666;
-            --card-shadow: 0 4px 15px rgba(0,0,0,0.08);
+            --bs-primary-pink: #e91e63;
+            --bs-primary-pink-hover: #d81b60;
+        }
+        .text-pink { color: var(--bs-primary-pink) !important; }
+        .bg-pink { background-color: var(--bs-primary-pink) !important; }
+        .btn-pink {
+            background-color: var(--bs-primary-pink);
+            color: #fff;
+            border: none;
+        }
+        .btn-pink:hover {
+            background-color: var(--bs-primary-pink-hover);
+            color: #fff;
+        }
+        .btn-outline-pink {
+            color: var(--bs-primary-pink);
+            border-color: var(--bs-primary-pink);
+        }
+        .btn-outline-pink:hover {
+            background-color: var(--bs-primary-pink);
+            color: #fff;
         }
 
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            margin: 0;
-            padding: 0;
-            background-color: var(--light);
-            color: var(--dark);
-        }
-
-        /* Header Layout */
-        header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 18px 40px;
-            background: #fff;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-            position: sticky;
-            top: 0;
-            z-index: 100;
-        }
-
-        .header-left {
-            display: flex;
-            align-items: center;
-            gap: 20px;
-        }
-
-        .logo {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--primary);
-            text-decoration: none;
-        }
-
-        /* User Greeting Badge on Top Left */
-        .user-badge {
-            display: none; /* Shown dynamically via JS */
-            align-items: center;
-            gap: 8px;
-            background: #fff0f5;
-            color: var(--primary);
-            padding: 6px 14px;
-            border-radius: 20px;
-            font-size: 0.9rem;
-            font-weight: 600;
-            border: 1px solid #f8bbd0;
-        }
-
-        .user-badge .icon {
-            font-size: 1.1rem;
-        }
-
-        .nav-links {
-            display: flex;
-            align-items: center;
-            gap: 20px;
-        }
-
-        .nav-links a {
-            color: var(--dark);
-            text-decoration: none;
-            font-weight: 600;
-            transition: color 0.2s ease;
-        }
-
-        .nav-links a:hover { color: var(--primary); }
-
-        .btn-primary {
-            background: var(--primary);
-            color: #fff !important;
-            padding: 10px 22px;
-            border-radius: 20px;
-            transition: background 0.2s ease !important;
-        }
-
-        .btn-primary:hover { background: var(--primary-hover) !important; }
-
-        .btn-secondary {
-            border: 2px solid var(--primary);
-            color: var(--primary) !important;
-            padding: 8px 20px;
-            border-radius: 20px;
-            transition: all 0.2s ease !important;
-        }
-
-        .btn-secondary:hover {
-            background: var(--primary);
-            color: #fff !important;
-        }
-
-        /* Hero Section */
-        .hero {
-            padding: 80px 20px;
-            text-align: center;
-            background: #fff;
-            border-bottom: 1px solid #eee;
-        }
-
-        .hero h1 {
-            font-size: 2.8rem;
-            margin-bottom: 16px;
-            color: var(--dark);
-        }
-
-        .hero p {
-            font-size: 1.2rem;
-            color: var(--gray);
-            max-width: 600px;
-            margin: 0 auto 32px auto;
-            line-height: 1.5;
-        }
-
-        .hero-actions {
-            display: flex;
-            justify-content: center;
-            gap: 16px;
-            flex-wrap: wrap;
-        }
-
-        .container {
-            max-width: 1100px;
-            margin: 50px auto;
-            padding: 0 20px;
-        }
-
-        .section-title {
-            text-align: center;
-            font-size: 1.8rem;
-            margin-bottom: 30px;
-        }
-
-        .teaser-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 24px;
-        }
-
+        /* Feature Card Hover Effects */
         .teaser-card {
-            background: #fff;
-            border-radius: 12px;
-            padding: 24px;
-            box-shadow: var(--card-shadow);
-            border: 1px solid #eee;
-            text-align: center;
+            transition: transform 0.25s ease, box-shadow 0.25s ease;
         }
-
-        .teaser-card h3 {
-            color: var(--primary);
-            margin-top: 0;
-        }
-
-        .teaser-card p {
-            color: var(--gray);
-            font-size: 0.95rem;
+        .teaser-card:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.12) !important;
         }
     </style>
 </head>
-<body>
+<body class="bg-light d-flex flex-column min-vh-100">
 
-<header>
-    <div class="header-left">
-        <a href="/" class="logo">Jenny's Nail Studio</a>
-        <!-- User Badge shown next to logo when logged in -->
-        <div class="user-badge" id="userBadge">
-            <span class="icon">✨</span>
-            <span id="usernameDisplay">Client</span>
+<!-- Navigation Header -->
+<header class="navbar navbar-expand-lg bg-white shadow-sm sticky-top px-3 px-lg-4">
+    <div class="container-fluid">
+        <div class="d-flex align-items-center gap-3">
+            <a href="/" class="navbar-brand fw-bold text-pink fs-4 mb-0">Jenny's Nail Studio</a>
+            <!-- User Badge shown next to logo when logged in -->
+            <div class="badge bg-danger-subtle text-pink border border-danger-subtle rounded-pill px-3 py-2 fs-6 d-none align-items-center gap-1" id="userBadge">
+                <i class="bi bi-stars"></i>
+                <span id="usernameDisplay">Client</span>
+            </div>
         </div>
-    </div>
 
-    <div class="nav-links" id="authNav">
-        <!-- Injected via JavaScript -->
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <div class="navbar-nav ms-auto align-items-lg-center gap-2 gap-lg-3 pt-3 pt-lg-0" id="authNav">
+                <!-- Injected dynamically via JavaScript -->
+            </div>
+        </div>
     </div>
 </header>
 
-<!-- Hero Banner -->
-<section class="hero">
-    <h1 id="heroHeading">Custom Nail Extensions & Hand-Painted Artistry</h1>
-    <p id="heroSubheading">Elevate your personal style with professional Bio Gel, Acrylic sculpting, and high-shine Shellac manicures.</p>
+<!-- Hero Section -->
+<section class="bg-white py-5 border-bottom text-center">
+    <div class="container py-4">
+        <h1 class="display-5 fw-bold text-dark mb-3" id="heroHeading">Custom Nail Extensions & Hand-Painted Artistry</h1>
+        <p class="lead text-muted mx-auto mb-4" style="max-width: 650px;" id="heroSubheading">Elevate your personal style with professional Bio Gel, Acrylic sculpting, and high-shine Shellac manicures.</p>
 
-    <div class="hero-actions" id="heroAction">
-        <!-- Injected via JavaScript -->
+        <div class="d-flex justify-content-center gap-3 flex-wrap" id="heroAction">
+            <!-- Injected dynamically via JavaScript -->
+        </div>
     </div>
 </section>
 
-<div class="container">
-    <h2 class="section-title">Popular Services Overview</h2>
+<!-- Main Content Container -->
+<main class="container my-5 flex-grow-1">
+    <h2 class="text-center fw-bold fs-3 mb-4 text-dark">Popular Services Overview</h2>
 
-    <div class="teaser-grid">
-        <div class="teaser-card">
-            <h3>Bio Gel Full Set</h3>
-            <p>Durable extensions crafted with tips and high-quality sculpting gel for maximum strength.</p>
+    <div class="row row-cols-1 row-cols-md-3 g-4">
+        <!-- Service Teaser 1 -->
+        <div class="col">
+            <div class="card h-100 border-0 shadow-sm rounded-4 p-4 text-center teaser-card">
+                <div class="card-body d-flex flex-column align-items-center">
+                    <div class="rounded-circle bg-danger-subtle text-pink p-3 mb-3 fs-3 d-inline-flex align-items-center justify-content-center" style="width: 60px; height: 60px;">
+                        <i class="bi bi-gem"></i>
+                    </div>
+                    <h3 class="card-title h4 fw-bold text-pink mb-2">Bio Gel Full Set</h3>
+                    <p class="card-text text-muted fs-6">Durable extensions crafted with tips and high-quality sculpting gel for maximum strength.</p>
+                </div>
+            </div>
         </div>
-        <div class="teaser-card">
-            <h3>Acrylic Extensions</h3>
-            <p>Classic full set extensions tailored to your preferred length and shape.</p>
+
+        <!-- Service Teaser 2 -->
+        <div class="col">
+            <div class="card h-100 border-0 shadow-sm rounded-4 p-4 text-center teaser-card">
+                <div class="card-body d-flex flex-column align-items-center">
+                    <div class="rounded-circle bg-danger-subtle text-pink p-3 mb-3 fs-3 d-inline-flex align-items-center justify-content-center" style="width: 60px; height: 60px;">
+                        <i class="bi bi-brush"></i>
+                    </div>
+                    <h3 class="card-title h4 fw-bold text-pink mb-2">Acrylic Extensions</h3>
+                    <p class="card-text text-muted fs-6">Classic full set extensions tailored to your preferred length and shape.</p>
+                </div>
+            </div>
         </div>
-        <div class="teaser-card">
-            <h3>Shellac Manicure</h3>
-            <p>Nail trimming, detailed cuticle cleanup, and long-lasting glossy shellac finish.</p>
+
+        <!-- Service Teaser 3 -->
+        <div class="col">
+            <div class="card h-100 border-0 shadow-sm rounded-4 p-4 text-center teaser-card">
+                <div class="card-body d-flex flex-column align-items-center">
+                    <div class="rounded-circle bg-danger-subtle text-pink p-3 mb-3 fs-3 d-inline-flex align-items-center justify-content-center" style="width: 60px; height: 60px;">
+                        <i class="bi bi-magic"></i>
+                    </div>
+                    <h3 class="card-title h4 fw-bold text-pink mb-2">Shellac Manicure</h3>
+                    <p class="card-text text-muted fs-6">Nail trimming, detailed cuticle cleanup, and long-lasting glossy shellac finish.</p>
+                </div>
+            </div>
         </div>
     </div>
-</div>
+</main>
+
+<!-- Footer -->
+<footer class="bg-white border-top text-center py-3 mt-auto">
+    <div class="container">
+        <small class="text-muted">&copy; Jenny's Nail Studio — Custom Nail Sculpting & Artistry</small>
+    </div>
+</footer>
+
+<!-- Bootstrap 5.3 JavaScript Bundle -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
     // Utility to decode JWT token payload without external libraries
@@ -254,39 +175,41 @@
 
             // Display Username in Header
             usernameDisplay.textContent = activeUser;
-            userBadge.style.display = 'flex';
+            userBadge.classList.remove('d-none');
+            userBadge.classList.add('d-inline-flex');
 
             // Personalize Hero Header
             heroHeading.textContent = `Welcome back, ${activeUser}!`;
 
             // Logged-in Navigation Links
             authNav.innerHTML = `
-                <a href="/dashboard.html">Showcase</a>
-                <a href="/services.html">Services</a>
-                <a href="/subscription-plans.html">Subscriptions</a>
-                <a href="#" onclick="handleLogout()" class="btn-secondary">Logout</a>
-            `;
+                    <a href="/dashboard.html" class="nav-link fw-semibold text-dark">Showcase</a>
+                    <a href="/services.html" class="nav-link fw-semibold text-dark">Services</a>
+                    <a href="/subscription-plans.html" class="nav-link fw-semibold text-dark">Subscriptions</a>
+                    <a href="#" onclick="handleLogout()" class="btn btn-outline-pink rounded-pill px-3 py-1 btn-sm ms-lg-2">Logout</a>
+                `;
 
             // Logged-in Hero Actions
             heroAction.innerHTML = `
-                <a href="/dashboard.html" class="btn-primary">View Client Showcase</a>
-                <a href="/services.html" class="btn-secondary">View Services & Pricing</a>
-            `;
+                    <a href="/dashboard.html" class="btn btn-pink rounded-pill px-4 py-2 fs-6">View Client Showcase</a>
+                    <a href="/services.html" class="btn btn-outline-pink rounded-pill px-4 py-2 fs-6">View Services & Pricing</a>
+                `;
         } else {
             // Guest View
-            userBadge.style.display = 'none';
+            userBadge.classList.add('d-none');
+            userBadge.classList.remove('d-inline-flex');
 
             authNav.innerHTML = `
-                <a href="/services.html">Services</a>
-                <a href="/login.html">Log In</a>
-                <a href="/signup.html">Sign Up</a>
-                <a href="/subscription-plans.html" class="btn-primary">Subscriptions</a>
-            `;
+                    <a href="/services.html" class="nav-link fw-semibold text-dark">Services</a>
+                    <a href="/login.html" class="nav-link fw-semibold text-dark">Log In</a>
+                    <a href="/signup.html" class="nav-link fw-semibold text-dark">Sign Up</a>
+                    <a href="/subscription-plans.html" class="btn btn-pink rounded-pill px-3 py-1 btn-sm ms-lg-2">Subscriptions</a>
+                `;
 
             heroAction.innerHTML = `
-                <a href="/services.html" class="btn-primary">Explore Services & Menu</a>
-                <a href="/login.html" class="btn-secondary">Client Log In</a>
-            `;
+                    <a href="/services.html" class="btn btn-pink rounded-pill px-4 py-2 fs-6">Explore Services & Menu</a>
+                    <a href="/login.html" class="btn btn-outline-pink rounded-pill px-4 py-2 fs-6">Client Log In</a>
+                `;
         }
     });
 
@@ -296,6 +219,5 @@
         window.location.reload();
     }
 </script>
-
 </body>
 </html>

@@ -4,278 +4,197 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Subscription Plans - Jenny's Nail Studio</title>
+    <!-- Favicon Tag -->
     <link rel="icon" type="image/x-icon" href="/favicon.ico?v=2">
+    <!-- Bootstrap 5.3 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <style>
         :root {
-            --primary: #e91e63;
-            --primary-hover: #d81b60;
-            --dark: #2c3e50;
-            --light: #f8f9fa;
-            --gray: #666;
-            --border: #eee;
-            --card-shadow: 0 4px 15px rgba(0,0,0,0.08);
+            --bs-primary-pink: #e91e63;
+            --bs-primary-pink-hover: #d81b60;
+        }
+        .text-pink { color: var(--bs-primary-pink) !important; }
+        .bg-pink { background-color: var(--bs-primary-pink) !important; }
+        .btn-pink {
+            background-color: var(--bs-primary-pink);
+            color: #fff;
+            border: none;
+        }
+        .btn-pink:hover {
+            background-color: var(--bs-primary-pink-hover);
+            color: #fff;
+        }
+        .btn-outline-pink {
+            color: var(--bs-primary-pink);
+            border-color: var(--bs-primary-pink);
+        }
+        .btn-outline-pink:hover {
+            background-color: var(--bs-primary-pink);
+            color: #fff;
         }
 
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            margin: 0;
-            padding: 0;
-            background-color: var(--light);
-            color: var(--dark);
-        }
-
-        /* Sticky Header */
-        header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 18px 40px;
-            background: #fff;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-            position: sticky;
-            top: 0;
-            z-index: 100;
-        }
-
-        .logo {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--primary);
-            text-decoration: none;
-        }
-
-        .nav-links a {
-            margin-left: 24px;
-            color: var(--dark);
-            text-decoration: none;
-            font-weight: 600;
-            transition: color 0.2s ease;
-        }
-
-        .nav-links a:hover { color: var(--primary); }
-
-        .btn-book {
-            background: var(--primary);
-            color: #fff !important;
-            padding: 8px 18px;
-            border-radius: 20px;
-        }
-
-        /* Container */
-        .container {
-            max-width: 1100px;
-            margin: 40px auto;
-            padding: 0 20px;
-        }
-
-        .hero-banner {
-            text-align: center;
-            margin-bottom: 50px;
-        }
-
-        .hero-banner h1 {
-            font-size: 2.2rem;
-            margin-bottom: 8px;
-            color: var(--dark);
-        }
-
-        .hero-banner p {
-            color: var(--gray);
-            font-size: 1.1rem;
-            margin: 0;
-        }
-
-        /* Plans Grid */
-        .plans-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 30px;
-            align-items: stretch;
-        }
-
+        /* Plan Card Hover Effects */
         .plan-card {
-            background: #fff;
-            border-radius: 16px;
-            padding: 35px 25px;
-            box-shadow: var(--card-shadow);
-            border: 2px solid var(--border);
-            display: flex;
-            flex-direction: column;
-            position: relative;
             transition: transform 0.25s ease, box-shadow 0.25s ease;
         }
-
         .plan-card:hover {
             transform: translateY(-6px);
-            box-shadow: 0 12px 30px rgba(0,0,0,0.12);
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.12) !important;
         }
 
-        /* Highlight Featured VIP Plan */
+        /* Featured Plan Highlights */
         .plan-card.featured {
-            border-color: var(--primary);
+            border: 2px solid var(--bs-primary-pink) !important;
         }
 
         .popular-badge {
-            position: absolute;
             top: -14px;
             left: 50%;
             transform: translateX(-50%);
-            background: var(--primary);
-            color: #fff;
-            font-size: 0.75rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            padding: 4px 16px;
-            border-radius: 12px;
+            background-color: var(--bs-primary-pink);
             letter-spacing: 0.5px;
-        }
-
-        .plan-name {
-            font-size: 1.4rem;
-            font-weight: 700;
-            margin: 0 0 10px 0;
-            text-align: center;
-        }
-
-        .plan-price {
-            text-align: center;
-            font-size: 2.5rem;
-            font-weight: 800;
-            color: var(--dark);
-            margin-bottom: 20px;
-        }
-
-        .plan-price span {
-            font-size: 1rem;
-            color: var(--gray);
-            font-weight: 600;
-        }
-
-        .plan-features {
-            list-style: none;
-            padding: 0;
-            margin: 0 0 30px 0;
-            flex-grow: 1;
-        }
-
-        .plan-features li {
-            padding: 10px 0;
-            border-bottom: 1px solid #f0f0f0;
-            font-size: 0.95rem;
-            color: var(--gray);
-            display: flex;
-            align-items: center;
-        }
-
-        .plan-features li::before {
-            content: "✓";
-            color: var(--primary);
-            font-weight: bold;
-            margin-right: 10px;
-        }
-
-        .plan-btn {
-            display: block;
-            width: 100%;
-            text-align: center;
-            padding: 12px 0;
-            border-radius: 25px;
-            text-decoration: none;
-            font-weight: 700;
-            transition: all 0.2s ease;
-            box-sizing: border-box;
-            border: none;
-            cursor: pointer;
-        }
-
-        .btn-outline {
-            border: 2px solid var(--primary);
-            color: var(--primary);
-            background: transparent;
-        }
-
-        .btn-outline:hover {
-            background: var(--primary);
-            color: #fff;
-        }
-
-        .btn-solid {
-            background: var(--primary);
-            color: #fff;
-        }
-
-        .btn-solid:hover {
-            background: var(--primary-hover);
         }
     </style>
 </head>
-<body>
-<header>
-    <div class="header-left">
-        <a href="/" class="logo">Jenny's Nail Studio</a>
-        <!-- User Badge shown next to logo when logged in -->
-        <div class="user-badge" id="userBadge">
-            <span class="icon">✨</span>
-            <span id="usernameDisplay">Client</span>
+<body class="bg-light d-flex flex-column min-vh-100">
+
+<!-- Navigation Header -->
+<header class="navbar navbar-expand-lg bg-white shadow-sm sticky-top px-3 px-lg-4">
+    <div class="container-fluid">
+        <div class="d-flex align-items-center gap-3">
+            <a href="/" class="navbar-brand fw-bold text-pink fs-4 mb-0">Jenny's Nail Studio</a>
+            <!-- User Badge shown next to logo when logged in -->
+            <div class="badge bg-danger-subtle text-pink border border-danger-subtle rounded-pill px-3 py-2 fs-6 d-none align-items-center gap-1" id="userBadge">
+                <i class="bi bi-stars"></i>
+                <span id="usernameDisplay">Client</span>
+            </div>
         </div>
-    </div>
-    <div class="nav-links" id="authNav">
-        <!-- Dynamically filled based on login status -->
+
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <div class="navbar-nav ms-auto align-items-lg-center gap-2 gap-lg-3 pt-3 pt-lg-0" id="authNav">
+                <!-- Dynamically filled based on login status -->
+            </div>
+        </div>
     </div>
 </header>
 
-<div class="container">
-    <div class="hero-banner">
-        <h1>Client Membership & Subscription Plans</h1>
-        <p>Enjoy exclusive monthly savings, priority booking, and free refills.</p>
+<!-- Main Content Container -->
+<main class="container my-5 flex-grow-1" style="max-width: 1100px;">
+    <!-- Hero Banner -->
+    <div class="text-center mb-5">
+        <h1 class="display-6 fw-bold text-dark mb-2">Client Membership &amp; Subscription Plans</h1>
+        <p class="lead text-muted mx-auto" style="max-width: 650px;">Enjoy exclusive monthly savings, priority booking, and free refills.</p>
     </div>
 
-    <div class="plans-grid">
+    <!-- Plans Grid -->
+    <div class="row row-cols-1 row-cols-md-3 g-4 align-items-stretch">
 
         <!-- Basic Plan -->
-        <div class="plan-card">
-            <h3 class="plan-name">Classic Care</h3>
-            <div class="plan-price">$45 <span>/ month</span></div>
-            <ul class="plan-features">
-                <li>1 Shellac Manicure per month</li>
-                <li>Free Removal with any service</li>
-                <li>10% off custom nail art</li>
-                <li>Standard booking window</li>
-            </ul>
-            <button class="plan-btn btn-outline" onclick="selectPlan('Classic Care')">Select Plan</button>
+        <div class="col">
+            <div class="card h-100 border-0 shadow-sm rounded-4 p-4 plan-card d-flex flex-column justify-content-between">
+                <div>
+                    <h2 class="h4 fw-bold text-dark text-center mb-3">Classic Care</h2>
+                    <div class="text-center display-6 fw-bold text-dark mb-4">
+                        $45 <span class="fs-6 text-muted fw-normal">/ month</span>
+                    </div>
+                    <ul class="list-unstyled mb-4">
+                        <li class="py-2 border-bottom d-flex align-items-center text-muted fs-6">
+                            <i class="bi bi-check-lg text-pink fw-bold me-2 fs-5"></i> 1 Shellac Manicure per month
+                        </li>
+                        <li class="py-2 border-bottom d-flex align-items-center text-muted fs-6">
+                            <i class="bi bi-check-lg text-pink fw-bold me-2 fs-5"></i> Free Removal with any service
+                        </li>
+                        <li class="py-2 border-bottom d-flex align-items-center text-muted fs-6">
+                            <i class="bi bi-check-lg text-pink fw-bold me-2 fs-5"></i> 10% off custom nail art
+                        </li>
+                        <li class="py-2 border-bottom d-flex align-items-center text-muted fs-6">
+                            <i class="bi bi-check-lg text-pink fw-bold me-2 fs-5"></i> Standard booking window
+                        </li>
+                    </ul>
+                </div>
+                <button class="btn btn-outline-pink w-100 rounded-pill py-2 fw-bold" onclick="selectPlan('Classic Care')">Select Plan</button>
+            </div>
         </div>
 
         <!-- Featured VIP Plan -->
-        <div class="plan-card featured">
-            <span class="popular-badge">Most Popular</span>
-            <h3 class="plan-name">Bio / Acrylic VIP</h3>
-            <div class="plan-price">$75 <span>/ month</span></div>
-            <ul class="plan-features">
-                <li>2 Refills per month (Bio or Acrylic)</li>
-                <li>Free Medium Length Upgrade</li>
-                <li>Free Cuticle Trim Add-on</li>
-                <li>15% off custom nail design</li>
-                <li>Priority booking access</li>
-            </ul>
-            <button class="plan-btn btn-solid" onclick="selectPlan('Bio / Acrylic VIP')">Select VIP Plan</button>
+        <div class="col">
+            <div class="card h-100 border-0 shadow-sm rounded-4 p-4 plan-card featured position-relative d-flex flex-column justify-content-between">
+                <span class="badge position-absolute popular-badge text-uppercase text-white rounded-pill px-3 py-1 fs-7 fw-bold">Most Popular</span>
+                <div>
+                    <h2 class="h4 fw-bold text-dark text-center mb-3 mt-2">Bio / Acrylic VIP</h2>
+                    <div class="text-center display-6 fw-bold text-dark mb-4">
+                        $75 <span class="fs-6 text-muted fw-normal">/ month</span>
+                    </div>
+                    <ul class="list-unstyled mb-4">
+                        <li class="py-2 border-bottom d-flex align-items-center text-muted fs-6">
+                            <i class="bi bi-check-lg text-pink fw-bold me-2 fs-5"></i> 2 Refills per month (Bio or Acrylic)
+                        </li>
+                        <li class="py-2 border-bottom d-flex align-items-center text-muted fs-6">
+                            <i class="bi bi-check-lg text-pink fw-bold me-2 fs-5"></i> Free Medium Length Upgrade
+                        </li>
+                        <li class="py-2 border-bottom d-flex align-items-center text-muted fs-6">
+                            <i class="bi bi-check-lg text-pink fw-bold me-2 fs-5"></i> Free Cuticle Trim Add-on
+                        </li>
+                        <li class="py-2 border-bottom d-flex align-items-center text-muted fs-6">
+                            <i class="bi bi-check-lg text-pink fw-bold me-2 fs-5"></i> 15% off custom nail design
+                        </li>
+                        <li class="py-2 border-bottom d-flex align-items-center text-muted fs-6">
+                            <i class="bi bi-check-lg text-pink fw-bold me-2 fs-5"></i> Priority booking access
+                        </li>
+                    </ul>
+                </div>
+                <button class="btn btn-pink w-100 rounded-pill py-2 fw-bold shadow-sm" onclick="selectPlan('Bio / Acrylic VIP')">Select VIP Plan</button>
+            </div>
         </div>
 
         <!-- Platinum Unlimited Plan -->
-        <div class="plan-card">
-            <h3 class="plan-name">NailArt Platinum</h3>
-            <div class="plan-price">$120 <span>/ month</span></div>
-            <ul class="plan-features">
-                <li>1 Full Set Extension per month</li>
-                <li>Unlimited Refills & Removals</li>
-                <li>Free Length Upgrade (Extra Long)</li>
-                <li>Free Custom Art on every set</li>
-                <li>VIP Priority Calendar Access</li>
-            </ul>
-            <button class="plan-btn btn-outline" onclick="selectPlan('NailArt Platinum')">Select Platinum</button>
+        <div class="col">
+            <div class="card h-100 border-0 shadow-sm rounded-4 p-4 plan-card d-flex flex-column justify-content-between">
+                <div>
+                    <h2 class="h4 fw-bold text-dark text-center mb-3">NailArt Platinum</h2>
+                    <div class="text-center display-6 fw-bold text-dark mb-4">
+                        $120 <span class="fs-6 text-muted fw-normal">/ month</span>
+                    </div>
+                    <ul class="list-unstyled mb-4">
+                        <li class="py-2 border-bottom d-flex align-items-center text-muted fs-6">
+                            <i class="bi bi-check-lg text-pink fw-bold me-2 fs-5"></i> 1 Full Set Extension per month
+                        </li>
+                        <li class="py-2 border-bottom d-flex align-items-center text-muted fs-6">
+                            <i class="bi bi-check-lg text-pink fw-bold me-2 fs-5"></i> Unlimited Refills &amp; Removals
+                        </li>
+                        <li class="py-2 border-bottom d-flex align-items-center text-muted fs-6">
+                            <i class="bi bi-check-lg text-pink fw-bold me-2 fs-5"></i> Free Length Upgrade (Extra Long)
+                        </li>
+                        <li class="py-2 border-bottom d-flex align-items-center text-muted fs-6">
+                            <i class="bi bi-check-lg text-pink fw-bold me-2 fs-5"></i> Free Custom Art on every set
+                        </li>
+                        <li class="py-2 border-bottom d-flex align-items-center text-muted fs-6">
+                            <i class="bi bi-check-lg text-pink fw-bold me-2 fs-5"></i> VIP Priority Calendar Access
+                        </li>
+                    </ul>
+                </div>
+                <button class="btn btn-outline-pink w-100 rounded-pill py-2 fw-bold" onclick="selectPlan('NailArt Platinum')">Select Platinum</button>
+            </div>
         </div>
 
     </div>
-</div>
+</main>
+
+<!-- Footer -->
+<footer class="bg-white border-top text-center py-3 mt-auto">
+    <div class="container">
+        <small class="text-muted">&copy; Jenny's Nail Studio — Custom Nail Sculpting &amp; Artistry</small>
+    </div>
+</footer>
+
+<!-- Bootstrap 5.3 JavaScript Bundle -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
     const token = localStorage.getItem('accessToken');
@@ -286,20 +205,20 @@
         if (token) {
             // Logged-in navigation
             authNav.innerHTML = `
-                <a href="/dashboard.html">Showcase</a>
-                <a href="/services.html">Services</a>
-                <a href="/subscription-plans.html" style="color: var(--primary);">Subscriptions</a>
-                <a href="#" onclick="handleLogout()" class="btn-outline" style="padding: 6px 16px;">Logout</a>
-            `;
+                    <a href="/dashboard.html" class="nav-link fw-semibold text-dark">Showcase</a>
+                    <a href="/services.html" class="nav-link fw-semibold text-dark">Services</a>
+                    <a href="/subscription-plans.html" class="nav-link fw-semibold text-pink active">Subscriptions</a>
+                    <a href="#" onclick="handleLogout()" class="btn btn-outline-pink rounded-pill px-3 py-1 btn-sm ms-lg-2">Logout</a>
+                `;
             loadCurrentSubscription();
         } else {
             // Guest navigation
             authNav.innerHTML = `
-                <a href="/services.html">Services</a>
-                <a href="/subscription-plans.html" style="color: var(--primary);">Subscriptions</a>
-                <a href="/login.html">Log In</a>
-                <a href="/signup.html" class="btn-book">Sign Up</a>
-            `;
+                    <a href="/services.html" class="nav-link fw-semibold text-dark">Services</a>
+                    <a href="/subscription-plans.html" class="nav-link fw-semibold text-pink active">Subscriptions</a>
+                    <a href="/login.html" class="nav-link fw-semibold text-dark">Log In</a>
+                    <a href="/signup.html" class="btn btn-pink rounded-pill px-3 py-1 btn-sm ms-lg-2">Sign Up</a>
+                `;
         }
     });
 
@@ -358,6 +277,5 @@
         window.location.reload();
     }
 </script>
-
 </body>
 </html>

@@ -6,102 +6,79 @@
     <title>Admin Dashboard - Jenny's Nail Studio</title>
     <!-- Favicon Tag -->
     <link rel="icon" type="image/x-icon" href="/favicon.ico?=v2">
+    <!-- Bootstrap 5.3 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <style>
         :root {
-            --primary: #e91e63;
-            --dark: #2c3e50;
-            --light: #f8f9fa;
+            --bs-primary-pink: #e91e63;
         }
-
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            margin: 0;
-            padding: 0;
-            background-color: var(--light);
-            color: var(--dark);
+        .text-pink { color: var(--bs-primary-pink) !important; }
+        .btn-outline-pink {
+            color: var(--bs-primary-pink);
+            border-color: var(--bs-primary-pink);
         }
-
-        header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 15px 40px;
-            background: #fff;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-        }
-
-        .logo { font-size: 1.4rem; font-weight: bold; color: var(--primary); }
-        .btn-logout {
-            background: transparent;
-            border: 1px solid var(--primary);
-            color: var(--primary);
-            padding: 8px 16px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: bold;
-        }
-
-        .container {
-            max-width: 1000px;
-            margin: 40px auto;
-            padding: 0 20px;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            background: #fff;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
-            border-radius: 8px;
-            overflow: hidden;
-        }
-
-        th, td {
-            padding: 15px 20px;
-            text-align: left;
-            border-bottom: 1px solid #eee;
-        }
-
-        th {
-            background-color: var(--dark);
+        .btn-outline-pink:hover {
+            background-color: var(--bs-primary-pink);
             color: #fff;
         }
-
-        .badge {
-            padding: 5px 10px;
-            border-radius: 12px;
-            font-size: 12px;
-            font-weight: bold;
-        }
-
-        .badge-active { background: #e8f5e9; color: #2e7d32; }
-        .badge-inactive { background: #ffebee; color: #c62828; }
     </style>
 </head>
-<body>
+<body class="bg-light d-flex flex-column min-vh-100">
 
-<header>
-    <div class="logo">Admin Portal</div>
-    <a href="/" class="logo">Jenny's Nail Studio</a>
-    <button class="btn-logout" onclick="handleLogout()">Log Out</button>
+<!-- Header Navigation -->
+<header class="navbar navbar-expand bg-white shadow-sm px-4">
+    <div class="container-fluid">
+            <span class="navbar-brand fw-bold text-dark fs-5">
+                <i class="bi bi-shield-lock-fill text-pink me-2"></i>Admin Portal
+            </span>
+        <a href="/" class="navbar-brand fw-bold text-pink text-decoration-none">
+            Jenny's Nail Studio
+        </a>
+        <button class="btn btn-outline-pink btn-sm fw-semibold ms-auto" onclick="handleLogout()">
+            <i class="bi bi-box-arrow-right me-1"></i> Log Out
+        </button>
+    </div>
 </header>
 
-<div class="container">
-    <h2>Registered Users & Subscriptions</h2>
-    <table>
-        <thead>
-        <tr>
-            <th>User ID</th>
-            <th>Username</th>
-            <th>Subscription Tier</th>
-            <th>Status</th>
-        </tr>
-        </thead>
-        <tbody id="userTableBody">
-        <!-- User rows injected dynamically -->
-        </tbody>
-    </table>
-</div>
+<!-- Main Container -->
+<main class="container my-5 flex-grow-1">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="h3 fw-bold text-dark mb-0">
+            <i class="bi bi-people-fill text-pink me-2"></i>Registered Users & Subscriptions
+        </h2>
+    </div>
+
+    <!-- Users Table Card -->
+    <div class="card border-0 shadow-sm rounded-3 overflow-hidden">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-dark">
+                <tr>
+                    <th scope="col" class="py-3 px-4">User ID</th>
+                    <scope="col" class="py-3 px-4">Username</th>
+                    <th scope="col" class="py-3 px-4">Subscription Tier</th>
+                    <th scope="col" class="py-3 px-4">Status</th>
+                </tr>
+                </thead>
+                <tbody id="userTableBody">
+                <!-- User rows injected dynamically -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</main>
+
+<!-- Footer -->
+<footer class="bg-white border-top text-center py-3 mt-auto">
+    <div class="container">
+        <small class="text-muted">&copy; Jenny's Nail Studio — Admin Management Panel</small>
+    </div>
+</footer>
+
+<!-- Bootstrap 5.3 JavaScript Bundle -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
     const token = localStorage.getItem('accessToken');
@@ -129,11 +106,12 @@
 
                     const row = document.createElement('tr');
                     row.innerHTML = `
-                            <td>${user.id || 'N/A'}</td>
-                            <td>${user.username}</td>
-                            <td>${savedPlan}</td>
-                            <td>
-                                <span class="badge ${isActive ? 'badge-active' : 'badge-inactive'}">
+                            <td class="px-4 fw-semibold text-secondary">${user.id || 'N/A'}</td>
+                            <td class="px-4 fw-bold text-dark">${user.username}</td>
+                            <td class="px-4"><span class="badge bg-secondary-subtle text-secondary border px-2 py-1">${savedPlan}</span></td>
+                            <td class="px-4">
+                                <span class="badge ${isActive ? 'bg-success-subtle text-success border border-success-subtle' : 'bg-danger-subtle text-danger border border-danger-subtle'} px-3 py-2 rounded-pill">
+                                    <i class="bi ${isActive ? 'bi-check-circle-fill' : 'bi-x-circle-fill'} me-1"></i>
                                     ${isActive ? 'Active' : 'Inactive'}
                                 </span>
                             </td>

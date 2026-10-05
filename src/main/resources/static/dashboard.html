@@ -6,487 +6,335 @@
     <title>Work Portfolio - Jenny's Nail Studio</title>
     <!-- Favicon Tag -->
     <link rel="icon" type="image/x-icon" href="/favicon.ico?v=2">
+    <!-- Bootstrap 5.3 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <style>
         :root {
-            --primary: #e91e63;
-            --primary-hover: #d81b60;
-            --dark: #2c3e50;
-            --light: #f8f9fa;
-            --gray: #666;
-            --card-shadow: 0 4px 15px rgba(0,0,0,0.08);
+            --bs-primary-pink: #e91e63;
+            --bs-primary-pink-hover: #d81b60;
         }
-
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            margin: 0;
-            padding: 0;
-            background-color: var(--light);
-            color: var(--dark);
-        }
-
-        /* Navigation Header */
-        header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 18px 40px;
-            background: #fff;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-            position: sticky;
-            top: 0;
-            z-index: 100;
-        }
-
-        .header-left {
-            display: flex;
-            align-items: center;
-            gap: 20px;
-        }
-
-        .logo {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--primary);
-            letter-spacing: -0.5px;
-            text-decoration: none;
-        }
-
-        /* User Badge on Top Left */
-        .user-badge {
-            display: none; /* Shown dynamically via JavaScript */
-            align-items: center;
-            gap: 8px;
-            background: #fff0f5;
-            color: var(--primary);
-            padding: 6px 14px;
-            border-radius: 20px;
-            font-size: 0.9rem;
-            font-weight: 600;
-            border: 1px solid #f8bbd0;
-        }
-
-        .user-badge .icon {
-            font-size: 1.1rem;
-        }
-
-        .nav-links {
-            display: flex;
-            align-items: center;
-            gap: 20px;
-        }
-
-        .nav-links a {
-            color: var(--dark);
-            text-decoration: none;
-            font-weight: 600;
-            transition: color 0.2s ease;
-        }
-
-        .nav-links a:hover { color: var(--primary); }
-
-        .btn-book {
-            background: var(--primary);
-            color: #fff !important;
-            padding: 8px 18px;
-            border-radius: 20px;
-            transition: background 0.2s ease !important;
-        }
-
-        .btn-book:hover { background: var(--primary-hover) !important; }
-
-        .btn-outline {
-            border: 2px solid var(--primary);
-            color: var(--primary) !important;
-            padding: 6px 16px;
-            border-radius: 20px;
-            transition: all 0.2s ease;
-        }
-
-        .btn-outline:hover {
-            background: var(--primary);
-            color: #fff !important;
-        }
-
-        /* Main Container */
-        .container {
-            max-width: 1200px;
-            margin: 40px auto;
-            padding: 0 20px;
-        }
-
-        .hero-banner {
-            text-align: center;
-            margin-bottom: 40px;
-        }
-
-        .hero-banner h1 {
-            font-size: 2.2rem;
-            margin-bottom: 8px;
-            color: var(--dark);
-        }
-
-        .hero-banner p {
-            color: var(--gray);
-            font-size: 1.1rem;
-            margin: 0;
-        }
-
-        /* Filter Controls */
-        .filter-container {
-            display: flex;
-            justify-content: center;
-            gap: 12px;
-            margin-bottom: 35px;
-            flex-wrap: wrap;
-        }
-
-        .filter-btn {
-            background: #fff;
-            border: 1px solid #ddd;
-            padding: 8px 20px;
-            border-radius: 20px;
-            font-weight: 600;
-            color: var(--gray);
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .filter-btn:hover, .filter-btn.active {
-            background: var(--primary);
+        .text-pink { color: var(--bs-primary-pink) !important; }
+        .bg-pink { background-color: var(--bs-primary-pink) !important; }
+        .btn-pink {
+            background-color: var(--bs-primary-pink);
             color: #fff;
-            border-color: var(--primary);
+            border: none;
+        }
+        .btn-pink:hover {
+            background-color: var(--bs-primary-pink-hover);
+            color: #fff;
+        }
+        .btn-outline-pink {
+            color: var(--bs-primary-pink);
+            border-color: var(--bs-primary-pink);
+        }
+        .btn-outline-pink:hover {
+            background-color: var(--bs-primary-pink);
+            color: #fff;
         }
 
-        /* Flexbox Showcase Gallery */
-        .showcase-gallery {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 25px;
-            justify-content: center;
-        }
-
-        /* Individual Card Item */
+        /* Card Hover Effects */
         .gallery-card {
-            background: #fff;
-            border-radius: 12px;
-            box-shadow: var(--card-shadow);
-            width: 280px;
-            flex: 1 1 280px;
-            max-width: 360px;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
             transition: transform 0.25s ease, box-shadow 0.25s ease;
         }
-
         .gallery-card:hover {
             transform: translateY(-6px);
-            box-shadow: 0 10px 25px rgba(0,0,0,0.12);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.12) !important;
         }
-
         .image-wrapper {
-            position: relative;
-            width: 100%;
-            height: 280px;
-            background-color: #eee;
+            height: 260px;
             overflow: hidden;
         }
-
         .image-wrapper img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
             transition: transform 0.35s ease;
         }
-
         .gallery-card:hover .image-wrapper img {
             transform: scale(1.06);
         }
 
-        .tag-badge {
-            position: absolute;
-            top: 12px;
-            right: 12px;
-            background: rgba(0,0,0,0.65);
-            color: #fff;
-            font-size: 11px;
-            font-weight: 700;
-            padding: 4px 10px;
-            border-radius: 12px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            backdrop-filter: blur(4px);
-        }
-
-        .card-body {
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            flex-grow: 1;
-        }
-
-        .card-title {
-            font-size: 1.15rem;
-            margin: 0 0 8px 0;
-            color: var(--dark);
-            font-weight: 700;
-        }
-
-        .card-desc {
-            font-size: 0.9rem;
-            color: var(--gray);
-            margin: 0 0 15px 0;
-            line-height: 1.4;
-        }
-
-        .card-footer {
-            margin-top: auto;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-top: 1px solid #eee;
-            padding-top: 12px;
-        }
-
-        .tech-credit {
-            font-size: 0.85rem;
-            font-weight: 600;
-            color: var(--primary);
-        }
-
-        .time-spent {
-            font-size: 0.8rem;
-            color: #888;
+        /* Filter Button Active Custom Styling */
+        .filter-btn.active {
+            background-color: var(--bs-primary-pink) !important;
+            color: #fff !important;
+            border-color: var(--bs-primary-pink) !important;
         }
     </style>
 </head>
-<body>
+<body class="bg-light d-flex flex-column min-vh-100">
 
-<header>
-    <div class="header-left">
-        <a href="/" class="logo">Jenny's Nail Studio</a>
-        <!-- User Badge shown next to logo when logged in -->
-        <div class="user-badge" id="userBadge">
-            <span class="icon">✨</span>
-            <span id="usernameDisplay">Client</span>
+<!-- Navigation Header -->
+<header class="navbar navbar-expand-lg bg-white shadow-sm sticky-top px-3 px-lg-4">
+    <div class="container-fluid">
+        <div class="d-flex align-items-center gap-3">
+            <a href="/" class="navbar-brand fw-bold text-pink fs-4 mb-0">Jenny's Nail Studio</a>
+            <!-- User Badge shown next to logo when logged in -->
+            <div class="badge bg-danger-subtle text-pink border border-danger-subtle rounded-pill px-3 py-2 fs-6 d-none align-items-center gap-1" id="userBadge">
+                <i class="bi bi-stars"></i>
+                <span id="usernameDisplay">Client</span>
+            </div>
         </div>
-    </div>
-    <div class="nav-links" id="authNav">
-        <!-- Injected dynamically via JavaScript -->
+
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <div class="navbar-nav ms-auto align-items-lg-center gap-2 gap-lg-3 pt-3 pt-lg-0" id="authNav">
+                <!-- Injected dynamically via JavaScript -->
+            </div>
+        </div>
     </div>
 </header>
 
-<div class="container">
-    <div class="hero-banner">
-        <h1 id="heroTitle">Recent Work & Client Creations</h1>
-        <p>Explore recent sets completed by our resident nail technician.</p>
+<!-- Main Content Container -->
+<main class="container my-5 flex-grow-1">
+    <!-- Hero Banner -->
+    <div class="text-center mb-4">
+        <h1 class="display-6 fw-bold text-dark" id="heroTitle">Recent Work & Client Creations</h1>
+        <p class="text-muted fs-5">Explore recent sets completed by our resident nail technician.</p>
     </div>
 
     <!-- Category Filters -->
-    <div class="filter-container">
-        <button class="filter-btn active" onclick="filterGallery(event, 'all')">All Sets</button>
-        <button class="filter-btn" onclick="filterGallery(event, 'gel')">Bio Gel</button>
-        <button class="filter-btn" onclick="filterGallery(event, 'acrylic')">Acrylic Sets</button>
-        <button class="filter-btn" onclick="filterGallery(event, 'art')">Custom Art</button>
+    <div class="d-flex justify-content-center gap-2 mb-5 flex-wrap" id="filterContainer">
+        <button class="btn btn-outline-secondary rounded-pill px-4 filter-btn active" onclick="filterGallery(event, 'all')">All Sets</button>
+        <button class="btn btn-outline-secondary rounded-pill px-4 filter-btn" onclick="filterGallery(event, 'gel')">Bio Gel</button>
+        <button class="btn btn-outline-secondary rounded-pill px-4 filter-btn" onclick="filterGallery(event, 'acrylic')">Acrylic Sets</button>
+        <button class="btn btn-outline-secondary rounded-pill px-4 filter-btn" onclick="filterGallery(event, 'art')">Custom Art</button>
     </div>
 
-    <!-- Showcase Gallery -->
-    <div class="showcase-gallery" id="galleryGrid">
+    <!-- Showcase Gallery Grid -->
+    <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-4" id="galleryGrid">
 
         <!-- Card 1 -->
-        <div class="gallery-card" data-category="gel">
-            <div class="image-wrapper">
-                <img src="/nail_collection/nail4.png" alt="Almond Chrome Set">
-                <span class="tag-badge">Gel-X</span>
-            </div>
-            <div class="card-body">
-                <h3 class="card-title">Short Almond Chrome</h3>
-                <p class="card-desc">Milky white base with iridescent pearl chrome dust finish.</p>
-                <div class="card-footer">
-                    <span class="tech-credit">Tech: @NailArtistry</span>
-                    <span class="time-spent">1 hr 15 mins</span>
+        <div class="col gallery-card" data-category="gel">
+            <div class="card h-100 border-0 shadow-sm rounded-3 overflow-hidden">
+                <div class="image-wrapper position-relative bg-secondary-subtle">
+                    <img src="/nail_collection/nail4.png" class="card-img-top w-100 h-100 object-fit-cover" alt="Almond Chrome Set">
+                    <span class="badge bg-dark bg-opacity-75 text-white position-absolute top-0 end-0 m-3 px-2 py-1 rounded-pill text-uppercase">Gel-X</span>
+                </div>
+                <div class="card-body d-flex flex-column p-4">
+                    <h3 class="card-title h5 fw-bold text-dark">Short Almond Chrome</h3>
+                    <p class="card-text text-muted small">Milky white base with iridescent pearl chrome dust finish.</p>
+                    <div class="mt-auto pt-3 border-top d-flex justify-content-between align-items-center">
+                        <span class="fw-semibold text-pink small">Tech: @NailArtistry</span>
+                        <span class="text-secondary small">1 hr 15 mins</span>
+                    </div>
                 </div>
             </div>
         </div>
 
         <!-- Card 2 -->
-        <div class="gallery-card" data-category="art">
-            <div class="image-wrapper">
-                <img src="/nail_collection/nail5.png" alt="Botanical Art">
-                <span class="tag-badge">Custom Art</span>
-            </div>
-            <div class="card-body">
-                <h3 class="card-title">Hand-Painted Botanical</h3>
-                <p class="card-desc">Matte nude background with fine line leaf detail and gold foil highlights.</p>
-                <div class="card-footer">
-                    <span class="tech-credit">Tech: @NailArtistry</span>
-                    <span class="time-spent">1 hr 45 mins</span>
+        <div class="col gallery-card" data-category="art">
+            <div class="card h-100 border-0 shadow-sm rounded-3 overflow-hidden">
+                <div class="image-wrapper position-relative bg-secondary-subtle">
+                    <img src="/nail_collection/nail5.png" class="card-img-top w-100 h-100 object-fit-cover" alt="Botanical Art">
+                    <span class="badge bg-dark bg-opacity-75 text-white position-absolute top-0 end-0 m-3 px-2 py-1 rounded-pill text-uppercase">Custom Art</span>
+                </div>
+                <div class="card-body d-flex flex-column p-4">
+                    <h3 class="card-title h5 fw-bold text-dark">Hand-Painted Botanical</h3>
+                    <p class="card-text text-muted small">Matte nude background with fine line leaf detail and gold foil highlights.</p>
+                    <div class="mt-auto pt-3 border-top d-flex justify-content-between align-items-center">
+                        <span class="fw-semibold text-pink small">Tech: @NailArtistry</span>
+                        <span class="text-secondary small">1 hr 45 mins</span>
+                    </div>
                 </div>
             </div>
         </div>
 
         <!-- Card 3 -->
-        <div class="gallery-card" data-category="acrylic">
-            <div class="image-wrapper">
-                <img src="/nail_collection/nail6.png" alt="Ombre French">
-                <span class="tag-badge">Acrylic</span>
-            </div>
-            <div class="card-body">
-                <h3 class="card-title">Coffin French Ombre</h3>
-                <p class="card-desc">Classic pink-and-white gradient extended coffin sculpt.</p>
-                <div class="card-footer">
-                    <span class="tech-credit">Tech: @NailArtistry</span>
-                    <span class="time-spent">1 hr 30 mins</span>
+        <div class="col gallery-card" data-category="acrylic">
+            <div class="card h-100 border-0 shadow-sm rounded-3 overflow-hidden">
+                <div class="image-wrapper position-relative bg-secondary-subtle">
+                    <img src="/nail_collection/nail6.png" class="card-img-top w-100 h-100 object-fit-cover" alt="Ombre French">
+                    <span class="badge bg-dark bg-opacity-75 text-white position-absolute top-0 end-0 m-3 px-2 py-1 rounded-pill text-uppercase">Acrylic</span>
+                </div>
+                <div class="card-body d-flex flex-column p-4">
+                    <h3 class="card-title h5 fw-bold text-dark">Coffin French Ombre</h3>
+                    <p class="card-text text-muted small">Classic pink-and-white gradient extended coffin sculpt.</p>
+                    <div class="mt-auto pt-3 border-top d-flex justify-content-between align-items-center">
+                        <span class="fw-semibold text-pink small">Tech: @NailArtistry</span>
+                        <span class="text-secondary small">1 hr 30 mins</span>
+                    </div>
                 </div>
             </div>
         </div>
 
         <!-- Card 4 -->
-        <div class="gallery-card" data-category="art">
-            <div class="image-wrapper">
-                <img src="/nail_collection/nail7.png" alt="3D Jelly Nails">
-                <span class="tag-badge">Custom Art</span>
-            </div>
-            <div class="card-body">
-                <h3 class="card-title">3D Y2K Jelly Sculpt</h3>
-                <p class="card-desc">Translucent pink jelly base layered with raised 3D gel swirls and charms.</p>
-                <div class="card-footer">
-                    <span class="tech-credit">Tech: @NailArtistry</span>
-                    <span class="time-spent">2 hrs</span>
+        <div class="col gallery-card" data-category="art">
+            <div class="card h-100 border-0 shadow-sm rounded-3 overflow-hidden">
+                <div class="image-wrapper position-relative bg-secondary-subtle">
+                    <img src="/nail_collection/nail7.png" class="card-img-top w-100 h-100 object-fit-cover" alt="3D Jelly Nails">
+                    <span class="badge bg-dark bg-opacity-75 text-white position-absolute top-0 end-0 m-3 px-2 py-1 rounded-pill text-uppercase">Custom Art</span>
+                </div>
+                <div class="card-body d-flex flex-column p-4">
+                    <h3 class="card-title h5 fw-bold text-dark">3D Y2K Jelly Sculpt</h3>
+                    <p class="card-text text-muted small">Translucent pink jelly base layered with raised 3D gel swirls and charms.</p>
+                    <div class="mt-auto pt-3 border-top d-flex justify-content-between align-items-center">
+                        <span class="fw-semibold text-pink small">Tech: @NailArtistry</span>
+                        <span class="text-secondary small">2 hrs</span>
+                    </div>
                 </div>
             </div>
         </div>
 
         <!-- Card 5 -->
-        <div class="gallery-card" data-category="art">
-            <div class="image-wrapper">
-                <img src="/nail_collection/nail8.png" alt="3D Jelly Nails">
-                <span class="tag-badge">Custom Art</span>
-            </div>
-            <div class="card-body">
-                <h3 class="card-title">3D Y2K Jelly Sculpt</h3>
-                <p class="card-desc">Translucent pink jelly base layered with raised 3D gel swirls and charms.</p>
-                <div class="card-footer">
-                    <span class="tech-credit">Tech: @NailArtistry</span>
-                    <span class="time-spent">2 hrs</span>
+        <div class="col gallery-card" data-category="art">
+            <div class="card h-100 border-0 shadow-sm rounded-3 overflow-hidden">
+                <div class="image-wrapper position-relative bg-secondary-subtle">
+                    <img src="/nail_collection/nail8.png" class="card-img-top w-100 h-100 object-fit-cover" alt="3D Jelly Nails">
+                    <span class="badge bg-dark bg-opacity-75 text-white position-absolute top-0 end-0 m-3 px-2 py-1 rounded-pill text-uppercase">Custom Art</span>
+                </div>
+                <div class="card-body d-flex flex-column p-4">
+                    <h3 class="card-title h5 fw-bold text-dark">3D Y2K Jelly Sculpt</h3>
+                    <p class="card-text text-muted small">Translucent pink jelly base layered with raised 3D gel swirls and charms.</p>
+                    <div class="mt-auto pt-3 border-top d-flex justify-content-between align-items-center">
+                        <span class="fw-semibold text-pink small">Tech: @NailArtistry</span>
+                        <span class="text-secondary small">2 hrs</span>
+                    </div>
                 </div>
             </div>
         </div>
 
         <!-- Card 6 -->
-        <div class="gallery-card" data-category="art">
-            <div class="image-wrapper">
-                <img src="/nail_collection/nail1.png" alt="3D Jelly Nails">
-                <span class="tag-badge">Custom Art</span>
-            </div>
-            <div class="card-body">
-                <h3 class="card-title">3D Y2K Jelly Sculpt</h3>
-                <p class="card-desc">Translucent pink jelly base layered with raised 3D gel swirls and charms.</p>
-                <div class="card-footer">
-                    <span class="tech-credit">Tech: @NailArtistry</span>
-                    <span class="time-spent">2 hrs</span>
+        <div class="col gallery-card" data-category="art">
+            <div class="card h-100 border-0 shadow-sm rounded-3 overflow-hidden">
+                <div class="image-wrapper position-relative bg-secondary-subtle">
+                    <img src="/nail_collection/nail1.png" class="card-img-top w-100 h-100 object-fit-cover" alt="3D Jelly Nails">
+                    <span class="badge bg-dark bg-opacity-75 text-white position-absolute top-0 end-0 m-3 px-2 py-1 rounded-pill text-uppercase">Custom Art</span>
+                </div>
+                <div class="card-body d-flex flex-column p-4">
+                    <h3 class="card-title h5 fw-bold text-dark">3D Y2K Jelly Sculpt</h3>
+                    <p class="card-text text-muted small">Translucent pink jelly base layered with raised 3D gel swirls and charms.</p>
+                    <div class="mt-auto pt-3 border-top d-flex justify-content-between align-items-center">
+                        <span class="fw-semibold text-pink small">Tech: @NailArtistry</span>
+                        <span class="text-secondary small">2 hrs</span>
+                    </div>
                 </div>
             </div>
         </div>
 
         <!-- Card 7 -->
-        <div class="gallery-card" data-category="art">
-            <div class="image-wrapper">
-                <img src="/nail_collection/nail10.png" alt="3D Jelly Nails">
-                <span class="tag-badge">Custom Art</span>
-            </div>
-            <div class="card-body">
-                <h3 class="card-title">3D Y2K Jelly Sculpt</h3>
-                <p class="card-desc">Translucent pink jelly base layered with raised 3D gel swirls and charms.</p>
-                <div class="card-footer">
-                    <span class="tech-credit">Tech: @NailArtistry</span>
-                    <span class="time-spent">2 hrs</span>
+        <div class="col gallery-card" data-category="art">
+            <div class="card h-100 border-0 shadow-sm rounded-3 overflow-hidden">
+                <div class="image-wrapper position-relative bg-secondary-subtle">
+                    <img src="/nail_collection/nail10.png" class="card-img-top w-100 h-100 object-fit-cover" alt="3D Jelly Nails">
+                    <span class="badge bg-dark bg-opacity-75 text-white position-absolute top-0 end-0 m-3 px-2 py-1 rounded-pill text-uppercase">Custom Art</span>
+                </div>
+                <div class="card-body d-flex flex-column p-4">
+                    <h3 class="card-title h5 fw-bold text-dark">3D Y2K Jelly Sculpt</h3>
+                    <p class="card-text text-muted small">Translucent pink jelly base layered with raised 3D gel swirls and charms.</p>
+                    <div class="mt-auto pt-3 border-top d-flex justify-content-between align-items-center">
+                        <span class="fw-semibold text-pink small">Tech: @NailArtistry</span>
+                        <span class="text-secondary small">2 hrs</span>
+                    </div>
                 </div>
             </div>
         </div>
 
         <!-- Card 8 -->
-        <div class="gallery-card" data-category="art">
-            <div class="image-wrapper">
-                <img src="/nail_collection/nail11.png" alt="3D Jelly Nails">
-                <span class="tag-badge">Custom Art</span>
-            </div>
-            <div class="card-body">
-                <h3 class="card-title">3D Y2K Jelly Sculpt</h3>
-                <p class="card-desc">Translucent pink jelly base layered with raised 3D gel swirls and charms.</p>
-                <div class="card-footer">
-                    <span class="tech-credit">Tech: @NailArtistry</span>
-                    <span class="time-spent">2 hrs</span>
+        <div class="col gallery-card" data-category="art">
+            <div class="card h-100 border-0 shadow-sm rounded-3 overflow-hidden">
+                <div class="image-wrapper position-relative bg-secondary-subtle">
+                    <img src="/nail_collection/nail11.png" class="card-img-top w-100 h-100 object-fit-cover" alt="3D Jelly Nails">
+                    <span class="badge bg-dark bg-opacity-75 text-white position-absolute top-0 end-0 m-3 px-2 py-1 rounded-pill text-uppercase">Custom Art</span>
+                </div>
+                <div class="card-body d-flex flex-column p-4">
+                    <h3 class="card-title h5 fw-bold text-dark">3D Y2K Jelly Sculpt</h3>
+                    <p class="card-text text-muted small">Translucent pink jelly base layered with raised 3D gel swirls and charms.</p>
+                    <div class="mt-auto pt-3 border-top d-flex justify-content-between align-items-center">
+                        <span class="fw-semibold text-pink small">Tech: @NailArtistry</span>
+                        <span class="text-secondary small">2 hrs</span>
+                    </div>
                 </div>
             </div>
         </div>
 
         <!-- Card 9 -->
-        <div class="gallery-card" data-category="art">
-            <div class="image-wrapper">
-                <img src="/nail_collection/nail12.png" alt="3D Jelly Nails">
-                <span class="tag-badge">Custom Art</span>
-            </div>
-            <div class="card-body">
-                <h3 class="card-title">3D Y2K Jelly Sculpt</h3>
-                <p class="card-desc">Translucent pink jelly base layered with raised 3D gel swirls and charms.</p>
-                <div class="card-footer">
-                    <span class="tech-credit">Tech: @NailArtistry</span>
-                    <span class="time-spent">2 hrs</span>
+        <div class="col gallery-card" data-category="art">
+            <div class="card h-100 border-0 shadow-sm rounded-3 overflow-hidden">
+                <div class="image-wrapper position-relative bg-secondary-subtle">
+                    <img src="/nail_collection/nail12.png" class="card-img-top w-100 h-100 object-fit-cover" alt="3D Jelly Nails">
+                    <span class="badge bg-dark bg-opacity-75 text-white position-absolute top-0 end-0 m-3 px-2 py-1 rounded-pill text-uppercase">Custom Art</span>
+                </div>
+                <div class="card-body d-flex flex-column p-4">
+                    <h3 class="card-title h5 fw-bold text-dark">3D Y2K Jelly Sculpt</h3>
+                    <p class="card-text text-muted small">Translucent pink jelly base layered with raised 3D gel swirls and charms.</p>
+                    <div class="mt-auto pt-3 border-top d-flex justify-content-between align-items-center">
+                        <span class="fw-semibold text-pink small">Tech: @NailArtistry</span>
+                        <span class="text-secondary small">2 hrs</span>
+                    </div>
                 </div>
             </div>
         </div>
 
         <!-- Card 10 -->
-        <div class="gallery-card" data-category="art">
-            <div class="image-wrapper">
-                <img src="/nail_collection/nail13.png" alt="3D Jelly Nails">
-                <span class="tag-badge">Custom Art</span>
-            </div>
-            <div class="card-body">
-                <h3 class="card-title">3D Y2K Jelly Sculpt</h3>
-                <p class="card-desc">Translucent pink jelly base layered with raised 3D gel swirls and charms.</p>
-                <div class="card-footer">
-                    <span class="tech-credit">Tech: @NailArtistry</span>
-                    <span class="time-spent">2 hrs</span>
+        <div class="col gallery-card" data-category="art">
+            <div class="card h-100 border-0 shadow-sm rounded-3 overflow-hidden">
+                <div class="image-wrapper position-relative bg-secondary-subtle">
+                    <img src="/nail_collection/nail13.png" class="card-img-top w-100 h-100 object-fit-cover" alt="3D Jelly Nails">
+                    <span class="badge bg-dark bg-opacity-75 text-white position-absolute top-0 end-0 m-3 px-2 py-1 rounded-pill text-uppercase">Custom Art</span>
+                </div>
+                <div class="card-body d-flex flex-column p-4">
+                    <h3 class="card-title h5 fw-bold text-dark">3D Y2K Jelly Sculpt</h3>
+                    <p class="card-text text-muted small">Translucent pink jelly base layered with raised 3D gel swirls and charms.</p>
+                    <div class="mt-auto pt-3 border-top d-flex justify-content-between align-items-center">
+                        <span class="fw-semibold text-pink small">Tech: @NailArtistry</span>
+                        <span class="text-secondary small">2 hrs</span>
+                    </div>
                 </div>
             </div>
         </div>
 
         <!-- Card 11 -->
-        <div class="gallery-card" data-category="art">
-            <div class="image-wrapper">
-                <img src="/nail_collection/nail2.png" alt="3D Jelly Nails">
-                <span class="tag-badge">Custom Art</span>
-            </div>
-            <div class="card-body">
-                <h3 class="card-title">3D Y2K Jelly Sculpt</h3>
-                <p class="card-desc">Translucent pink jelly base layered with raised 3D gel swirls and charms.</p>
-                <div class="card-footer">
-                    <span class="tech-credit">Tech: @NailArtistry</span>
-                    <span class="time-spent">2 hrs</span>
+        <div class="col gallery-card" data-category="art">
+            <div class="card h-100 border-0 shadow-sm rounded-3 overflow-hidden">
+                <div class="image-wrapper position-relative bg-secondary-subtle">
+                    <img src="/nail_collection/nail2.png" class="card-img-top w-100 h-100 object-fit-cover" alt="3D Jelly Nails">
+                    <span class="badge bg-dark bg-opacity-75 text-white position-absolute top-0 end-0 m-3 px-2 py-1 rounded-pill text-uppercase">Custom Art</span>
+                </div>
+                <div class="card-body d-flex flex-column p-4">
+                    <h3 class="card-title h5 fw-bold text-dark">3D Y2K Jelly Sculpt</h3>
+                    <p class="card-text text-muted small">Translucent pink jelly base layered with raised 3D gel swirls and charms.</p>
+                    <div class="mt-auto pt-3 border-top d-flex justify-content-between align-items-center">
+                        <span class="fw-semibold text-pink small">Tech: @NailArtistry</span>
+                        <span class="text-secondary small">2 hrs</span>
+                    </div>
                 </div>
             </div>
         </div>
 
         <!-- Card 12 -->
-        <div class="gallery-card" data-category="art">
-            <div class="image-wrapper">
-                <img src="/nail_collection/nail3.png" alt="3D Jelly Nails">
-                <span class="tag-badge">Custom Art</span>
-            </div>
-            <div class="card-body">
-                <h3 class="card-title">3D Y2K Jelly Sculpt</h3>
-                <p class="card-desc">Translucent pink jelly base layered with raised 3D gel swirls and charms.</p>
-                <div class="card-footer">
-                    <span class="tech-credit">Tech: @NailArtistry</span>
-                    <span class="time-spent">2 hrs</span>
+        <div class="col gallery-card" data-category="art">
+            <div class="card h-100 border-0 shadow-sm rounded-3 overflow-hidden">
+                <div class="image-wrapper position-relative bg-secondary-subtle">
+                    <img src="/nail_collection/nail3.png" class="card-img-top w-100 h-100 object-fit-cover" alt="3D Jelly Nails">
+                    <span class="badge bg-dark bg-opacity-75 text-white position-absolute top-0 end-0 m-3 px-2 py-1 rounded-pill text-uppercase">Custom Art</span>
+                </div>
+                <div class="card-body d-flex flex-column p-4">
+                    <h3 class="card-title h5 fw-bold text-dark">3D Y2K Jelly Sculpt</h3>
+                    <p class="card-text text-muted small">Translucent pink jelly base layered with raised 3D gel swirls and charms.</p>
+                    <div class="mt-auto pt-3 border-top d-flex justify-content-between align-items-center">
+                        <span class="fw-semibold text-pink small">Tech: @NailArtistry</span>
+                        <span class="text-secondary small">2 hrs</span>
+                    </div>
                 </div>
             </div>
         </div>
 
     </div>
-</div>
+</main>
+
+<!-- Footer -->
+<footer class="bg-white border-top text-center py-3 mt-auto">
+    <div class="container">
+        <small class="text-muted">&copy; Jenny's Nail Studio — Client Portfolio & Gallery</small>
+    </div>
+</footer>
+
+<!-- Bootstrap 5.3 JavaScript Bundle -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
     // Helper function to decode JWT claims safely
@@ -502,6 +350,18 @@
             return null;
         }
     }
+    document.addEventListener('DOMContentLoaded', () => {
+        const token = localStorage.getItem('accessToken');
+        const username = localStorage.getItem('username');
+        const userBadge = document.getElementById('userBadge');
+        const usernameDisplay = document.getElementById('usernameDisplay');
+
+        if (token && username && userBadge && usernameDisplay) {
+            usernameDisplay.textContent = username;
+            userBadge.classList.remove('d-none');
+            userBadge.classList.add('d-inline-flex');
+        }
+    });
 
     document.addEventListener('DOMContentLoaded', () => {
         const token = localStorage.getItem('accessToken');
@@ -520,25 +380,27 @@
 
             // Display User Badge
             usernameDisplay.textContent = activeUser;
-            userBadge.style.display = 'flex';
+            userBadge.classList.remove('d-none');
+            userBadge.classList.add('d-inline-flex');
 
             // Populate Logged-In Header Links
             authNav.innerHTML = `
-                <a href="/dashboard.html" style="color: var(--primary);">Showcase</a>
-                <a href="/services.html">Services</a>
-                <a href="/subscription-plans.html">Subscriptions</a>
-                <a href="/profile.html">Profile</a>
-                <a href="#" onclick="handleLogout()" class="btn-outline">Logout</a>
-            `;
+                    <a href="/dashboard.html" class="nav-link fw-semibold text-pink active">Showcase</a>
+                    <a href="/services.html" class="nav-link fw-semibold text-dark">Services</a>
+                    <a href="/subscription-plans.html" class="nav-link fw-semibold text-dark">Subscriptions</a>
+                    <a href="/profile.html" class="nav-link fw-semibold text-dark">Profile</a>
+                    <a href="#" onclick="handleLogout()" class="btn btn-outline-pink rounded-pill px-3 py-1 btn-sm">Logout</a>
+                `;
         } else {
             // Guest Header Links
-            userBadge.style.display = 'none';
+            userBadge.classList.add('d-none');
+            userBadge.classList.remove('d-inline-flex');
             authNav.innerHTML = `
-                <a href="/services.html">Services</a>
-                <a href="/subscription-plans.html">Subscriptions</a>
-                <a href="/login.html">Log in</a>
-                <a href="/signup.html" class="btn-book">Sign up</a>
-            `;
+                    <a href="/services.html" class="nav-link fw-semibold text-dark">Services</a>
+                    <a href="/subscription-plans.html" class="nav-link fw-semibold text-dark">Subscriptions</a>
+                    <a href="/login.html" class="nav-link fw-semibold text-dark">Log in</a>
+                    <a href="/signup.html" class="btn btn-pink rounded-pill px-3 py-1 btn-sm">Sign up</a>
+                `;
         }
     });
 
@@ -559,9 +421,9 @@
         cards.forEach(card => {
             const cardCategory = card.getAttribute('data-category');
             if (category === 'all' || cardCategory === category) {
-                card.style.display = 'flex';
+                card.classList.remove('d-none');
             } else {
-                card.style.display = 'none';
+                card.classList.add('d-none');
             }
         });
     }

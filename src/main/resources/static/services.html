@@ -4,262 +4,207 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Services & Pricing - Jenny's Nail Studio</title>
+    <!-- Favicon Tag -->
     <link rel="icon" type="image/x-icon" href="/favicon.ico?v=2">
+    <!-- Bootstrap 5.3 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <style>
         :root {
-            --primary: #e91e63;
-            --primary-hover: #d81b60;
-            --dark: #2c3e50;
-            --light: #f8f9fa;
-            --gray: #666;
-            --border: #eee;
-            --card-shadow: 0 4px 15px rgba(0,0,0,0.06);
+            --bs-primary-pink: #e91e63;
+            --bs-primary-pink-hover: #d81b60;
+        }
+        .text-pink { color: var(--bs-primary-pink) !important; }
+        .bg-pink { background-color: var(--bs-primary-pink) !important; }
+        .btn-pink {
+            background-color: var(--bs-primary-pink);
+            color: #fff;
+            border: none;
+        }
+        .btn-pink:hover {
+            background-color: var(--bs-primary-pink-hover);
+            color: #fff;
+        }
+        .btn-outline-pink {
+            color: var(--bs-primary-pink);
+            border-color: var(--bs-primary-pink);
+        }
+        .btn-outline-pink:hover {
+            background-color: var(--bs-primary-pink);
+            color: #fff;
         }
 
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            margin: 0;
-            padding: 0;
-            background-color: var(--light);
-            color: var(--dark);
+        /* Card Hover Effects */
+        .service-card, .addons-card {
+            transition: transform 0.25s ease, box-shadow 0.25s ease;
         }
-
-        header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 18px 40px;
-            background: #fff;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-            position: sticky;
-            top: 0;
-            z-index: 100;
-        }
-
-        .logo {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--primary);
-        }
-
-        .nav-links a {
-            margin-left: 24px;
-            color: var(--dark);
-            text-decoration: none;
-            font-weight: 600;
-            transition: color 0.2s;
-        }
-
-        .nav-links a:hover { color: var(--primary); }
-
-        .btn-book {
-            background: var(--primary);
-            color: #fff !important;
-            padding: 8px 18px;
-            border-radius: 20px;
-        }
-
-        .container {
-            max-width: 1000px;
-            margin: 40px auto;
-            padding: 0 20px;
-        }
-
-        .hero-banner {
-            text-align: center;
-            margin-bottom: 40px;
-        }
-
-        .hero-banner h1 {
-            font-size: 2.2rem;
-            margin-bottom: 8px;
-        }
-
-        .hero-banner p {
-            color: var(--gray);
-            font-size: 1.1rem;
-        }
-
-        .service-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 25px;
-            margin-bottom: 40px;
-        }
-
-        .service-card {
-            background: #fff;
-            border-radius: 12px;
-            padding: 24px;
-            box-shadow: var(--card-shadow);
-            border: 1px solid var(--border);
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-        }
-
-        .service-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 12px;
-        }
-
-        .service-title {
-            font-size: 1.2rem;
-            font-weight: 700;
-            margin: 0;
-        }
-
-        .service-desc {
-            color: var(--gray);
-            font-size: 0.95rem;
-            line-height: 1.4;
-            margin-bottom: 20px;
-        }
-
-        .category-title {
-            font-size: 1.4rem;
-            font-weight: 700;
-            margin: 40px 0 20px 0;
-            padding-bottom: 8px;
-            border-bottom: 2px solid var(--primary);
-            display: inline-block;
-        }
-
-        /* Extras Section */
-        .addons-card {
-            background: #fff;
-            border-radius: 12px;
-            padding: 25px;
-            box-shadow: var(--card-shadow);
-            border: 1px solid var(--border);
-        }
-
-        .addon-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 12px 0;
-            border-bottom: 1px dashed var(--border);
-        }
-
-        .addon-item:last-child {
-            border-bottom: none;
-        }
-
-        .addon-name {
-            font-weight: 600;
-        }
-
-        .addon-price {
-            color: var(--primary);
-            font-weight: 700;
+        .service-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.12) !important;
         }
     </style>
 </head>
-<body>
-<header>
-    <div class="header-left">
-        <a href="/" class="logo">Jenny's Nail Studio</a>
-        <!-- User Badge shown next to logo when logged in -->
-        <div class="user-badge" id="userBadge">
-            <span class="icon">✨</span>
-            <span id="usernameDisplay">Client</span>
+<body class="bg-light d-flex flex-column min-vh-100">
+
+<!-- Navigation Header -->
+<header class="navbar navbar-expand-lg bg-white shadow-sm sticky-top px-3 px-lg-4">
+    <div class="container-fluid">
+        <div class="d-flex align-items-center gap-3">
+            <a href="/" class="navbar-brand fw-bold text-pink fs-4 mb-0">Jenny's Nail Studio</a>
+            <!-- User Badge shown next to logo when logged in -->
+            <div class="badge bg-danger-subtle text-pink border border-danger-subtle rounded-pill px-3 py-2 fs-6 d-none align-items-center gap-1" id="userBadge">
+                <i class="bi bi-stars"></i>
+                <span id="usernameDisplay">Client</span>
+            </div>
         </div>
-    </div>
-    <div class="nav-links">
-        <a href="/login.html">Log in</a>
-        <a href="/signup.html">Sign up</a>
-        <a href="/index.html" class="btn-book">Subscription Plans</a>
+
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <div class="navbar-nav ms-auto align-items-lg-center gap-2 gap-lg-3 pt-3 pt-lg-0" id="authNav">
+                <a href="/login.html" class="nav-link fw-semibold text-dark">Log in</a>
+                <a href="/signup.html" class="nav-link fw-semibold text-dark">Sign up</a>
+                <a href="/index.html" class="btn btn-pink rounded-pill px-3 py-1 btn-sm ms-lg-2">Subscription Plans</a>
+            </div>
+        </div>
     </div>
 </header>
 
-<div class="container">
-    <div class="hero-banner">
-        <h1>Services & Pricing Menu</h1>
-        <p>Professional nail care, extensions, and custom hand-painted art.</p>
+<!-- Main Content Container -->
+<main class="container my-5 flex-grow-1" style="max-width: 1000px;">
+    <!-- Hero Banner -->
+    <div class="text-center mb-5">
+        <h1 class="display-6 fw-bold text-dark mb-2">Services & Pricing Menu</h1>
+        <p class="lead text-muted mx-auto" style="max-width: 600px;">Professional nail care, extensions, and custom hand-painted art.</p>
     </div>
 
-    <div class="category-title">Main Services</div>
-    <div class="service-grid">
+    <!-- Section Title: Main Services -->
+    <div class="d-inline-block border-bottom border-3 border-danger pb-2 mb-4">
+        <h2 class="h4 fw-bold text-dark mb-0">Main Services</h2>
+    </div>
 
+    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4 mb-5">
         <!-- Bio Gel Extension -->
-        <div class="service-card">
-            <div>
-                <div class="service-header">
-                    <h3 class="service-title">Bio Full Set Extension</h3>
+        <div class="col">
+            <div class="card h-100 border-0 shadow-sm rounded-4 p-4 service-card">
+                <div class="card-body p-0 d-flex flex-column">
+                    <div class="d-flex align-items-center gap-2 mb-3 text-pink">
+                        <i class="bi bi-gem fs-4"></i>
+                        <h3 class="card-title h5 fw-bold text-dark mb-0">Bio Full Set Extension</h3>
+                    </div>
+                    <p class="card-text text-muted fs-6">Full set extension created longer using tips and high-quality bio gel sculpting.</p>
                 </div>
-                <p class="service-desc">Full set extension created longer using tips and high-quality bio gel sculpting.</p>
             </div>
         </div>
 
         <!-- Bio Refill -->
-        <div class="service-card">
-            <div>
-                <div class="service-header">
-                    <h3 class="service-title">Bio Refill</h3>
+        <div class="col">
+            <div class="card h-100 border-0 shadow-sm rounded-4 p-4 service-card">
+                <div class="card-body p-0 d-flex flex-column">
+                    <div class="d-flex align-items-center gap-2 mb-3 text-pink">
+                        <i class="bi bi-arrow-repeat fs-4"></i>
+                        <h3 class="card-title h5 fw-bold text-dark mb-0">Bio Refill</h3>
+                    </div>
+                    <p class="card-text text-muted fs-6">Maintenance fill for existing bio gel sets to restore structure and shine.</p>
                 </div>
-                <p class="service-desc">Maintenance fill for existing bio gel sets to restore structure and shine.</p>
             </div>
         </div>
 
         <!-- Acrylic Full Set -->
-        <div class="service-card">
-            <div>
-                <div class="service-header">
-                    <h3 class="service-title">Acrylic Full Set</h3>
+        <div class="col">
+            <div class="card h-100 border-0 shadow-sm rounded-4 p-4 service-card">
+                <div class="card-body p-0 d-flex flex-column">
+                    <div class="d-flex align-items-center gap-2 mb-3 text-pink">
+                        <i class="bi bi-brush fs-4"></i>
+                        <h3 class="card-title h5 fw-bold text-dark mb-0">Acrylic Full Set</h3>
+                    </div>
+                    <p class="card-text text-muted fs-6">Classic full acrylic set structured for enhanced durability and length.</p>
                 </div>
-                <p class="service-desc">Classic full acrylic set structured for enhanced durability and length.</p>
             </div>
         </div>
 
         <!-- Acrylic Refill -->
-        <div class="service-card">
-            <div>
-                <div class="service-header">
-                    <h3 class="service-title">Acrylic Refill</h3>
+        <div class="col">
+            <div class="card h-100 border-0 shadow-sm rounded-4 p-4 service-card">
+                <div class="card-body p-0 d-flex flex-column">
+                    <div class="d-flex align-items-center gap-2 mb-3 text-pink">
+                        <i class="bi bi-arrow-clockwise fs-4"></i>
+                        <h3 class="card-title h5 fw-bold text-dark mb-0">Acrylic Refill</h3>
+                    </div>
+                    <p class="card-text text-muted fs-6">In-fill maintenance service for acrylic extensions as your natural nails grow.</p>
                 </div>
-                <p class="service-desc">In-fill maintenance service for acrylic extensions as your natural nails grow.</p>
             </div>
         </div>
 
         <!-- Manicure -->
-        <div class="service-card">
-            <div>
-                <div class="service-header">
-                    <h3 class="service-title">Shellac Manicure</h3>
+        <div class="col">
+            <div class="card h-100 border-0 shadow-sm rounded-4 p-4 service-card">
+                <div class="card-body p-0 d-flex flex-column">
+                    <div class="d-flex align-items-center gap-2 mb-3 text-pink">
+                        <i class="bi bi-magic fs-4"></i>
+                        <h3 class="card-title h5 fw-bold text-dark mb-0">Shellac Manicure</h3>
+                    </div>
+                    <p class="card-text text-muted fs-6">Complete natural nail care including nail trimming, detailed cuticle cleaning, and shellac polish application.</p>
                 </div>
-                <p class="service-desc">Complete natural nail care including nail trimming, detailed cuticle cleaning, and shellac polish application.</p>
             </div>
         </div>
-
     </div>
 
-    <!-- Extras / Add-ons -->
-    <div class="category-title">Add-ons & Extras</div>
-    <div class="addons-card">
-        <div class="addon-item">
-            <span class="addon-name">Removal</span>
-            <span class="addon-price">$5</span>
-        </div>
-        <div class="addon-item">
-            <span class="addon-name">Trim Cuticle Extra</span>
-            <span class="addon-price">$10</span>
-        </div>
-        <div class="addon-item">
-            <span class="addon-name">Length: Medium</span>
-            <span class="addon-price">+$5</span>
-        </div>
-        <div class="addon-item">
-            <span class="addon-name">Length: Extra Long</span>
-            <span class="addon-price">+$10</span>
-        </div>
-        <div class="addon-item">
-            <span class="addon-name">Custom Nail Design</span>
-            <span class="addon-price">$10 & up</span>
+    <!-- Section Title: Add-ons & Extras -->
+    <div class="d-inline-block border-bottom border-3 border-danger pb-2 mb-4">
+        <h2 class="h4 fw-bold text-dark mb-0">Add-ons & Extras</h2>
+    </div>
+
+    <div class="card border-0 shadow-sm rounded-4 p-4 addons-card mb-4">
+        <div class="list-group list-group-flush">
+            <div class="list-group-item d-flex justify-content-between align-items-center bg-transparent py-3 px-0 border-bottom border-dashed">
+                <span class="fw-semibold text-dark">Removal</span>
+                <span class="fw-bold text-pink fs-5">$5</span>
+            </div>
+            <div class="list-group-item d-flex justify-content-between align-items-center bg-transparent py-3 px-0 border-bottom border-dashed">
+                <span class="fw-semibold text-dark">Trim Cuticle Extra</span>
+                <span class="fw-bold text-pink fs-5">$10</span>
+            </div>
+            <div class="list-group-item d-flex justify-content-between align-items-center bg-transparent py-3 px-0 border-bottom border-dashed">
+                <span class="fw-semibold text-dark">Length: Medium</span>
+                <span class="fw-bold text-pink fs-5">+$5</span>
+            </div>
+            <div class="list-group-item d-flex justify-content-between align-items-center bg-transparent py-3 px-0 border-bottom border-dashed">
+                <span class="fw-semibold text-dark">Length: Extra Long</span>
+                <span class="fw-bold text-pink fs-5">+$10</span>
+            </div>
+            <div class="list-group-item d-flex justify-content-between align-items-center bg-transparent py-3 px-0 border-0">
+                <span class="fw-semibold text-dark">Custom Nail Design</span>
+                <span class="fw-bold text-pink fs-5">$10 & up</span>
+            </div>
         </div>
     </div>
-</div>
+</main>
 
+<!-- Footer -->
+<footer class="bg-white border-top text-center py-3 mt-auto">
+    <div class="container">
+        <small class="text-muted">&copy; Jenny's Nail Studio — Custom Nail Sculpting & Artistry</small>
+    </div>
+</footer>
+
+<!-- Bootstrap 5.3 JavaScript Bundle -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+    const token = localStorage.getItem('accessToken');
+    const username = localStorage.getItem('username');
+    const userBadge = document.getElementById('userBadge');
+    const usernameDisplay = document.getElementById('usernameDisplay');
+
+    if (token && username && userBadge && usernameDisplay) {
+        usernameDisplay.textContent = username;
+        userBadge.classList.remove('d-none');
+        userBadge.classList.add('d-inline-flex');
+    }
+});</script>
 </body>
 </html>

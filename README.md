@@ -2,6 +2,7 @@
 
 A full-stack RESTful application and DevOps platform built with **Spring Boot 3.2.5**, **Spring Security 6**, and **JSON Web Tokens (JWT)**. The application features stateless Bearer token authorization, an integrated single-page frontend, and an automated multi-environment CI/CD deployment pipeline on Ubuntu 24.04 LTS.
 
+[View Project Timesheet](./TIMESHEET.MD)
 ---
 
 ## ✨ Features

@@ -1,5 +1,11 @@
-package com.example.demo;
+package com.example.demo.controller;
 
+import com.example.demo.dto.JwtAuthResponse;
+import com.example.demo.dto.LoginRequest;
+import com.example.demo.dto.RegisterRequest;
+import com.example.demo.entity.UserEntity;
+import com.example.demo.repository.UserRepository;
+import com.example.demo.security.JwtUtil;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;

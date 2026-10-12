@@ -1,5 +1,7 @@
-package com.example.demo;
+package com.example.demo.config;
 
+import com.example.demo.security.CustomUserDetailsService;
+import com.example.demo.security.JwtAuthenticationFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -44,6 +46,7 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/",
                                 "/index.html",
+                                "/booking.html",
                                 "/login.html",
                                 "/signup.html",
                                 "/profile.html",
@@ -52,6 +55,8 @@ public class SecurityConfig {
                                 "/dashboard.html",
                                 "/products.html",
                                 "/services.html",
+                                "/api/services/**",
+                                "/api/appointments/**",
                                 "/favicon.ico",
                                 "/*.css",
                                 "/*.js",

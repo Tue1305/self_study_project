@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Book an Appointment - Jenny's Nail Studio</title>
+    <!-- Bootstrap 5 CDN -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --bs-primary-pink: #e91e63;
+            --bs-primary-pink-hover: #d81b60;
+        }
+        .text-pink { color: var(--bs-primary-pink) !important; }
+        .bg-pink { background-color: var(--bs-primary-pink) !important; }
+        .btn-pink {
+            background-color: var(--bs-primary-pink);
+            color: #fff;
+            border: none;
+        }
+        .btn-pink:hover {
+            background-color: var(--bs-primary-pink-hover);
+            color: #fff;
+        }
+        .btn-outline-pink {
+            color: var(--bs-primary-pink);
+            border-color: var(--bs-primary-pink);
+        }
+        .btn-outline-pink:hover {
+            background-color: var(--bs-primary-pink);
+            color: #fff;
+        }
+
+        /* Feature Card Hover Effects */
+        .teaser-card {
+            transition: transform 0.25s ease, box-shadow 0.25s ease;
+        }
+        .teaser-card:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.12) !important;
+        }
+    </style>
+</head>
+<body class="bg-light">
+
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card shadow-sm border-0 rounded-4 teaser-card">
+                <div class="card-body p-4 p-md-5">
+                    <h2 class="text-center text-pink mb-2 fw-bold">Jenny's Nail Studio</h2>
+                    <p class="text-center text-muted mb-4">Book your next nail session online!</p>
+
+                    <div id="successMessage" class="alert alert-success d-none text-center" role="alert">
+                        🎉 Appointment booked successfully! We look forward to seeing you.
+                    </div>
+
+                    <form id="bookingForm">
+                        <div class="mb-3">
+                            <label for="customerName" class="form-label fw-semibold">Full Name</label>
+                            <input type="text" class="form-control" id="customerName" required placeholder="Jane Doe">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="customerPhone" class="form-label fw-semibold">Phone Number</label>
+                            <input type="tel" class="form-control" id="customerPhone" required placeholder="(555) 000-0000">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="customerEmail" class="form-label fw-semibold">Email Address</label>
+                            <input type="email" class="form-control" id="customerEmail" required placeholder="jane@example.com">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="serviceSelect" class="form-label fw-semibold">Select Nail Service</label>
+                            <select class="form-select" id="serviceSelect" required>
+                                <option value="">Loading services...</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-4">
+                            <label for="appointmentTime" class="form-label fw-semibold">Date & Time</label>
+                            <input type="datetime-local" class="form-control" id="appointmentTime" required>
+                        </div>
+
+                        <button type="submit" class="btn btn-pink w-100 btn-lg rounded-3 fw-bold">Confirm Booking</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bootstrap 5 JS Bundle -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+    // Fetch available services on load
+    window.addEventListener('DOMContentLoaded', async () => {
+        try {
+            const response = await fetch('/api/services');
+            const services = await response.json();
+            const select = document.getElementById('serviceSelect');
+
+            select.innerHTML = '<option value="">-- Choose a Service --</option>';
+            services.forEach(service => {
+                const option = document.createElement('option');
+                option.value = service.id;
+                option.textContent = `${service.name} ($${service.price} - ${service.durationMinutes} mins)`;
+                select.appendChild(option);
+            });
+        } catch (err) {
+            console.error('Error loading services:', err);
+            document.getElementById('serviceSelect').innerHTML = '<option value="">Error loading services</option>';
+        }
+    });
+
+    // Handle form submit
+    document.getElementById('bookingForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const bookingData = {
+            customerName: document.getElementById('customerName').value,
+            customerPhone: document.getElementById('customerPhone').value,
+            customerEmail: document.getElementById('customerEmail').value,
+            service: { id: parseInt(document.getElementById('serviceSelect').value) },
+            appointmentTime: document.getElementById('appointmentTime').value
+        };
+
+        try {
+            const response = await fetch('/api/appointments', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(bookingData)
+            });
+
+            if (response.ok) {
+                document.getElementById('bookingForm').reset();
+                document.getElementById('successMessage').classList.remove('d-none');
+            } else {
+                alert('Failed to book appointment. Please try again.');
+            }
+        } catch (err) {
+            console.error('Error submitting booking:', err);
+            alert('An error occurred while connecting to the server.');
+        }
+    });
+</script>
+
+</body>
+</html>

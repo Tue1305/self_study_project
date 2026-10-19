@@ -10,6 +10,8 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Bootstrap Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <!-- FullCalendar 6 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css" rel="stylesheet">
     <style>
         :root {
             --bs-primary-pink: #e91e63;
@@ -23,6 +25,12 @@
             background-color: var(--bs-primary-pink);
             color: #fff;
         }
+        #calendar {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
     </style>
 </head>
 <body class="bg-light d-flex flex-column min-vh-100">
@@ -30,9 +38,9 @@
 <!-- Header Navigation -->
 <header class="navbar navbar-expand bg-white shadow-sm px-4">
     <div class="container-fluid">
-            <span class="navbar-brand fw-bold text-dark fs-5">
-                <i class="bi bi-shield-lock-fill text-pink me-2"></i>Admin Portal
-            </span>
+        <span class="navbar-brand fw-bold text-dark fs-5">
+            <i class="bi bi-shield-lock-fill text-pink me-2"></i>Admin Portal
+        </span>
         <a href="/" class="navbar-brand fw-bold text-pink text-decoration-none">
             Jenny's Nail Studio
         </a>
@@ -46,29 +54,35 @@
 <main class="container my-5 flex-grow-1">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2 class="h3 fw-bold text-dark mb-0">
-            <i class="bi bi-people-fill text-pink me-2"></i>Registered Users & Subscriptions
+            <i class="bi bi-calendar-check-fill text-pink me-2"></i>Appointment Schedule
         </h2>
     </div>
 
-    <!-- Users Table Card -->
-    <div class="card border-0 shadow-sm rounded-3 overflow-hidden">
-        <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
-                <thead class="table-dark">
-                <tr>
-                    <th scope="col" class="py-3 px-4">User ID</th>
-                    <scope="col" class="py-3 px-4">Username</th>
-                    <th scope="col" class="py-3 px-4">Subscription Tier</th>
-                    <th scope="col" class="py-3 px-4">Status</th>
-                </tr>
-                </thead>
-                <tbody id="userTableBody">
-                <!-- User rows injected dynamically -->
-                </tbody>
-            </table>
-        </div>
+    <!-- Calendar Card Container -->
+    <div class="card border-0 shadow-sm rounded-3 p-3">
+        <div id="calendar"></div>
     </div>
 </main>
+
+<!-- Appointment Details Modal -->
+<div class="modal fade" id="appointmentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold text-dark">
+                    <i class="bi bi-info-circle text-pink me-2"></i>Booking Details
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="modalBody">
+                <!-- Populated dynamically -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <!-- Footer -->
 <footer class="bg-white border-top text-center py-3 mt-auto">
@@ -79,51 +93,82 @@
 
 <!-- Bootstrap 5.3 JavaScript Bundle -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<!-- FullCalendar 6 JS -->
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
 
 <script>
+    // Token verification check on page load
     const token = localStorage.getItem('accessToken');
     if (!token) {
         window.location.href = './login.html';
     } else {
-        loadUsers();
+        document.addEventListener('DOMContentLoaded', initCalendar);
     }
 
-    async function loadUsers() {
-        try {
-            const response = await fetch('/api/auth/admin/users', {
-                headers: { 'Authorization': 'Bearer ' + token }
-            });
+    function initCalendar() {
+        const calendarEl = document.getElementById('calendar');
 
-            if (response.ok) {
-                const users = await response.json();
-                const tableBody = document.getElementById('userTableBody');
-                tableBody.innerHTML = '';
+        const calendar = new FullCalendar.Calendar(calendarEl, {
+            initialView: 'timeGridWeek',
+            headerToolbar: {
+                left: 'prev,next today',
+                center: 'title',
+                right: 'dayGridMonth,timeGridWeek,timeGridDay'
+            },
+            // Fetch appointments from your Spring Boot backend
+            events: function(fetchInfo, successCallback, failureCallback) {
+                fetch('/api/appointments', {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                })
+                    .then(response => {
+                        if (!response.ok) throw new Error('Failed to fetch appointments');
+                        return response.json();
+                    })
+                    .then(data => {
+                        const events = data.map(apt => {
+                            return {
+                                id: apt.id,
+                                title: `${apt.customerName} - ${apt.service ? apt.service.name : 'Service'}`,
+                                start: apt.appointmentTime,
+                                backgroundColor: apt.status === 'CONFIRMED' ? '#198754' : '#ffc107',
+                                borderColor: apt.status === 'CONFIRMED' ? '#198754' : '#ffc107',
+                                textColor: '#000',
+                                extendedProps: {
+                                    phone: apt.customerPhone,
+                                    email: apt.customerEmail,
+                                    status: apt.status,
+                                    serviceName: apt.service ? apt.service.name : 'N/A'
+                                }
+                            };
+                        });
+                        successCallback(events);
+                    })
+                    .catch(error => {
+                        console.error('Error loading calendar events:', error);
+                        failureCallback(error);
+                    });
+            },
+            // Open modal showing booking info when admin clicks an appointment block
+            eventClick: function(info) {
+                const props = info.event.extendedProps;
+                const modalBody = document.getElementById('modalBody');
+                const customerName = info.event.title.split(' - ')[0];
 
-                users.forEach(user => {
-                    // Check if subscription info is saved locally or in DB
-                    const savedPlan = localStorage.getItem('selectedPlan') || 'None';
-                    const isActive = savedPlan !== 'None';
+                modalBody.innerHTML = `
+                    <p class="mb-2"><strong>Customer Name:</strong> ${customerName}</p>
+                    <p class="mb-2"><strong>Phone Number:</strong> <a href="tel:${props.phone}" class="text-decoration-none">${props.phone}</a></p>
+                    <p class="mb-2"><strong>Email:</strong> <a href="mailto:${props.email}" class="text-decoration-none">${props.email}</a></p>
+                    <p class="mb-2"><strong>Service:</strong> ${props.serviceName}</p>
+                    <p class="mb-2"><strong>Time:</strong> ${info.event.start.toLocaleString()}</p>
+                    <p class="mb-0"><strong>Status:</strong> <span class="badge bg-secondary">${props.status}</span></p>
+                `;
 
-                    const row = document.createElement('tr');
-                    row.innerHTML = `
-                            <td class="px-4 fw-semibold text-secondary">${user.id || 'N/A'}</td>
-                            <td class="px-4 fw-bold text-dark">${user.username}</td>
-                            <td class="px-4"><span class="badge bg-secondary-subtle text-secondary border px-2 py-1">${savedPlan}</span></td>
-                            <td class="px-4">
-                                <span class="badge ${isActive ? 'bg-success-subtle text-success border border-success-subtle' : 'bg-danger-subtle text-danger border border-danger-subtle'} px-3 py-2 rounded-pill">
-                                    <i class="bi ${isActive ? 'bi-check-circle-fill' : 'bi-x-circle-fill'} me-1"></i>
-                                    ${isActive ? 'Active' : 'Inactive'}
-                                </span>
-                            </td>
-                        `;
-                    tableBody.appendChild(row);
-                });
-            } else {
-                alert('Failed to fetch users or unauthorized.');
+                const modal = new bootstrap.Modal(document.getElementById('appointmentModal'));
+                modal.show();
             }
-        } catch (err) {
-            console.error(err);
-        }
+        });
+
+        calendar.render();
     }
 
     function handleLogout() {

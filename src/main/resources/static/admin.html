@@ -78,7 +78,9 @@
                 <!-- Populated dynamically -->
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-success btn-sm" onclick="updateAppointmentStatus('CONFIRMED')">Confirm</button>
+                <button type="button" class="btn btn-danger btn-sm" onclick="updateAppointmentStatus('CANCELLED')">Cancel</button>
+                <button type="button" class="btn btn-secondary btn-sm ms-auto" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
     </div>
@@ -97,8 +99,10 @@
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
 
 <script>
-    // Token verification check on page load
+    let currentAppointmentId = null;
     const token = localStorage.getItem('accessToken');
+
+    // Token verification check on page load
     if (!token) {
         window.location.href = './login.html';
     } else {
@@ -126,13 +130,17 @@
                     })
                     .then(data => {
                         const events = data.map(apt => {
+                            let badgeColor = '#ffc107'; // PENDING
+                            if (apt.status === 'CONFIRMED') badgeColor = '#198754'; // GREEN
+                            if (apt.status === 'CANCELLED') badgeColor = '#dc3545'; // RED
+
                             return {
                                 id: apt.id,
                                 title: `${apt.customerName} - ${apt.service ? apt.service.name : 'Service'}`,
                                 start: apt.appointmentTime,
-                                backgroundColor: apt.status === 'CONFIRMED' ? '#198754' : '#ffc107',
-                                borderColor: apt.status === 'CONFIRMED' ? '#198754' : '#ffc107',
-                                textColor: '#000',
+                                backgroundColor: badgeColor,
+                                borderColor: badgeColor,
+                                textColor: '#fff',
                                 extendedProps: {
                                     phone: apt.customerPhone,
                                     email: apt.customerEmail,
@@ -150,6 +158,7 @@
             },
             // Open modal showing booking info when admin clicks an appointment block
             eventClick: function(info) {
+                currentAppointmentId = info.event.id;
                 const props = info.event.extendedProps;
                 const modalBody = document.getElementById('modalBody');
                 const customerName = info.event.title.split(' - ')[0];
@@ -169,6 +178,26 @@
         });
 
         calendar.render();
+    }
+
+    async function updateAppointmentStatus(newStatus) {
+        if (!currentAppointmentId) return;
+
+        try {
+            const response = await fetch(`/api/appointments/${currentAppointmentId}/status?status=${newStatus}`, {
+                method: 'PATCH',
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+
+            if (response.ok) {
+                location.reload();
+            } else {
+                alert('Failed to update appointment status.');
+            }
+        } catch (err) {
+            console.error('Error updating status:', err);
+            alert('Server connection error.');
+        }
     }
 
     function handleLogout() {

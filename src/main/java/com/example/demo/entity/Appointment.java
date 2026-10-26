@@ -26,7 +26,10 @@ public class Appointment {
     @ManyToOne
     @JoinColumn(name = "service_id", nullable = false)
     private ServiceEntity service;
-    private UserEntity nailTech;
+
+    @ManyToOne
+    @JoinColumn(name = "nail_tech_id")
+    private UserEntity nailTech; // <-- Added proper relationship annotations
 
     @Enumerated(EnumType.STRING)
     private AppointmentStatus status = AppointmentStatus.PENDING;
@@ -56,6 +59,9 @@ public class Appointment {
 
     public ServiceEntity getService() { return service; }
     public void setService(ServiceEntity service) { this.service = service; }
+
+    public UserEntity getNailTech() { return nailTech; }
+    public void setNailTech(UserEntity nailTech) { this.nailTech = nailTech; }
 
     public AppointmentStatus getStatus() { return status; }
     public void setStatus(AppointmentStatus status) { this.status = status; }

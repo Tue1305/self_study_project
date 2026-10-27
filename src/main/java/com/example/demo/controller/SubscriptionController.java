@@ -4,9 +4,11 @@ import com.example.demo.entity.UserEntity;
 import com.example.demo.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -47,5 +49,13 @@ public class SubscriptionController {
                 "subscriptionPlan", plan,
                 "subscriptionStatus", status
         ));
+    }
+
+    // Secured admin endpoint to view all subscribers/users
+    @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/admin/all")
+    public ResponseEntity<?> getAllSubscribers() {
+        List<UserEntity> users = userRepository.findAll();
+        return ResponseEntity.ok(users);
     }
 }

@@ -8,6 +8,7 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity; // <-- Added import
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -19,6 +20,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity // <-- Enables @PreAuthorize("hasRole('ADMIN')") on your controllers
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
@@ -31,14 +33,12 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
-                .formLogin(AbstractHttpConfigurer::disable) // Critical: stop Spring from intercepting /login[cite: 5]
+                .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
-                .cors(Customizer.withDefaults()) // Ensure CORS pre-flight requests are permitted
-                // Set session management to stateless for JWT APIs
+                .cors(Customizer.withDefaults())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .exceptionHandling(exception -> exception
                         .authenticationEntryPoint((request, response, authException) -> {
-                            // Redirect Unauthenticated Users to login.html
                             response.sendRedirect("/login.html");
                         })
                 )
@@ -51,7 +51,10 @@ public class SecurityConfig {
                                 "/signup.html",
                                 "/profile.html",
                                 "/subscription-plans.html",
-                                "/admin.html",
+                                "/admin-calender.html",
+                                "/admin-dashboard.html",
+                                "/admin-subs.html",
+                                "/nail-techs.html",
                                 "/dashboard.html",
                                 "/products.html",
                                 "/services.html",
@@ -70,6 +73,8 @@ public class SecurityConfig {
                                 "/customers/**",
                                 "/templates/customers/**"
                         ).permitAll()
+                        // NOTE: Notice that admin-dashboard.html, admin-calendar.html, nail-techs.html,
+                        // and subscribers.html are NOT in permitAll, so unauthenticated users will be redirected to login.html
                         .requestMatchers("/api/auth/**").permitAll()
                         .anyRequest().authenticated()
                 )

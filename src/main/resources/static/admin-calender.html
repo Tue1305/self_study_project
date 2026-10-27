@@ -204,6 +204,50 @@
         localStorage.removeItem('accessToken');
         window.location.href = './index.html';
     }
+
+    // --- ADMIN ROUTE GUARD ---
+    (function() {
+        const token = localStorage.getItem('accessToken');
+        let role = localStorage.getItem('userRole');
+
+        // 1. Check if token exists
+        if (!token) {
+            window.location.href = './login.html';
+            return;
+        }
+
+        // 2. If role isn't stored in localStorage, try parsing it from the JWT token
+        if (!role) {
+            role = parseJwtRole(token);
+            if (role) {
+                localStorage.setItem('userRole', role);
+            }
+        }
+
+        // 3. Enforce Admin Role
+        if (role !== 'ROLE_ADMIN' && role !== 'ADMIN') {
+            alert('Access Denied: Administrator privileges are required to view this page.');
+            window.location.href = './index.html';
+        }
+
+        // JWT Role Parser Helper
+        function parseJwtRole(jwtToken) {
+            try {
+                const base64Url = jwtToken.split('.')[1];
+                const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+                const jsonPayload = decodeURIComponent(atob(base64).split('').map(c => {
+                    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                }).join(''));
+
+                const payload = JSON.parse(jsonPayload);
+                return payload.role || (payload.roles ? payload.roles[0] : null) || 'ROLE_USER';
+            } catch (e) {
+                console.error('Failed to parse JWT role:', e);
+                return 'ROLE_USER';
+            }
+        }
+    })();
+    // --- END ADMIN GUARD ---
 </script>
 </body>
 </html>

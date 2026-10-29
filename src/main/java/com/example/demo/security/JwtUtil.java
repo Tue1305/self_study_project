@@ -4,6 +4,7 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
@@ -43,14 +44,22 @@ public class JwtUtil {
         if (userDetails == null || userDetails.getUsername() == null) {
             throw new IllegalArgumentException("UserDetails or username cannot be null");
         }
-        return createToken(userDetails.getUsername());
+
+        // Automatically extract the first authority/role from UserDetails
+        String role = userDetails.getAuthorities().stream()
+                .findFirst()
+                .map(GrantedAuthority::getAuthority)
+                .orElse("ROLE_USER");
+
+        return createToken(userDetails.getUsername(), role);
     }
 
-    private String createToken(String subject) {
+    private String createToken(String subject, String role) {
         return Jwts.builder()
                 .setSubject(subject)
+                .claim("role", role) // Embeds the role into the token claims
                 .setIssuedAt(new Date(System.currentTimeMillis()))
-                .setExpiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60 * 10)) // 10 Hours
+                .setExpiration(new Date(System.currentTimeMillis() + 1000L * 60 * 60 * 10)) // 10 Hours
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
     }

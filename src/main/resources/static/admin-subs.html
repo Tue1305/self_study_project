@@ -15,7 +15,8 @@
         .text-pink { color: var(--bs-primary-pink) !important; }
         .btn-outline-pink { color: var(--bs-primary-pink); border-color: var(--bs-primary-pink); }
         .btn-outline-pink:hover { background-color: var(--bs-primary-pink); color: #fff; }
-        .bg-pink { background-color: var(--bs-primary-pink) !important; color: #fff !important; }
+        .btn-pink { background-color: var(--bs-primary-pink); color: #fff; }
+        .btn-pink:hover { background-color: #d81b60; color: #fff; }
     </style>
 </head>
 <body class="bg-light d-flex flex-column min-vh-100">
@@ -24,26 +25,36 @@
 <header class="navbar navbar-expand-lg bg-white shadow-sm px-4">
     <div class="container-fluid">
         <span class="navbar-brand fw-bold text-dark fs-5">
-            <i class="bi bi-shield-lock-fill text-pink me-2"></i>Admin Portal
+            <i class="bi bi-shield-lock-fill text-pink me-2"></i>Jenny's Admin Portal
         </span>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#adminNav">
             <span class="navbar-toggler-icon"></span>
         </button>
         <div class="collapse navbar-collapse" id="adminNav">
-            <ul class="navbar-nav me-auto mb-2 mb-lg-0 ms-lg-4 gap-2">
+            <ul class="navbar-nav me-auto mb-2 mb-lg-0 ms-lg-4 gap-1">
                 <li class="nav-item">
-                    <a class="nav-link btn btn-light btn-sm px-3 fw-semibold text-dark" href="./admin-calendar.html">
-                        <i class="bi bi-calendar-week me-1"></i> Customer Calendar
+                    <a class="nav-link btn btn-light btn-sm px-3 fw-semibold text-dark me-1" href="./admin-portal.html">
+                        <i class="bi bi-house-door me-1"></i> Portal
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link btn btn-light btn-sm px-3 fw-semibold text-dark" href="./nail-techs.html">
+                    <a class="nav-link btn btn-light btn-sm px-3 fw-semibold text-dark me-1" href="./admin-dashboard.html">
+                        <i class="bi bi-speedometer2 me-1"></i> Dashboard
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link btn btn-light btn-sm px-3 fw-semibold text-dark me-1" href="./admin-calender.html">
+                        <i class="bi bi-calendar-week me-1"></i> Calendar
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link btn btn-light btn-sm px-3 fw-semibold text-dark me-1" href="./admin-nailtech.html">
                         <i class="bi bi-people me-1"></i> Nail Techs
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link btn btn-pink btn-sm px-3 fw-semibold" href="./subscribers.html">
-                        <i class="bi bi-star me-1"></i> View Subscribers
+                    <a class="nav-link btn btn-pink btn-sm px-3 fw-semibold text-white" href="./admin-subs.html">
+                        <i class="bi bi-star me-1"></i> Subscribers
                     </a>
                 </li>
             </ul>
@@ -58,7 +69,7 @@
 <main class="container my-5 flex-grow-1">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2 class="h3 fw-bold text-dark mb-0">
-            <i class="bi bi-star-fill text-pink me-2"></i>Customer Subscribers
+            <i class="bi bi-star-fill text-pink me-2"></i>Customer Subscribers & Accounts
         </h2>
     </div>
 
@@ -94,7 +105,8 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
-    const token = localStorage.getItem('accessToken');
+    // Fallback-safe token lookup supporting both key conventions
+    const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
 
     if (!token) {
         window.location.href = './login.html';
@@ -114,7 +126,7 @@
             tbody.innerHTML = '';
 
             if (users.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-4">No subscribers found.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-4">No accounts found.</td></tr>`;
                 return;
             }
 
@@ -138,35 +150,33 @@
 
     function handleLogout() {
         localStorage.removeItem('accessToken');
+        localStorage.removeItem('token');
+        localStorage.removeItem('userRole');
         window.location.href = './index.html';
     }
 
     // --- ADMIN ROUTE GUARD ---
     (function() {
-        const token = localStorage.getItem('accessToken');
+        const guardToken = localStorage.getItem('accessToken') || localStorage.getItem('token');
         let role = localStorage.getItem('userRole');
 
-        // 1. Check if token exists
-        if (!token) {
+        if (!guardToken) {
             window.location.href = './login.html';
             return;
         }
 
-        // 2. If role isn't stored in localStorage, try parsing it from the JWT token
         if (!role) {
-            role = parseJwtRole(token);
+            role = parseJwtRole(guardToken);
             if (role) {
                 localStorage.setItem('userRole', role);
             }
         }
 
-        // 3. Enforce Admin Role
         if (role !== 'ROLE_ADMIN' && role !== 'ADMIN') {
             alert('Access Denied: Administrator privileges are required to view this page.');
             window.location.href = './index.html';
         }
 
-        // JWT Role Parser Helper
         function parseJwtRole(jwtToken) {
             try {
                 const base64Url = jwtToken.split('.')[1];
@@ -176,7 +186,7 @@
                 }).join(''));
 
                 const payload = JSON.parse(jsonPayload);
-                return payload.role || (payload.roles ? payload.roles[0] : null) || 'ROLE_USER';
+                return payload.role || payload.authorities || (payload.roles ? payload.roles[0] : null) || 'ROLE_USER';
             } catch (e) {
                 console.error('Failed to parse JWT role:', e);
                 return 'ROLE_USER';

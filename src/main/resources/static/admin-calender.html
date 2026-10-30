@@ -100,7 +100,7 @@
 
 <script>
     let currentAppointmentId = null;
-    const token = localStorage.getItem('accessToken');
+    const token = localStorage.getItem('accessToken')|| localStorage.getItem('token');
 
     // Token verification check on page load
     if (!token) {
@@ -207,7 +207,7 @@
 
     // --- ADMIN ROUTE GUARD ---
     (function() {
-        const token = localStorage.getItem('accessToken');
+        const token = localStorage.getItem('accessToken')|| localStorage.getItem('token');
         let role = localStorage.getItem('userRole');
 
         // 1. Check if token exists

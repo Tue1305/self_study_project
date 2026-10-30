@@ -165,7 +165,7 @@
 <script>
     // --- ADMIN ROUTE GUARD ---
     (function() {
-        const token = localStorage.getItem('accessToken');
+        const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
         let role = localStorage.getItem('userRole');
 
         if (!token) {
@@ -196,6 +196,7 @@
 
     function handleLogout() {
         localStorage.removeItem('accessToken');
+        localStorage.removeItem('token');
         localStorage.removeItem('userRole');
         window.location.href = './index.html';
     }

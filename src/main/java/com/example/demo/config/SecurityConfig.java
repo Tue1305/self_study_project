@@ -54,7 +54,7 @@ public class SecurityConfig {
                                 "/admin-calender.html",
                                 "/admin-dashboard.html",
                                 "/admin-subs.html",
-                                "/nail-techs.html",
+                                "/nail-tech.html",
                                 "/dashboard.html",
                                 "/products.html",
                                 "/services.html",
@@ -73,8 +73,13 @@ public class SecurityConfig {
                                 "/customers/**",
                                 "/templates/customers/**"
                         ).permitAll()
-                        // NOTE: Notice that admin-dashboard.html, admin-calendar.html, nail-techs.html,
-                        // and subscribers.html are NOT in permitAll, so unauthenticated users will be redirected to login.html
+                        // Nail-tech rules for connection
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/nail-techs/**").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/nail-techs/**").hasAnyRole("ADMIN", "ROLE_ADMIN")
+                        .requestMatchers(org.springframework.http.HttpMethod.PUT, "/api/nail-techs/**").hasAnyRole("ADMIN", "ROLE_ADMIN")
+                        .requestMatchers(org.springframework.http.HttpMethod.DELETE, "/api/nail-techs/**").hasAnyRole("ADMIN", "ROLE_ADMIN")
+                        // Subscribers rules for connection
+                        .requestMatchers("/api/subscriptions/admin/**").hasAnyRole("ADMIN", "ROLE_ADMIN")
                         .requestMatchers("/api/auth/**").permitAll()
                         .anyRequest().authenticated()
                 )

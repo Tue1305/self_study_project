@@ -38,7 +38,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 || path.equals("/templates/customers/index.html")
                 || path.equals("/signup.html")
                 || path.equals("/login.html")
-                || path.equals("/admin-calender.html")
+                || path.equals("/admin-calendar.html")
                 || path.equals("/admin-dashboard.html")
                 || path.equals("/admin-subs.html")
                 || path.equals("/nail-techs.html")

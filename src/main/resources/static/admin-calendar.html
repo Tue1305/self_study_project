@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard - Jenny's Nail Studio</title>
+    <title>Appointment Schedule - Jenny's Nail Studio</title>
     <!-- Favicon Tag -->
     <link rel="icon" type="image/x-icon" href="/favicon.ico?=v2">
     <!-- Bootstrap 5.3 CSS -->
@@ -39,14 +39,16 @@
 <header class="navbar navbar-expand bg-white shadow-sm px-4">
     <div class="container-fluid">
         <span class="navbar-brand fw-bold text-dark fs-5">
-            <i class="bi bi-shield-lock-fill text-pink me-2"></i>Admin Portal
+            <i class="bi bi-shield-lock-fill text-pink me-2"></i>Admin Dashboard
         </span>
-        <a href="/" class="navbar-brand fw-bold text-pink text-decoration-none">
-            Jenny's Nail Studio
-        </a>
-        <button class="btn btn-outline-pink btn-sm fw-semibold ms-auto" onclick="handleLogout()">
-            <i class="bi bi-box-arrow-right me-1"></i> Log Out
-        </button>
+        <div class="d-flex align-items-center gap-3">
+            <a href="./admin-dashboard.html" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-house-door me-1"></i> Dashboard
+            </a>
+            <button class="btn btn-outline-pink btn-sm fw-semibold" onclick="handleLogout()">
+                <i class="bi bi-box-arrow-right me-1"></i> Log Out
+            </button>
+        </div>
     </div>
 </header>
 
@@ -100,7 +102,7 @@
 
 <script>
     let currentAppointmentId = null;
-    const token = localStorage.getItem('accessToken')|| localStorage.getItem('token');
+    const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
 
     // Token verification check on page load
     if (!token) {
@@ -202,23 +204,25 @@
 
     function handleLogout() {
         localStorage.removeItem('accessToken');
+        localStorage.removeItem('token');
+        localStorage.removeItem('userRole');
         window.location.href = './index.html';
     }
 
     // --- ADMIN ROUTE GUARD ---
     (function() {
-        const token = localStorage.getItem('accessToken')|| localStorage.getItem('token');
+        const guardToken = localStorage.getItem('accessToken') || localStorage.getItem('token');
         let role = localStorage.getItem('userRole');
 
         // 1. Check if token exists
-        if (!token) {
+        if (!guardToken) {
             window.location.href = './login.html';
             return;
         }
 
         // 2. If role isn't stored in localStorage, try parsing it from the JWT token
         if (!role) {
-            role = parseJwtRole(token);
+            role = parseJwtRole(guardToken);
             if (role) {
                 localStorage.setItem('userRole', role);
             }
@@ -240,7 +244,7 @@
                 }).join(''));
 
                 const payload = JSON.parse(jsonPayload);
-                return payload.role || (payload.roles ? payload.roles[0] : null) || 'ROLE_USER';
+                return payload.role || payload.authorities || (payload.roles ? payload.roles[0] : null) || 'ROLE_USER';
             } catch (e) {
                 console.error('Failed to parse JWT role:', e);
                 return 'ROLE_USER';

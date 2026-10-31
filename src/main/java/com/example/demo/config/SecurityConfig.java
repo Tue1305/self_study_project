@@ -79,7 +79,7 @@ public class SecurityConfig {
                         .requestMatchers(org.springframework.http.HttpMethod.PUT, "/api/nail-techs/**").hasAnyRole("ADMIN")
                         .requestMatchers(org.springframework.http.HttpMethod.DELETE, "/api/nail-techs/**").hasAnyRole("ADMIN")
                         // Subscribers rules for connection
-                        .requestMatchers("/api/subscriptions/admin/**").hasAnyRole("ADMIN")
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/subscriptions/admin/**").hasAnyRole("ADMIN")
                         .requestMatchers("/api/auth/**").permitAll()
                         .anyRequest().authenticated()
                 )

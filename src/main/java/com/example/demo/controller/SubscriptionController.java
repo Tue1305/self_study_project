@@ -15,8 +15,11 @@ import java.util.Map;
 @RequestMapping("/api/subscriptions")
 public class SubscriptionController {
 
-    @Autowired
-    private UserRepository userRepository;
+    private final UserRepository userRepository;
+
+    public SubscriptionController(UserRepository userRepository) {
+        this.userRepository = userRepository;
+    }
 
     @PostMapping("/subscribe")
     public ResponseEntity<?> subscribeUser(@RequestBody Map<String, String> request, Principal principal) {
@@ -52,7 +55,7 @@ public class SubscriptionController {
     }
 
     // Secured admin endpoint to view all subscribers/users
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ADMIN')")
     @GetMapping("/admin/all")
     public ResponseEntity<?> getAllSubscribers() {
         List<UserEntity> users = userRepository.findAll();

@@ -33,7 +33,7 @@ public class NailTechController {
                 .toList();
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ADMIN')")
     @PostMapping
     public ResponseEntity<?> createNailTech(@RequestBody UserEntity tech) {
         String identifier = tech.getEmail() != null ? tech.getEmail() : tech.getUsername();
@@ -57,7 +57,7 @@ public class NailTechController {
         return ResponseEntity.ok(savedTech);
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ADMIN')")
     @PutMapping("/{id}")
     public ResponseEntity<?> updateNailTech(@PathVariable Long id, @RequestBody UserEntity updatedTech) {
         return userRepository.findById(id)
@@ -75,7 +75,7 @@ public class NailTechController {
                         .body(Map.of("message", "Nail technician not found")));
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ADMIN')")
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteNailTech(@PathVariable Long id) {
         if (!userRepository.existsById(id)) {

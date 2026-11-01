@@ -59,6 +59,17 @@ public class SubscriptionController {
     @GetMapping("/admin/all")
     public ResponseEntity<?> getAllSubscribers() {
         List<UserEntity> users = userRepository.findAll();
-        return ResponseEntity.ok(users);
+
+        var response = users.stream().map(user -> {
+            return Map.of(
+                    "id", user.getId(),
+                    "username", user.getUsername() != null ? user.getUsername() : "",
+                    "role", user.getRole() != null ? user.getRole() : "ROLE_USER",
+                    "subscriptionPlan", user.getSubscriptionPlan() != null ? user.getSubscriptionPlan() : "None",
+                    "subscriptionStatus", user.getSubscriptionStatus() != null ? user.getSubscriptionStatus() : "INACTIVE"
+            );
+        }).toList();
+
+        return ResponseEntity.ok(response);
     }
 }

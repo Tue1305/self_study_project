@@ -51,10 +51,10 @@ public class SecurityConfig {
                                 "/signup.html",
                                 "/profile.html",
                                 "/subscription-plans.html",
-                                "/admin-calender.html",
+                                "/admin-calendar.html",
                                 "/admin-dashboard.html",
                                 "/admin-subs.html",
-                                "/nail-tech.html",
+                                "/nail-techs.html",
                                 "/dashboard.html",
                                 "/products.html",
                                 "/services.html",
@@ -79,7 +79,8 @@ public class SecurityConfig {
                         .requestMatchers(org.springframework.http.HttpMethod.PUT, "/api/nail-techs/**").hasAnyRole("ADMIN")
                         .requestMatchers(org.springframework.http.HttpMethod.DELETE, "/api/nail-techs/**").hasAnyRole("ADMIN")
                         // Subscribers rules for connection
-                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/subscriptions/admin/**").hasAnyRole("ADMIN")
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/subscriptions/admin/**")
+                        .hasAnyAuthority("ROLE_ADMIN", "ADMIN")
                         .requestMatchers("/api/auth/**").permitAll()
                         .anyRequest().authenticated()
                 )

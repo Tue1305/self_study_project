@@ -76,9 +76,9 @@ public class SecurityConfig {
                         ).permitAll()
                         // Nail-tech rules for connection
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/nail-techs/**").permitAll()
-                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/nail-techs/**").hasAnyRole("ROLE_ADMIN","ADMIN")
-                        .requestMatchers(org.springframework.http.HttpMethod.PUT, "/api/nail-techs/**").hasAnyRole("ROLE_ADMIN","ADMIN")
-                        .requestMatchers(org.springframework.http.HttpMethod.DELETE, "/api/nail-techs/**").hasAnyRole("ROLE_ADMIN","ADMIN")
+                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/nail-techs/**").hasAnyAuthority("ROLE_ADMIN","ADMIN")
+                        .requestMatchers(org.springframework.http.HttpMethod.PUT, "/api/nail-techs/**").hasAnyAuthority("ROLE_ADMIN","ADMIN")
+                        .requestMatchers(org.springframework.http.HttpMethod.DELETE, "/api/nail-techs/**").hasAnyAuthority("ROLE_ADMIN","ADMIN")
                         // Subscribers rules for connection
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/subscriptions/admin/**")
                         .hasAnyAuthority("ROLE_ADMIN", "ADMIN")

@@ -24,7 +24,7 @@ public class CustomUserDetailsService implements UserDetailsService {
         UserEntity user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
 
-        // Normalize role to prevent casing or prefix mismatches
+        // Normalize role so it's always uppercase and has the ROLE_ prefix
         String role = user.getRole();
         if (role == null || role.trim().isEmpty()) {
             role = "ROLE_USER";
@@ -38,7 +38,7 @@ public class CustomUserDetailsService implements UserDetailsService {
         return new org.springframework.security.core.userdetails.User(
                 user.getUsername(),
                 user.getPassword(),
-                Collections.singletonList(new SimpleGrantedAuthority(role))
+                java.util.List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority(role))
         );
     }
 }

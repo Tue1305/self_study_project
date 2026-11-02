@@ -77,6 +77,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
         } catch(Exception e){
             // If the token is invalid/expired, do not crash; clear context and proceed
+            // PRINT THE EXACT ERROR TO DOCKER LOGS
+            logger.error("JWT Authentication failed: " + e.getMessage(), e);
             SecurityContextHolder.clearContext();
         }
 

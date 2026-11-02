@@ -32,6 +32,7 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
+                .requiresChannel(channel -> channel.anyRequest().requiresSecure())
                 .csrf(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
@@ -75,9 +76,9 @@ public class SecurityConfig {
                         ).permitAll()
                         // Nail-tech rules for connection
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/nail-techs/**").permitAll()
-                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/nail-techs/**").hasAnyRole("ADMIN")
-                        .requestMatchers(org.springframework.http.HttpMethod.PUT, "/api/nail-techs/**").hasAnyRole("ADMIN")
-                        .requestMatchers(org.springframework.http.HttpMethod.DELETE, "/api/nail-techs/**").hasAnyRole("ADMIN")
+                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/nail-techs/**").hasAnyRole("ROLE_ADMIN","ADMIN")
+                        .requestMatchers(org.springframework.http.HttpMethod.PUT, "/api/nail-techs/**").hasAnyRole("ROLE_ADMIN","ADMIN")
+                        .requestMatchers(org.springframework.http.HttpMethod.DELETE, "/api/nail-techs/**").hasAnyRole("ROLE_ADMIN","ADMIN")
                         // Subscribers rules for connection
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/subscriptions/admin/**")
                         .hasAnyAuthority("ROLE_ADMIN", "ADMIN")

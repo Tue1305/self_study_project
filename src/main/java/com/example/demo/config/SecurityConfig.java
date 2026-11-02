@@ -82,10 +82,11 @@ public class SecurityConfig {
                                 "/templates/customers/**"
                         ).permitAll()
                         // Nail-tech rules for connection
-                        .requestMatchers(HttpMethod.GET, "/api/nail-techs/**").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/nail-techs/**").hasAnyAuthority("ROLE_ADMIN","ADMIN")
-                        .requestMatchers(HttpMethod.PUT, "/api/nail-techs/**").hasAnyAuthority("ROLE_ADMIN","ADMIN")
-                        .requestMatchers(HttpMethod.DELETE, "/api/nail-techs/**").hasAnyAuthority("ROLE_ADMIN","ADMIN")
+                        // Nail-tech rules for connection (Explicitly list exact path + wildcard)
+                        .requestMatchers(HttpMethod.GET, "/api/nail-techs", "/api/nail-techs/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/nail-techs", "/api/nail-techs/**").hasAnyAuthority("ROLE_ADMIN","ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/nail-techs", "/api/nail-techs/**").hasAnyAuthority("ROLE_ADMIN","ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/nail-techs", "/api/nail-techs/**").hasAnyAuthority("ROLE_ADMIN","ADMIN")
                         // Subscribers rules for connection
                         .requestMatchers(HttpMethod.GET, "/api/subscriptions/admin/**").hasAnyAuthority("ROLE_ADMIN", "ADMIN")
                         .requestMatchers("/api/auth/**").permitAll()

@@ -68,6 +68,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             UserDetails userDetails = this.userDetailsService.loadUserByUsername(username);
 
             if (jwtUtil.isTokenValid(token, userDetails)) {
+                // ---> ADD THESE TWO DEBUG LINES HERE <---
+                System.out.println("DEBUG: Authenticated User: " + userDetails.getUsername());
+                System.out.println("DEBUG: Loaded Authorities: " + userDetails.getAuthorities());
+
                 UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                         userDetails, null, userDetails.getAuthorities()
                 );

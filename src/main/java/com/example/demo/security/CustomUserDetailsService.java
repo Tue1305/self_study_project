@@ -2,6 +2,7 @@ package com.example.demo.security;
 
 import com.example.demo.entity.UserEntity;
 import com.example.demo.repository.UserRepository;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -23,10 +24,21 @@ public class CustomUserDetailsService implements UserDetailsService {
         UserEntity user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
 
+        // Normalize role to prevent casing or prefix mismatches
+        String role = user.getRole();
+        if (role == null || role.trim().isEmpty()) {
+            role = "ROLE_USER";
+        } else {
+            role = role.toUpperCase();
+            if (!role.startsWith("ROLE_")) {
+                role = "ROLE_" + role;
+            }
+        }
+
         return new org.springframework.security.core.userdetails.User(
                 user.getUsername(),
                 user.getPassword(),
-                java.util.List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority(user.getRole()))
+                Collections.singletonList(new SimpleGrantedAuthority(role))
         );
     }
 }

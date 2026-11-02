@@ -2,13 +2,15 @@ package com.example.demo.config;
 
 import com.example.demo.security.CustomUserDetailsService;
 import com.example.demo.security.JwtAuthenticationFilter;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
-import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity; // <-- Added import
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -20,7 +22,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity // <-- Enables @PreAuthorize("hasRole('ADMIN')") on your controllers
+@EnableMethodSecurity
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
@@ -40,7 +42,12 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .exceptionHandling(exception -> exception
                         .authenticationEntryPoint((request, response, authException) -> {
-                            response.sendRedirect("/login.html");
+                            // Return 401 Unauthorized for API requests, redirect HTML pages to login
+                            if (request.getRequestURI().startsWith("/api/")) {
+                                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized: Token is missing or invalid");
+                            } else {
+                                response.sendRedirect("/login.html");
+                            }
                         })
                 )
                 .authorizeHttpRequests(auth -> auth
@@ -75,13 +82,12 @@ public class SecurityConfig {
                                 "/templates/customers/**"
                         ).permitAll()
                         // Nail-tech rules for connection
-                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/nail-techs/**").permitAll()
-                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/nail-techs/**").hasAnyAuthority("ROLE_ADMIN","ADMIN")
-                        .requestMatchers(org.springframework.http.HttpMethod.PUT, "/api/nail-techs/**").hasAnyAuthority("ROLE_ADMIN","ADMIN")
-                        .requestMatchers(org.springframework.http.HttpMethod.DELETE, "/api/nail-techs/**").hasAnyAuthority("ROLE_ADMIN","ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/nail-techs/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/nail-techs/**").hasAnyAuthority("ROLE_ADMIN","ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/nail-techs/**").hasAnyAuthority("ROLE_ADMIN","ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/nail-techs/**").hasAnyAuthority("ROLE_ADMIN","ADMIN")
                         // Subscribers rules for connection
-                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/subscriptions/admin/**")
-                        .hasAnyAuthority("ROLE_ADMIN", "ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/subscriptions/admin/**").hasAnyAuthority("ROLE_ADMIN", "ADMIN")
                         .requestMatchers("/api/auth/**").permitAll()
                         .anyRequest().authenticated()
                 )

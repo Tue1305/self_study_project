@@ -228,6 +228,9 @@
             });
 
             if (response.ok) {
+                if (document.activeElement) {
+                    document.activeElement.blur();
+                }
                 techModalInstance.hide();
                 loadNailTechs();
             } else {

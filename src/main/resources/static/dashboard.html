@@ -352,7 +352,7 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
-    // Helper function to decode JWT claims safely
+    // Helper function to decode JWT claims safely and check expiration
     function parseJwt(token) {
         try {
             const base64Url = token.split('.')[1];
@@ -360,25 +360,36 @@
             const jsonPayload = decodeURIComponent(atob(base64).split('').map(c => {
                 return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
             }).join(''));
-            return JSON.parse(jsonPayload);
+
+            const payload = JSON.parse(jsonPayload);
+            if (payload.exp && Date.now() >= payload.exp * 1000) {
+                return null; // Expired token
+            }
+            return payload;
         } catch (e) {
             return null;
         }
     }
 
     document.addEventListener('DOMContentLoaded', () => {
-        const token = localStorage.getItem('accessToken');
+        // Fallback-safe token retrieval matching all storage keys in the project
+        const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
         const storedUser = localStorage.getItem('username');
         const userBadge = document.getElementById('userBadge');
         const usernameDisplay = document.getElementById('usernameDisplay');
         const authNav = document.getElementById('authNav');
 
-        if (token) {
+        const decodedToken = token ? parseJwt(token) : null;
+
+        if (token && decodedToken) {
             let activeUser = storedUser;
             if (!activeUser) {
-                const decodedToken = parseJwt(token);
-                activeUser = decodedToken ? (decodedToken.sub || decodedToken.username) : 'Client';
+                activeUser = decodedToken.sub || decodedToken.username || 'Client';
             }
+
+            // Extract role to determine if user is admin
+            const role = decodedToken.role || decodedToken.authorities || (decodedToken.roles ? decodedToken.roles[0] : 'ROLE_USER');
+            const isAdmin = role === 'ROLE_ADMIN' || role === 'ADMIN';
 
             // Display User Badge
             if (userBadge && usernameDisplay) {
@@ -387,18 +398,31 @@
                 userBadge.classList.add('d-inline-flex');
             }
 
-            // Logged-In Header Links (Only Subscription Plans is a pink button)
+            // Build Logged-In Header Links (Includes Admin Portal link if admin)
+            let adminLinkHtml = '';
+            if (isAdmin) {
+                adminLinkHtml = `<a href="./admin-dashboard.html" class="nav-link fw-bold text-danger"><i class="bi bi-shield-lock-fill me-1"></i>Admin Portal</a>`;
+            }
+
             if (authNav) {
                 authNav.innerHTML = `
                     <a href="./dashboard.html" class="nav-link fw-semibold text-dark">Showcase</a>
                     <a href="./services.html" class="nav-link fw-semibold text-dark">Services</a>
+                    ${adminLinkHtml}
                     <a href="./profile.html" class="nav-link fw-semibold text-dark">Profile</a>
                     <a href="#" onclick="handleLogout()" class="nav-link fw-semibold text-dark">Logout</a>
                     <a href="subscription-plans.html" class="btn btn-pink rounded-pill px-4 py-2 fw-semibold">Subscription Plans</a>
                 `;
             }
         } else {
-            // Guest Header Links (Only Subscription Plans is a pink button)
+            // Clear expired or invalid token if present
+            if (token) {
+                localStorage.removeItem('accessToken');
+                localStorage.removeItem('token');
+                localStorage.removeItem('username');
+            }
+
+            // Guest Header Links
             if (userBadge) {
                 userBadge.classList.add('d-none');
                 userBadge.classList.remove('d-inline-flex');
@@ -408,7 +432,7 @@
                     <a href="./services.html" class="nav-link fw-semibold text-dark">Services</a>
                     <a href="./login.html" class="nav-link fw-semibold text-dark">Log in</a>
                     <a href="./signup.html" class="nav-link fw-semibold text-dark">Sign up</a>
-                    <a href="./subscription-plans.html" class="btn btn-pink rounded-pill px-4 py-2 fw-semibold">Subscription Plans</a>
+                    <a href="subscription-plans.html" class="btn btn-pink rounded-pill px-4 py-2 fw-semibold">Subscription Plans</a>
                 `;
             }
         }
@@ -416,7 +440,9 @@
 
     function handleLogout() {
         localStorage.removeItem('accessToken');
+        localStorage.removeItem('token');
         localStorage.removeItem('username');
+        localStorage.removeItem('userRole');
         window.location.href = './login.html';
     }
 

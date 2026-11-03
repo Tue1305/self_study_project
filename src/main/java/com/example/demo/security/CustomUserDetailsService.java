@@ -24,6 +24,9 @@ public class CustomUserDetailsService implements UserDetailsService {
         UserEntity user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
 
+        // ---> ADD THIS LINE TO DEBUG <---
+        System.out.println("DEBUG DB RAW ROLE for " + username + ": [" + user.getRole() + "]");
+
         // Normalize role so it's always uppercase and has the ROLE_ prefix
         String role = user.getRole();
         if (role == null || role.trim().isEmpty()) {

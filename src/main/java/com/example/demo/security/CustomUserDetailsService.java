@@ -8,7 +8,7 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
-import java.util.Collections;
+import java.util.List;
 
 @Service
 public class CustomUserDetailsService implements UserDetailsService {
@@ -24,11 +24,11 @@ public class CustomUserDetailsService implements UserDetailsService {
         UserEntity user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
 
-        // ---> ADD THIS LINE TO DEBUG <---
-        System.out.println("DEBUG DB RAW ROLE for " + username + ": [" + user.getRole() + "]");
+        // Read raw role from database entity
+        String rawRole = user.getRole();
+        System.out.println("DEBUG: Raw DB role for " + username + " is: [" + rawRole + "]");
 
-        // Normalize role so it's always uppercase and has the ROLE_ prefix
-        String role = user.getRole();
+        String role = rawRole;
         if (role == null || role.trim().isEmpty()) {
             role = "ROLE_USER";
         } else {
@@ -38,10 +38,12 @@ public class CustomUserDetailsService implements UserDetailsService {
             }
         }
 
+        System.out.println("DEBUG: Assigned Spring Security Authority: [" + role + "]");
+
         return new org.springframework.security.core.userdetails.User(
                 user.getUsername(),
                 user.getPassword(),
-                java.util.List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority(role))
+                List.of(new SimpleGrantedAuthority(role))
         );
     }
 }

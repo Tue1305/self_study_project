@@ -22,9 +22,10 @@ public class UserEntity {
     private String subscriptionPlan = "None";
     private String subscriptionStatus = "INACTIVE";
 
-    // Fields for Nail Technician management
+    // Fields for Nail Technician management & User Profile
     private String name;
     private String email;
+    private String phoneNumber;
     private String specialty;
 
     public UserEntity() {}
@@ -64,6 +65,9 @@ public class UserEntity {
 
     public String getEmail() { return email; }
     public void setEmail(String email) { this.email = email; }
+
+    public String getPhoneNumber() { return phoneNumber; }
+    public void setPhoneNumber(String phoneNumber) { this.phoneNumber = phoneNumber; }
 
     public String getSpecialty() { return specialty; }
     public void setSpecialty(String specialty) { this.specialty = specialty; }

@@ -35,6 +35,18 @@
             color: #fff;
         }
 
+        /* Clickable User Badge Styling */
+        .user-badge-link {
+            text-decoration: none;
+            transition: all 0.2s ease-in-out;
+            cursor: pointer;
+        }
+        .user-badge-link:hover {
+            transform: translateY(-1px);
+            background-color: #f8d7da !important;
+            box-shadow: 0 2px 5px rgba(233, 30, 99, 0.15);
+        }
+
         /* Feature Card Hover Effects */
         .teaser-card {
             transition: transform 0.25s ease, box-shadow 0.25s ease;
@@ -52,11 +64,14 @@
     <div class="container-fluid">
         <div class="d-flex align-items-center gap-3">
             <a href="/" class="navbar-brand fw-bold text-pink fs-4 mb-0">Jenny's Nail Studio</a>
-            <!-- User Badge shown next to logo when logged in -->
-            <div class="badge bg-danger-subtle text-pink border border-danger-subtle rounded-pill px-3 py-2 fs-6 d-none align-items-center gap-1" id="userBadge">
-                <i class="bi bi-stars"></i>
+            <!-- Clickable User Badge shown next to logo when logged in -->
+            <a href="profile.html"
+               id="userBadge"
+               class="badge bg-danger-subtle text-pink border border-danger-subtle rounded-pill px-3 py-2 fs-6 d-none align-items-center gap-1 user-badge-link"
+               title="Click to view and edit profile settings">
+                <i class="bi bi-person-fill"></i>
                 <span id="usernameDisplay">Client</span>
-            </div>
+            </a>
         </div>
 
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
@@ -192,16 +207,18 @@
             // Personalize Hero Header
             heroHeading.textContent = `Welcome back, ${activeUser}!`;
 
-            // Build Logged-in Navigation Links (Includes Admin Portal link if admin)
+            // Build Admin Link if applicable
             let adminLinkHtml = '';
             if (isAdmin) {
                 adminLinkHtml = `<a href="./admin-dashboard.html" class="nav-link fw-bold text-danger"><i class="bi bi-shield-lock-fill me-1"></i>Admin Portal</a>`;
             }
 
+            // Logged-in Navigation Links (Includes Profile & Subscriptions)
             authNav.innerHTML = `
                 <a href="./dashboard.html" class="nav-link fw-semibold text-dark">Showcase</a>
                 <a href="./services.html" class="nav-link fw-semibold text-dark">Services</a>
                 ${adminLinkHtml}
+                <a href="./profile.html" class="nav-link fw-semibold text-dark">Profile</a>
                 <a href="#" onclick="handleLogout()" class="nav-link fw-semibold text-dark">Logout</a>
                 <a href="./subscription-plans.html" class="btn btn-pink rounded-pill px-4 py-2 fw-semibold">Subscription Plans</a>
             `;
@@ -217,6 +234,7 @@
                 localStorage.removeItem('accessToken');
                 localStorage.removeItem('token');
                 localStorage.removeItem('username');
+                localStorage.removeItem('userRole');
             }
 
             // Guest View Navigation

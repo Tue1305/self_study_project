@@ -267,8 +267,8 @@
 
         const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
         if (token) {
-            // Logged in -> go to dashboard to view booking
-            window.location.href = './dashboard.html';
+            // Logged in -> redirect directly to booking page
+            window.location.href = './booking.html';
         } else {
             // Not logged in -> prompt login
             window.location.href = './login.html';

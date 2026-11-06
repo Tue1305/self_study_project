@@ -17,6 +17,7 @@ public class UserEntity {
     @JsonIgnore
     private String password;
 
+    @Column(name = "role")
     private String role = "ROLE_USER";
 
     private String subscriptionPlan = "None";

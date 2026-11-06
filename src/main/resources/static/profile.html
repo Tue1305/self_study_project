@@ -66,7 +66,7 @@
             <a href="/" class="navbar-brand fw-bold text-pink fs-4 mb-0">Jenny's Nail Studio</a>
             <div class="badge bg-danger-subtle text-pink border border-danger-subtle rounded-pill px-3 py-2 fs-6 d-inline-flex align-items-center gap-1" id="userBadge">
                 <i class="bi bi-person-fill"></i>
-                <span id="usernameDisplay">Client</span>
+                <span id="usernameDisplay"></span>
             </div>
         </div>
 
@@ -181,7 +181,8 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
-    const token = localStorage.getItem('accessToken');
+    // Fallback-safe token retrieval matching all project storage keys
+    const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
     if (!token) {
         window.location.href = './login.html';
     }
@@ -197,25 +198,31 @@
     }
 
     async function loadUserProfile() {
+        const storedUser = localStorage.getItem('username') || 'Client';
+
         try {
-            // Fetch account details
             const userResponse = await fetch('/api/users/me', {
                 headers: { 'Authorization': 'Bearer ' + token }
             });
 
-            const storedUser = localStorage.getItem('username') || 'Client';
-
             if (userResponse.ok) {
                 const userData = await userResponse.json();
-                document.getElementById('usernameInput').value = userData.username || storedUser;
+                const displayName = userData.username || storedUser;
+
+                document.getElementById('usernameInput').value = userData.username || '';
                 document.getElementById('emailInput').value = userData.email || '';
                 document.getElementById('phoneInput').value = userData.phoneNumber || '';
 
-                document.getElementById('profileHeaderName').textContent = userData.username || storedUser;
-                document.getElementById('usernameDisplay').textContent = userData.username || storedUser;
-                document.getElementById('avatarLetter').textContent = (userData.username || storedUser).charAt(0).toUpperCase();
+                document.getElementById('profileHeaderName').textContent = displayName;
+                document.getElementById('usernameDisplay').textContent = displayName;
+                document.getElementById('avatarLetter').textContent = displayName.charAt(0).toUpperCase();
+
+                // Set user role badge
+                if (userData.role) {
+                    document.getElementById('profileRole').textContent = userData.role;
+                }
             } else {
-                // Fallback to local storage if user endpoint isn't fully set up yet
+                // Fallback rendering
                 document.getElementById('profileHeaderName').textContent = storedUser;
                 document.getElementById('usernameDisplay').textContent = storedUser;
                 document.getElementById('usernameInput').value = storedUser;
@@ -268,7 +275,8 @@
                 showAlert('Profile updated successfully!');
                 loadUserProfile();
             } else {
-                showAlert('Failed to update profile details.', 'danger');
+                const errorText = await response.text();
+                showAlert('Failed to update profile: ' + (errorText || 'Server error'), 'danger');
             }
         } catch (err) {
             console.error(err);
@@ -311,7 +319,9 @@
 
     function handleLogout() {
         localStorage.removeItem('accessToken');
+        localStorage.removeItem('token');
         localStorage.removeItem('username');
+        localStorage.removeItem('userRole');
         window.location.href = './login.html';
     }
 

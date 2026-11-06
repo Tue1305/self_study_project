@@ -217,6 +217,14 @@
         const method = id ? 'PUT' : 'POST';
         const url = id ? `/api/nail-techs/${id}` : '/api/nail-techs';
 
+        // Provide both email and username properties for backend entity compatibility
+        const payload = {
+            name: name,
+            email: email,
+            username: email,
+            specialty: specialty
+        };
+
         try {
             const response = await fetch(url, {
                 method: method,
@@ -224,7 +232,7 @@
                     'Content-Type': 'application/json',
                     'Authorization': 'Bearer ' + token
                 },
-                body: JSON.stringify({ name, email, specialty })
+                body: JSON.stringify(payload)
             });
 
             if (response.ok) {

@@ -81,8 +81,7 @@ public class SecurityConfig {
                                 "/customers/**",
                                 "/templates/customers/**"
                         ).permitAll()
-                        // Nail-tech rules for connection
-                        // Nail-tech rules for connection (Explicitly list exact path + wildcard)
+                        // Nail-tech rules for connection (covering both exact and subpaths)
                         .requestMatchers(HttpMethod.GET, "/api/nail-techs", "/api/nail-techs/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/nail-techs", "/api/nail-techs/**").hasAnyAuthority("ROLE_ADMIN","ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/nail-techs", "/api/nail-techs/**").hasAnyAuthority("ROLE_ADMIN","ADMIN")

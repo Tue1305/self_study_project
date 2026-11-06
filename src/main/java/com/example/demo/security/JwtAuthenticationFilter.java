@@ -32,19 +32,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String path = request.getServletPath();
         return path.startsWith("/api/auth/")
                 || path.startsWith("/static/")
-                || path.startsWith("/nail_collection/") // <--- BYPASS FILTER FOR IMAGES
+                || path.startsWith("/nail_collection/")
                 || path.equals("/")
                 || path.equals("/error")
-                || path.equals("/templates/customers/index.html")
-                || path.equals("/signup.html")
-                || path.equals("/login.html")
-                || path.equals("/admin-calendar.html")
-                || path.equals("/admin-dashboard.html")
-                || path.equals("/admin-subs.html")
-                || path.equals("/nail-techs.html")
-                || path.equals("/dashboard.html")
                 || path.equals("/favicon.ico")
-                || path.endsWith(".html")
                 || path.endsWith(".css")
                 || path.endsWith(".js");
     }

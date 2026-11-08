@@ -48,8 +48,13 @@
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link btn btn-light btn-sm px-3 fw-semibold text-dark" href="./admin-customers.html">
+                    <a class="nav-link btn btn-light btn-sm px-3 fw-semibold text-dark me-1" href="./admin-customers.html">
                         <i class="bi bi-person-lines-fill me-1"></i> Customers
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link btn btn-outline-secondary btn-sm px-3 fw-semibold text-dark" href="./index.html">
+                        <i class="bi bi-globe me-1"></i> Main Website
                     </a>
                 </li>
             </ul>
@@ -160,12 +165,9 @@
             return;
         }
 
-        if (!role) {
-            role = parseJwtRole(guardToken);
-            if (role) {
-                localStorage.setItem('userRole', role);
-            }
-        }
+        // Always verify role directly from the JWT token claims
+        role = parseJwtRole(guardToken);
+        localStorage.setItem('userRole', role);
 
         if (role !== 'ROLE_ADMIN' && role !== 'ADMIN') {
             alert('Access Denied: Administrator privileges are required to view this page.');

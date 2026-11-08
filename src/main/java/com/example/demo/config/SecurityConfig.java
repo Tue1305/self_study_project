@@ -85,8 +85,6 @@ public class SecurityConfig {
                                 "/dashboard.html",
                                 "/products.html",
                                 "/services.html",
-                                "/api/services",
-                                "/api/services/**",
                                 "/api/appointments",
                                 "/api/appointments/**",
                                 "/favicon.ico",
@@ -100,6 +98,11 @@ public class SecurityConfig {
                                 "/*.jpeg",
                                 "/login"
                         ).permitAll()
+                        // Services rules (public GET, admin-only POST/PUT/DELETE)
+                        .requestMatchers(HttpMethod.GET, "/api/services", "/api/services/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/services", "/api/services/**").hasAnyAuthority("ROLE_ADMIN", "ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/services", "/api/services/**").hasAnyAuthority("ROLE_ADMIN", "ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/services", "/api/services/**").hasAnyAuthority("ROLE_ADMIN", "ADMIN")
                         // Nail-tech rules for connection (covering both exact and subpaths)
                         .requestMatchers(HttpMethod.GET, "/api/nail-techs", "/api/nail-techs/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/nail-techs", "/api/nail-techs/**").hasAnyAuthority("ROLE_ADMIN", "ADMIN")

@@ -266,7 +266,7 @@
         if (token && decodedToken) {
             let activeUser = storedUser || decodedToken.sub || decodedToken.username || 'Client';
 
-            const role = decodedToken.role || decodedToken.authorities || (decodedToken.roles ? decodedToken.roles[0] : null) || localStorage.getItem('userRole') || 'ROLE_USER';
+            const role = decodedToken.role || decodedToken.authorities || (decodedToken.roles ? decodedToken.roles[0] : 'ROLE_USER');
             isAdminUser = (role === 'ROLE_ADMIN' || role === 'ADMIN');
 
             if (userBadge && usernameDisplay) {
@@ -283,8 +283,11 @@
 
             if (authNav) {
                 authNav.innerHTML = `
-                    <a href="./dashboard.html" class="nav-link fw-semibold text-dark">Showcase</a>
+                    <a href="./index.html" class="nav-link fw-semibold text-dark">Home</a>
+                    <a href="./dashboard.html" class="nav-link fw-semibold text-pink active">Showcase</a>
+                    <a href="./products.html" class="nav-link fw-semibold text-dark">Products</a>
                     <a href="./services.html" class="nav-link fw-semibold text-dark">Services</a>
+                    <a href="./booking.html" class="nav-link fw-semibold text-dark">Book Now</a>
                     ${adminLinkHtml}
                     <a href="./profile.html" class="nav-link fw-semibold text-dark">Profile</a>
                     <a href="#" onclick="handleLogout()" class="nav-link fw-semibold text-dark">Logout</a>
@@ -296,6 +299,7 @@
                 localStorage.removeItem('accessToken');
                 localStorage.removeItem('token');
                 localStorage.removeItem('username');
+                localStorage.removeItem('userRole');
             }
 
             if (userBadge) {
@@ -304,7 +308,11 @@
             }
             if (authNav) {
                 authNav.innerHTML = `
+                    <a href="./index.html" class="nav-link fw-semibold text-dark">Home</a>
+                    <a href="./dashboard.html" class="nav-link fw-semibold text-pink active">Showcase</a>
+                    <a href="./products.html" class="nav-link fw-semibold text-dark">Products</a>
                     <a href="./services.html" class="nav-link fw-semibold text-dark">Services</a>
+                    <a href="./booking.html" class="nav-link fw-semibold text-dark">Book Now</a>
                     <a href="./login.html" class="nav-link fw-semibold text-dark">Log in</a>
                     <a href="./signup.html" class="nav-link fw-semibold text-dark">Sign up</a>
                     <a href="subscription-plans.html" class="btn btn-pink rounded-pill px-4 py-2 fw-semibold">Subscription Plans</a>

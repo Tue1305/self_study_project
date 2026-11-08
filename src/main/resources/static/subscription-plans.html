@@ -76,9 +76,9 @@
 <header class="navbar navbar-expand-lg bg-white shadow-sm sticky-top px-3 px-lg-4">
     <div class="container-fluid">
         <div class="d-flex align-items-center gap-3">
-            <a href="/" class="navbar-brand fw-bold text-pink fs-4 mb-0">Jenny's Nail Studio</a>
+            <a href="./index.html" class="navbar-brand fw-bold text-pink fs-4 mb-0">Jenny's Nail Studio</a>
             <!-- Clickable User Badge shown next to logo when logged in -->
-            <a href="profile.html"
+            <a href="./profile.html"
                id="userBadge"
                class="badge bg-danger-subtle text-pink border border-danger-subtle rounded-pill px-3 py-2 fs-6 d-none align-items-center gap-1 user-badge-link"
                title="Click to view and edit profile settings">
@@ -212,7 +212,6 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
-    // Safe JWT parser with expiration check
     function parseJwt(token) {
         try {
             const base64Url = token.split('.')[1];
@@ -242,16 +241,11 @@
         const decodedToken = token ? parseJwt(token) : null;
 
         if (token && decodedToken) {
-            let activeUser = username;
-            if (!activeUser) {
-                activeUser = decodedToken.sub || decodedToken.username || 'Client';
-            }
+            const activeUser = username || decodedToken.sub || decodedToken.username || 'Client';
 
-            // Extract role to check for admin privileges
             const role = decodedToken.role || decodedToken.authorities || (decodedToken.roles ? decodedToken.roles[0] : 'ROLE_USER');
             const isAdmin = role === 'ROLE_ADMIN' || role === 'ADMIN';
 
-            // Display Username Badge
             if (userBadge && usernameDisplay) {
                 usernameDisplay.textContent = activeUser;
                 userBadge.classList.remove('d-none');
@@ -263,10 +257,12 @@
                 adminLinkHtml = `<a href="./admin-dashboard.html" class="nav-link fw-bold text-danger"><i class="bi bi-shield-lock-fill me-1"></i>Admin Portal</a>`;
             }
 
-            // Logged-in navigation
             authNav.innerHTML = `
+                <a href="./index.html" class="nav-link fw-semibold text-dark">Home</a>
                 <a href="./dashboard.html" class="nav-link fw-semibold text-dark">Showcase</a>
+                <a href="./products.html" class="nav-link fw-semibold text-dark">Products</a>
                 <a href="./services.html" class="nav-link fw-semibold text-dark">Services</a>
+                <a href="./booking.html" class="nav-link fw-semibold text-dark">Book Now</a>
                 ${adminLinkHtml}
                 <a href="./profile.html" class="nav-link fw-semibold text-dark">Profile</a>
                 <a href="#" onclick="handleLogout()" class="nav-link fw-semibold text-dark">Logout</a>
@@ -277,23 +273,26 @@
                 localStorage.removeItem('accessToken');
                 localStorage.removeItem('token');
                 localStorage.removeItem('username');
+                localStorage.removeItem('userRole');
             }
 
-            // Guest navigation
             if (userBadge) {
                 userBadge.classList.add('d-none');
                 userBadge.classList.remove('d-inline-flex');
             }
 
             authNav.innerHTML = `
+                <a href="./index.html" class="nav-link fw-semibold text-dark">Home</a>
+                <a href="./dashboard.html" class="nav-link fw-semibold text-dark">Showcase</a>
+                <a href="./products.html" class="nav-link fw-semibold text-dark">Products</a>
                 <a href="./services.html" class="nav-link fw-semibold text-dark">Services</a>
+                <a href="./booking.html" class="nav-link fw-semibold text-dark">Book Now</a>
                 <a href="./login.html" class="nav-link fw-semibold text-dark">Log in</a>
                 <a href="./signup.html" class="nav-link fw-semibold text-dark">Sign up</a>
             `;
         }
     });
 
-    // Check if logged-in user already has an active subscription
     async function loadCurrentSubscription() {
         try {
             const response = await fetch('/api/subscriptions/current', {
@@ -311,7 +310,6 @@
         }
     }
 
-    // Handle button click for both guests and logged-in users
     async function selectPlan(planName) {
         if (!token) {
             alert(`Please log in or create an account to subscribe to the ${planName} plan.`);

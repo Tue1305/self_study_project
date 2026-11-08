@@ -63,9 +63,9 @@
 <header class="navbar navbar-expand-lg bg-white shadow-sm sticky-top px-3 px-lg-4">
     <div class="container-fluid">
         <div class="d-flex align-items-center gap-3">
-            <a href="/" class="navbar-brand fw-bold text-pink fs-4 mb-0">Jenny's Nail Studio</a>
+            <a href="./index.html" class="navbar-brand fw-bold text-pink fs-4 mb-0">Jenny's Nail Studio</a>
             <!-- Clickable User Badge shown next to logo when logged in -->
-            <a href="profile.html"
+            <a href="./profile.html"
                id="userBadge"
                class="badge bg-danger-subtle text-pink border border-danger-subtle rounded-pill px-3 py-2 fs-6 d-none align-items-center gap-1 user-badge-link"
                title="Click to view and edit profile settings">
@@ -89,7 +89,7 @@
 <!-- Hero Section -->
 <section class="bg-white py-5 border-bottom text-center">
     <div class="container py-4">
-        <h1 class="display-5 fw-bold text-dark mb-3" id="heroHeading">Custom Nail Extensions & Hand-Painted Artistry</h1>
+        <h1 class="display-5 fw-bold text-dark mb-3" id="heroHeading">Custom Nail Extensions &amp; Hand-Painted Artistry</h1>
         <p class="lead text-muted mx-auto mb-4" style="max-width: 650px;" id="heroSubheading">Elevate your personal style with professional Bio Gel, Acrylic sculpting, and high-shine Shellac manicures.</p>
 
         <div class="d-flex justify-content-center gap-3 flex-wrap" id="heroAction">
@@ -147,7 +147,7 @@
 <!-- Footer -->
 <footer class="bg-white border-top text-center py-3 mt-auto">
     <div class="container">
-        <small class="text-muted">&copy; Jenny's Nail Studio — Custom Nail Sculpting & Artistry</small>
+        <small class="text-muted">&copy; Jenny's Nail Studio — Custom Nail Sculpting &amp; Artistry</small>
     </div>
 </footer>
 
@@ -177,7 +177,6 @@
     }
 
     document.addEventListener('DOMContentLoaded', () => {
-        // Fallback-safe token retrieval matching all storage standards in the project
         const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
         const username = localStorage.getItem('username');
 
@@ -190,46 +189,43 @@
         const decodedToken = token ? parseJwt(token) : null;
 
         if (token && decodedToken) {
-            let activeUser = username;
-            if (!activeUser) {
-                activeUser = decodedToken.sub || decodedToken.username || 'Client';
-            }
+            const activeUser = username || decodedToken.sub || decodedToken.username || 'Client';
 
-            // Extract user role from token claims
+            // Strictly check JWT token claims for admin role
             const role = decodedToken.role || decodedToken.authorities || (decodedToken.roles ? decodedToken.roles[0] : 'ROLE_USER');
             const isAdmin = role === 'ROLE_ADMIN' || role === 'ADMIN';
 
-            // Display Username in Header Badge
             usernameDisplay.textContent = activeUser;
             userBadge.classList.remove('d-none');
             userBadge.classList.add('d-inline-flex');
 
-            // Personalize Hero Header
             heroHeading.textContent = `Welcome back, ${activeUser}!`;
 
-            // Build Admin Link if applicable
+            // Admin Portal link shown ONLY to verified admins
             let adminLinkHtml = '';
             if (isAdmin) {
                 adminLinkHtml = `<a href="./admin-dashboard.html" class="nav-link fw-bold text-danger"><i class="bi bi-shield-lock-fill me-1"></i>Admin Portal</a>`;
             }
 
-            // Logged-in Navigation Links (Includes Profile & Subscriptions)
             authNav.innerHTML = `
+                <a href="./index.html" class="nav-link fw-semibold text-pink active">Home</a>
                 <a href="./dashboard.html" class="nav-link fw-semibold text-dark">Showcase</a>
+                <a href="./products.html" class="nav-link fw-semibold text-dark">Products</a>
                 <a href="./services.html" class="nav-link fw-semibold text-dark">Services</a>
+                <a href="./booking.html" class="nav-link fw-semibold text-dark">Book Now</a>
                 ${adminLinkHtml}
                 <a href="./profile.html" class="nav-link fw-semibold text-dark">Profile</a>
                 <a href="#" onclick="handleLogout()" class="nav-link fw-semibold text-dark">Logout</a>
                 <a href="./subscription-plans.html" class="btn btn-pink rounded-pill px-4 py-2 fw-semibold">Subscription Plans</a>
             `;
 
-            // Logged-in Hero Actions
             heroAction.innerHTML = `
-                <a href="./dashboard.html" class="btn btn-pink rounded-pill px-4 py-2 fs-6">View Client Showcase</a>
-                <a href="./services.html" class="btn btn-outline-pink rounded-pill px-4 py-2 fs-6">View Services & Pricing</a>
+                <a href="./booking.html" class="btn btn-pink rounded-pill px-4 py-2 fs-6">Book an Appointment</a>
+                <a href="./dashboard.html" class="btn btn-outline-pink rounded-pill px-4 py-2 fs-6">View Client Showcase</a>
+                <a href="./products.html" class="btn btn-outline-pink rounded-pill px-4 py-2 fs-6">Browse Products</a>
+                <a href="./services.html" class="btn btn-outline-pink rounded-pill px-4 py-2 fs-6">Services &amp; Pricing</a>
             `;
         } else {
-            // Clear stale/expired token if present
             if (token) {
                 localStorage.removeItem('accessToken');
                 localStorage.removeItem('token');
@@ -237,20 +233,25 @@
                 localStorage.removeItem('userRole');
             }
 
-            // Guest View Navigation
             userBadge.classList.add('d-none');
             userBadge.classList.remove('d-inline-flex');
 
             authNav.innerHTML = `
+                <a href="./index.html" class="nav-link fw-semibold text-pink active">Home</a>
+                <a href="./dashboard.html" class="nav-link fw-semibold text-dark">Showcase</a>
+                <a href="./products.html" class="nav-link fw-semibold text-dark">Products</a>
                 <a href="./services.html" class="nav-link fw-semibold text-dark">Services</a>
+                <a href="./booking.html" class="nav-link fw-semibold text-dark">Book Now</a>
                 <a href="./login.html" class="nav-link fw-semibold text-dark">Log in</a>
                 <a href="./signup.html" class="nav-link fw-semibold text-dark">Sign up</a>
                 <a href="./subscription-plans.html" class="btn btn-pink rounded-pill px-4 py-2 fw-semibold">Subscription Plans</a>
             `;
 
             heroAction.innerHTML = `
-                <a href="./dashboard.html" class="btn btn-pink rounded-pill px-4 py-2 fs-6">Explore Recent Work & Client Creations</a>
-                <a href="./login.html" class="btn btn-outline-pink rounded-pill px-4 py-2 fs-6">Client Log In</a>
+                <a href="./booking.html" class="btn btn-pink rounded-pill px-4 py-2 fs-6">Book an Appointment</a>
+                <a href="./dashboard.html" class="btn btn-outline-pink rounded-pill px-4 py-2 fs-6">Explore Showcase</a>
+                <a href="./products.html" class="btn btn-outline-pink rounded-pill px-4 py-2 fs-6">Browse Products</a>
+                <a href="./services.html" class="btn btn-outline-pink rounded-pill px-4 py-2 fs-6">Services &amp; Pricing</a>
             `;
         }
     });

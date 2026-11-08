@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/showcase")
@@ -51,32 +52,35 @@ public class ShowcaseController {
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ADMIN')")
     @PutMapping("/{id}")
     public ResponseEntity<?> updateShowcaseItem(@PathVariable Long id, @RequestBody ShowcaseItem updated) {
-        return showcaseRepository.findById(id)
-                .map(existing -> {
-                    if (updated.getTitle() != null && !updated.getTitle().isBlank()) {
-                        existing.setTitle(updated.getTitle().trim());
-                    }
-                    existing.setDescription(updated.getDescription());
-                    if (updated.getCategory() != null && !updated.getCategory().isBlank()) {
-                        existing.setCategory(updated.getCategory().trim());
-                    }
-                    if (updated.getBadgeText() != null && !updated.getBadgeText().isBlank()) {
-                        existing.setBadgeText(updated.getBadgeText().trim());
-                    }
-                    if (updated.getTechName() != null && !updated.getTechName().isBlank()) {
-                        existing.setTechName(updated.getTechName().trim());
-                    }
-                    if (updated.getDuration() != null && !updated.getDuration().isBlank()) {
-                        existing.setDuration(updated.getDuration().trim());
-                    }
-                    if (updated.getImageUrl() != null && !updated.getImageUrl().isBlank()) {
-                        existing.setImageUrl(updated.getImageUrl());
-                    }
-                    ShowcaseItem saved = showcaseRepository.save(existing);
-                    return ResponseEntity.ok(saved);
-                })
-                .orElse(ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body(Map.of("message", "Showcase item not found.")));
+        Optional<ShowcaseItem> optional = showcaseRepository.findById(id);
+        if (optional.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("message", "Showcase item not found."));
+        }
+
+        ShowcaseItem existing = optional.get();
+        if (updated.getTitle() != null && !updated.getTitle().isBlank()) {
+            existing.setTitle(updated.getTitle().trim());
+        }
+        existing.setDescription(updated.getDescription());
+        if (updated.getCategory() != null && !updated.getCategory().isBlank()) {
+            existing.setCategory(updated.getCategory().trim());
+        }
+        if (updated.getBadgeText() != null && !updated.getBadgeText().isBlank()) {
+            existing.setBadgeText(updated.getBadgeText().trim());
+        }
+        if (updated.getTechName() != null && !updated.getTechName().isBlank()) {
+            existing.setTechName(updated.getTechName().trim());
+        }
+        if (updated.getDuration() != null && !updated.getDuration().isBlank()) {
+            existing.setDuration(updated.getDuration().trim());
+        }
+        if (updated.getImageUrl() != null && !updated.getImageUrl().isBlank()) {
+            existing.setImageUrl(updated.getImageUrl());
+        }
+
+        ShowcaseItem saved = showcaseRepository.save(existing);
+        return ResponseEntity.ok(saved);
     }
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ADMIN')")

@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/services")
@@ -39,22 +40,24 @@ public class ServiceController {
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ADMIN')")
     @PutMapping("/{id}")
     public ResponseEntity<?> updateService(@PathVariable Long id, @RequestBody ServiceEntity updated) {
-        return serviceRepository.findById(id)
-                .map(existing -> {
-                    if (updated.getName() != null && !updated.getName().isBlank()) {
-                        existing.setName(updated.getName().trim());
-                    }
-                    existing.setDescription(updated.getDescription());
-                    if (updated.getPrice() != null) {
-                        existing.setPrice(updated.getPrice());
-                    }
-                    if (updated.getDurationMinutes() != null) {
-                        existing.setDurationMinutes(updated.getDurationMinutes());
-                    }
-                    return ResponseEntity.ok(serviceRepository.save(existing));
-                })
-                .orElse(ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body(Map.of("message", "Service not found.")));
+        Optional<ServiceEntity> optional = serviceRepository.findById(id);
+        if (optional.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("message", "Service not found."));
+        }
+
+        ServiceEntity existing = optional.get();
+        if (updated.getName() != null && !updated.getName().isBlank()) {
+            existing.setName(updated.getName().trim());
+        }
+        existing.setDescription(updated.getDescription());
+        if (updated.getPrice() != null) {
+            existing.setPrice(updated.getPrice());
+        }
+        if (updated.getDurationMinutes() != null) {
+            existing.setDurationMinutes(updated.getDurationMinutes());
+        }
+        return ResponseEntity.ok(serviceRepository.save(existing));
     }
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ADMIN')")

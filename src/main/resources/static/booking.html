@@ -110,8 +110,8 @@
 
                         <div class="mb-3">
                             <label for="nailTechSelect" class="form-label fw-semibold">Preferred Nail Technician</label>
-                            <select class="form-select" id="nailTechSelect" required>
-                                <option value="">Loading technicians...</option>
+                            <select class="form-select" id="nailTechSelect">
+                                <option value="">Anyone Available (No Preference)</option>
                             </select>
                         </div>
 
@@ -229,22 +229,23 @@
             document.getElementById('serviceSelect').innerHTML = '<option value="">Error loading services</option>';
         }
 
-        // 2. Load Nail Technicians (Staff)
+        // 2. Load Nail Technicians (Staff) with "Anyone Available" as default
+        const techSelect = document.getElementById('nailTechSelect');
+        techSelect.innerHTML = '<option value="">Anyone Available (No Preference)</option>';
         try {
             const response = await fetch('/api/nail-techs');
-            const techs = await response.json();
-            const select = document.getElementById('nailTechSelect');
-
-            select.innerHTML = '<option value="">-- Choose a Nail Tech --</option>';
-            techs.forEach(tech => {
-                const option = document.createElement('option');
-                option.value = tech.id;
-                option.textContent = tech.name || tech.username;
-                select.appendChild(option);
-            });
+            if (response.ok) {
+                const techs = await response.json();
+                techs.forEach(tech => {
+                    const option = document.createElement('option');
+                    option.value = tech.id;
+                    const specialtyText = tech.specialty ? ` (${tech.specialty})` : '';
+                    option.textContent = `${tech.name || tech.username}${specialtyText}`;
+                    techSelect.appendChild(option);
+                });
+            }
         } catch (err) {
             console.error('Error loading nail techs:', err);
-            document.getElementById('nailTechSelect').innerHTML = '<option value="">Error loading technicians</option>';
         }
     });
 
@@ -252,12 +253,14 @@
     document.getElementById('bookingForm').addEventListener('submit', async (e) => {
         e.preventDefault();
 
+        const selectedTechId = document.getElementById('nailTechSelect').value;
+
         const bookingData = {
             customerName: document.getElementById('customerName').value,
             customerPhone: document.getElementById('customerPhone').value,
             customerEmail: document.getElementById('customerEmail').value,
             service: { id: parseInt(document.getElementById('serviceSelect').value) },
-            nailTech: { id: parseInt(document.getElementById('nailTechSelect').value) },
+            nailTech: selectedTechId ? { id: parseInt(selectedTechId) } : null,
             appointmentTime: document.getElementById('appointmentTime').value
         };
 

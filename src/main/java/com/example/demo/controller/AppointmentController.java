@@ -25,6 +25,10 @@ public class AppointmentController {
 
     @PostMapping
     public Appointment bookAppointment(@RequestBody Appointment appointment) {
+        // If "Anyone Available" was chosen (no nail tech ID), set nailTech to null
+        if (appointment.getNailTech() != null && appointment.getNailTech().getId() == null) {
+            appointment.setNailTech(null);
+        }
         return appointmentRepository.save(appointment);
     }
 

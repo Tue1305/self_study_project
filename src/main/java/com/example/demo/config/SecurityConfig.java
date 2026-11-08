@@ -34,18 +34,20 @@ public class SecurityConfig {
     public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
     }
+
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOriginPatterns(List.of("*"));
-        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "Cache-Control"));
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "Cache-Control", "*"));
         configuration.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;
     }
+
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
@@ -72,6 +74,7 @@ public class SecurityConfig {
                                 "/booking.html",
                                 "/login.html",
                                 "/signup.html",
+                                "/forgot-password.html",
                                 "/profile.html",
                                 "/subscription-plans.html",
                                 "/admin-calendar.html",
@@ -81,7 +84,9 @@ public class SecurityConfig {
                                 "/dashboard.html",
                                 "/products.html",
                                 "/services.html",
+                                "/api/services",
                                 "/api/services/**",
+                                "/api/appointments",
                                 "/api/appointments/**",
                                 "/favicon.ico",
                                 "/*.css",
@@ -93,14 +98,15 @@ public class SecurityConfig {
                                 "/*.jpg",
                                 "/*.jpeg",
                                 "/login",
+                                "/customers",
                                 "/customers/**",
                                 "/templates/customers/**"
                         ).permitAll()
                         // Nail-tech rules for connection (covering both exact and subpaths)
                         .requestMatchers(HttpMethod.GET, "/api/nail-techs", "/api/nail-techs/**").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/nail-techs", "/api/nail-techs/**").hasAnyAuthority("ROLE_ADMIN","ADMIN")
-                        .requestMatchers(HttpMethod.PUT, "/api/nail-techs", "/api/nail-techs/**").hasAnyAuthority("ROLE_ADMIN","ADMIN")
-                        .requestMatchers(HttpMethod.DELETE, "/api/nail-techs", "/api/nail-techs/**").hasAnyAuthority("ROLE_ADMIN","ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/nail-techs", "/api/nail-techs/**").hasAnyAuthority("ROLE_ADMIN", "ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/nail-techs", "/api/nail-techs/**").hasAnyAuthority("ROLE_ADMIN", "ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/nail-techs", "/api/nail-techs/**").hasAnyAuthority("ROLE_ADMIN", "ADMIN")
                         // Subscribers rules for connection
                         .requestMatchers(HttpMethod.GET, "/api/subscriptions/admin/**").hasAnyAuthority("ROLE_ADMIN", "ADMIN")
                         .requestMatchers("/api/auth/**").permitAll()

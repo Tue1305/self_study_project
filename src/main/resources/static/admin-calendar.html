@@ -155,19 +155,22 @@
 
                             const serviceName = apt.service ? apt.service.name : 'Service';
                             const customerName = apt.customerName || 'Customer';
+                            const techName = apt.nailTech ? (apt.nailTech.name || apt.nailTech.username) : 'Anyone Available';
 
                             return {
                                 id: apt.id,
-                                title: `${customerName} - ${serviceName}`,
+                                title: `${customerName} - ${serviceName} (${techName})`,
                                 start: apt.appointmentTime,
                                 backgroundColor: badgeColor,
                                 borderColor: badgeColor,
                                 textColor: '#fff',
                                 extendedProps: {
+                                    customerName: customerName,
                                     phone: apt.customerPhone,
                                     email: apt.customerEmail,
                                     status: apt.status,
-                                    serviceName: serviceName
+                                    serviceName: serviceName,
+                                    techName: techName
                                 }
                             };
                         });
@@ -183,14 +186,14 @@
                 currentAppointmentId = info.event.id;
                 const props = info.event.extendedProps;
                 const modalBody = document.getElementById('modalBody');
-                const titleParts = info.event.title.split(' - ');
-                const customerName = titleParts[0] || 'Customer';
+                const customerName = props.customerName || info.event.title.split(' - ')[0] || 'Customer';
 
                 modalBody.innerHTML = `
                     <p class="mb-2"><strong>Customer Name:</strong> ${customerName}</p>
                     <p class="mb-2"><strong>Phone Number:</strong> <a href="tel:${props.phone}" class="text-decoration-none">${props.phone || 'N/A'}</a></p>
                     <p class="mb-2"><strong>Email:</strong> <a href="mailto:${props.email}" class="text-decoration-none">${props.email || 'N/A'}</a></p>
                     <p class="mb-2"><strong>Service:</strong> ${props.serviceName}</p>
+                    <p class="mb-2"><strong>Nail Technician:</strong> ${props.techName || 'Anyone Available'}</p>
                     <p class="mb-2"><strong>Time:</strong> ${info.event.start.toLocaleString()}</p>
                     <p class="mb-0"><strong>Status:</strong> <span class="badge bg-secondary">${props.status}</span></p>
                 `;

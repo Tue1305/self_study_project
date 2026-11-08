@@ -80,6 +80,7 @@ public class SecurityConfig {
                                 "/admin-calendar.html",
                                 "/admin-dashboard.html",
                                 "/admin-subs.html",
+                                "/admin-customers.html",
                                 "/nail-techs.html",
                                 "/dashboard.html",
                                 "/products.html",
@@ -97,16 +98,15 @@ public class SecurityConfig {
                                 "/*.png",
                                 "/*.jpg",
                                 "/*.jpeg",
-                                "/login",
-                                "/customers",
-                                "/customers/**",
-                                "/templates/customers/**"
+                                "/login"
                         ).permitAll()
                         // Nail-tech rules for connection (covering both exact and subpaths)
                         .requestMatchers(HttpMethod.GET, "/api/nail-techs", "/api/nail-techs/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/nail-techs", "/api/nail-techs/**").hasAnyAuthority("ROLE_ADMIN", "ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/nail-techs", "/api/nail-techs/**").hasAnyAuthority("ROLE_ADMIN", "ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/nail-techs", "/api/nail-techs/**").hasAnyAuthority("ROLE_ADMIN", "ADMIN")
+                        // Customers admin API rules
+                        .requestMatchers("/api/customers", "/api/customers/**").hasAnyAuthority("ROLE_ADMIN", "ADMIN")
                         // Subscribers rules for connection
                         .requestMatchers(HttpMethod.GET, "/api/subscriptions/admin/**").hasAnyAuthority("ROLE_ADMIN", "ADMIN")
                         .requestMatchers("/api/auth/**").permitAll()

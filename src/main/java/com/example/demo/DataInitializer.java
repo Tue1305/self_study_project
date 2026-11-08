@@ -5,10 +5,8 @@ import com.example.demo.entity.ServiceEntity;
 import com.example.demo.repository.ServiceRepository;
 import com.example.demo.repository.UserRepository;
 import org.springframework.boot.CommandLineRunner;
-import org.springframework.context.annotation.Bean;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
-import org.springframework.context.annotation.Configuration;
 
 import java.math.BigDecimal;
 
@@ -33,9 +31,13 @@ public class DataInitializer implements CommandLineRunner {
             userRepository.save(user);
         }
 
-        // Seed admin user
-        if (!userRepository.existsByUsername("admin")) {
-            UserEntity admin = new UserEntity("admin", passwordEncoder.encode("admin123"));
+        // Seed admin user and ensure its role is ROLE_ADMIN
+        UserEntity admin = userRepository.findByUsername("admin").orElse(null);
+        if (admin == null) {
+            admin = new UserEntity("admin", passwordEncoder.encode("admin123"), "ROLE_ADMIN");
+            userRepository.save(admin);
+        } else if (!"ROLE_ADMIN".equals(admin.getRole())) {
+            admin.setRole("ROLE_ADMIN");
             userRepository.save(admin);
         }
 
@@ -48,4 +50,3 @@ public class DataInitializer implements CommandLineRunner {
         }
     }
 }
-

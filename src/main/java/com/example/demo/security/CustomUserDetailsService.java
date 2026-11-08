@@ -32,7 +32,7 @@ public class CustomUserDetailsService implements UserDetailsService {
         if (role == null || role.trim().isEmpty()) {
             role = "ROLE_USER";
         } else {
-            role = role.toUpperCase();
+            role = role.trim().toUpperCase();
             if (!role.startsWith("ROLE_")) {
                 role = "ROLE_" + role;
             }

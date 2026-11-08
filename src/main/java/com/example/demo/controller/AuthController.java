@@ -6,6 +6,7 @@ import com.example.demo.dto.RegisterRequest;
 import com.example.demo.entity.UserEntity;
 import com.example.demo.repository.UserRepository;
 import com.example.demo.security.JwtUtil;
+import com.example.demo.service.CustomerService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -28,13 +29,18 @@ public class AuthController {
     private final JwtUtil jwtUtil;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final CustomerService customerService;
 
-    public AuthController(AuthenticationManager authenticationManager, JwtUtil jwtUtil, UserRepository userRepository,
-                          PasswordEncoder passwordEncoder) {
+    public AuthController(AuthenticationManager authenticationManager,
+                          JwtUtil jwtUtil,
+                          UserRepository userRepository,
+                          PasswordEncoder passwordEncoder,
+                          CustomerService customerService) {
         this.authenticationManager = authenticationManager;
         this.jwtUtil = jwtUtil;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.customerService = customerService;
     }
 
     @PostMapping("/login")
@@ -52,11 +58,15 @@ public class AuthController {
             UserDetails userDetails = (UserDetails) authentication.getPrincipal();
             String jwt = jwtUtil.generateToken(userDetails);
 
+            // Ensure ROLE_USER accounts are synced into the Customer database on login
+            userRepository.findByUsername(userDetails.getUsername())
+                    .ifPresent(customerService::syncUserToCustomer);
+
             return ResponseEntity.ok(new JwtAuthResponse(jwt));
 
         } catch (BadCredentialsException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("message","Invalid username or password"));
+                    .body(Map.of("message", "Invalid username or password"));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("message", "An unexpected error occurred: " + e.getMessage()));
@@ -72,8 +82,12 @@ public class AuthController {
         UserEntity user = new UserEntity();
         user.setUsername(registerRequest.getUsername());
         user.setPassword(passwordEncoder.encode(registerRequest.getPassword()));
+        user.setRole("ROLE_USER");
 
-        userRepository.save(user);
+        UserEntity savedUser = userRepository.save(user);
+
+        // Automatically add new ROLE_USER account into the Customer database
+        customerService.syncUserToCustomer(savedUser);
 
         return ResponseEntity.ok("User registered successfully!");
     }

@@ -2,8 +2,9 @@ package com.example.demo.controller;
 
 import com.example.demo.dto.PasswordChangeDto;
 import com.example.demo.dto.UserUpdateDto;
-import com.example.demo.entity.UserEntity; // Adjust if your entity name differs (e.g. User)
+import com.example.demo.entity.UserEntity;
 import com.example.demo.repository.UserRepository;
+import com.example.demo.service.CustomerService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -19,10 +20,14 @@ public class UserController {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final CustomerService customerService;
 
-    public UserController(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public UserController(UserRepository userRepository,
+                          PasswordEncoder passwordEncoder,
+                          CustomerService customerService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.customerService = customerService;
     }
 
     // Get current logged-in user profile details
@@ -64,7 +69,10 @@ public class UserController {
             user.setPhoneNumber(updateDto.getPhoneNumber());
         }
 
-        userRepository.save(user);
+        UserEntity savedUser = userRepository.save(user);
+
+        // Sync updated email/phone/username to the Customer database as well
+        customerService.syncUserToCustomer(savedUser);
 
         return ResponseEntity.ok().body("Profile updated successfully");
     }

@@ -4,6 +4,7 @@ import com.example.demo.entity.UserEntity;
 import com.example.demo.entity.ServiceEntity;
 import com.example.demo.repository.ServiceRepository;
 import com.example.demo.repository.UserRepository;
+import com.example.demo.service.CustomerService;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
@@ -16,18 +17,23 @@ public class DataInitializer implements CommandLineRunner {
     private final UserRepository userRepository;
     private final ServiceRepository serviceRepository;
     private final PasswordEncoder passwordEncoder;
+    private final CustomerService customerService;
 
-    public DataInitializer(UserRepository userRepository, ServiceRepository serviceRepository, PasswordEncoder passwordEncoder) {
+    public DataInitializer(UserRepository userRepository,
+                           ServiceRepository serviceRepository,
+                           PasswordEncoder passwordEncoder,
+                           CustomerService customerService) {
         this.userRepository = userRepository;
         this.serviceRepository = serviceRepository;
         this.passwordEncoder = passwordEncoder;
+        this.customerService = customerService;
     }
 
     @Override
     public void run(String... args) {
         // Seed default user
         if (!userRepository.existsByUsername("user")) {
-            UserEntity user = new UserEntity("user", passwordEncoder.encode("password"));
+            UserEntity user = new UserEntity("user", passwordEncoder.encode("password"), "ROLE_USER");
             userRepository.save(user);
         }
 
@@ -40,6 +46,9 @@ public class DataInitializer implements CommandLineRunner {
             admin.setRole("ROLE_ADMIN");
             userRepository.save(admin);
         }
+
+        // Sync all existing ROLE_USER accounts into the Customer database
+        userRepository.findAll().forEach(customerService::syncUserToCustomer);
 
         if (serviceRepository.count() == 0) {
             serviceRepository.save(new ServiceEntity("Gel Manicure", "Long-lasting gel polish with cuticle care and hand massage.", new BigDecimal("45.00"), 45));

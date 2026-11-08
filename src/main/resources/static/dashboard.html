@@ -72,6 +72,12 @@
             color: #fff !important;
             border-color: var(--bs-primary-pink) !important;
         }
+
+        #imagePreview {
+            max-height: 200px;
+            object-fit: cover;
+            border-radius: 0.5rem;
+        }
     </style>
 </head>
 <body class="bg-light d-flex flex-column min-vh-100">
@@ -109,6 +115,13 @@
     <div class="text-center mb-4">
         <h1 class="display-6 fw-bold text-dark" id="heroTitle">Recent Work & Client Creations</h1>
         <p class="text-muted fs-5">Explore recent sets completed by our resident nail technician.</p>
+
+        <!-- Admin Controls Banner (Visible only to ROLE_ADMIN) -->
+        <div id="adminControls" class="d-none mt-3">
+            <button class="btn btn-pink rounded-pill px-4 py-2 fw-semibold shadow-sm" onclick="openAddShowcaseModal()">
+                <i class="bi bi-plus-circle me-1"></i> Add Completed Nail Work
+            </button>
+        </div>
     </div>
 
     <!-- Category Filters -->
@@ -121,225 +134,77 @@
 
     <!-- Showcase Gallery Grid -->
     <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-4" id="galleryGrid">
-
-        <!-- Card 1 -->
-        <div class="col gallery-card" data-category="gel">
-            <div class="card h-100 border-0 shadow-sm rounded-3 overflow-hidden">
-                <div class="image-wrapper position-relative bg-secondary-subtle">
-                    <img src="nail_collection/nail4.png" class="card-img-top w-100 h-100 object-fit-cover" alt="Almond Chrome Set">
-                    <span class="badge bg-dark bg-opacity-75 text-white position-absolute top-0 end-0 m-3 px-2 py-1 rounded-pill text-uppercase">Gel-X</span>
-                </div>
-                <div class="card-body d-flex flex-column p-4">
-                    <h3 class="card-title h5 fw-bold text-dark">Short Almond Chrome</h3>
-                    <p class="card-text text-muted small">Milky white base with iridescent pearl chrome dust finish.</p>
-                    <div class="mt-auto pt-3 border-top d-flex justify-content-between align-items-center">
-                        <span class="fw-semibold text-pink small">Tech: @NailArtistry</span>
-                        <span class="text-secondary small">1 hr 15 mins</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Card 2 -->
-        <div class="col gallery-card" data-category="art">
-            <div class="card h-100 border-0 shadow-sm rounded-3 overflow-hidden">
-                <div class="image-wrapper position-relative bg-secondary-subtle">
-                    <img src="nail_collection/nail5.png" class="card-img-top w-100 h-100 object-fit-cover" alt="Botanical Art">
-                    <span class="badge bg-dark bg-opacity-75 text-white position-absolute top-0 end-0 m-3 px-2 py-1 rounded-pill text-uppercase">Custom Art</span>
-                </div>
-                <div class="card-body d-flex flex-column p-4">
-                    <h3 class="card-title h5 fw-bold text-dark">Hand-Painted Botanical</h3>
-                    <p class="card-text text-muted small">Matte nude background with fine line leaf detail and gold foil highlights.</p>
-                    <div class="mt-auto pt-3 border-top d-flex justify-content-between align-items-center">
-                        <span class="fw-semibold text-pink small">Tech: @NailArtistry</span>
-                        <span class="text-secondary small">1 hr 45 mins</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Card 3 -->
-        <div class="col gallery-card" data-category="acrylic">
-            <div class="card h-100 border-0 shadow-sm rounded-3 overflow-hidden">
-                <div class="image-wrapper position-relative bg-secondary-subtle">
-                    <img src="nail_collection/nail6.png" class="card-img-top w-100 h-100 object-fit-cover" alt="Ombre French">
-                    <span class="badge bg-dark bg-opacity-75 text-white position-absolute top-0 end-0 m-3 px-2 py-1 rounded-pill text-uppercase">Acrylic</span>
-                </div>
-                <div class="card-body d-flex flex-column p-4">
-                    <h3 class="card-title h5 fw-bold text-dark">Coffin French Ombre</h3>
-                    <p class="card-text text-muted small">Classic pink-and-white gradient extended coffin sculpt.</p>
-                    <div class="mt-auto pt-3 border-top d-flex justify-content-between align-items-center">
-                        <span class="fw-semibold text-pink small">Tech: @NailArtistry</span>
-                        <span class="text-secondary small">1 hr 30 mins</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Card 4 -->
-        <div class="col gallery-card" data-category="art">
-            <div class="card h-100 border-0 shadow-sm rounded-3 overflow-hidden">
-                <div class="image-wrapper position-relative bg-secondary-subtle">
-                    <img src="nail_collection/nail7.png" class="card-img-top w-100 h-100 object-fit-cover" alt="3D Jelly Nails">
-                    <span class="badge bg-dark bg-opacity-75 text-white position-absolute top-0 end-0 m-3 px-2 py-1 rounded-pill text-uppercase">Custom Art</span>
-                </div>
-                <div class="card-body d-flex flex-column p-4">
-                    <h3 class="card-title h5 fw-bold text-dark">3D Y2K Jelly Sculpt</h3>
-                    <p class="card-text text-muted small">Translucent pink jelly base layered with raised 3D gel swirls and charms.</p>
-                    <div class="mt-auto pt-3 border-top d-flex justify-content-between align-items-center">
-                        <span class="fw-semibold text-pink small">Tech: @NailArtistry</span>
-                        <span class="text-secondary small">2 hrs</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Card 5 -->
-        <div class="col gallery-card" data-category="art">
-            <div class="card h-100 border-0 shadow-sm rounded-3 overflow-hidden">
-                <div class="image-wrapper position-relative bg-secondary-subtle">
-                    <img src="nail_collection/nail8.png" class="card-img-top w-100 h-100 object-fit-cover" alt="3D Jelly Nails">
-                    <span class="badge bg-dark bg-opacity-75 text-white position-absolute top-0 end-0 m-3 px-2 py-1 rounded-pill text-uppercase">Custom Art</span>
-                </div>
-                <div class="card-body d-flex flex-column p-4">
-                    <h3 class="card-title h5 fw-bold text-dark">3D Y2K Jelly Sculpt</h3>
-                    <p class="card-text text-muted small">Translucent pink jelly base layered with raised 3D gel swirls and charms.</p>
-                    <div class="mt-auto pt-3 border-top d-flex justify-content-between align-items-center">
-                        <span class="fw-semibold text-pink small">Tech: @NailArtistry</span>
-                        <span class="text-secondary small">2 hrs</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Card 6 -->
-        <div class="col gallery-card" data-category="art">
-            <div class="card h-100 border-0 shadow-sm rounded-3 overflow-hidden">
-                <div class="image-wrapper position-relative bg-secondary-subtle">
-                    <img src="nail_collection/nail1.png" class="card-img-top w-100 h-100 object-fit-cover" alt="3D Jelly Nails">
-                    <span class="badge bg-dark bg-opacity-75 text-white position-absolute top-0 end-0 m-3 px-2 py-1 rounded-pill text-uppercase">Custom Art</span>
-                </div>
-                <div class="card-body d-flex flex-column p-4">
-                    <h3 class="card-title h5 fw-bold text-dark">3D Y2K Jelly Sculpt</h3>
-                    <p class="card-text text-muted small">Translucent pink jelly base layered with raised 3D gel swirls and charms.</p>
-                    <div class="mt-auto pt-3 border-top d-flex justify-content-between align-items-center">
-                        <span class="fw-semibold text-pink small">Tech: @NailArtistry</span>
-                        <span class="text-secondary small">2 hrs</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Card 7 -->
-        <div class="col gallery-card" data-category="art">
-            <div class="card h-100 border-0 shadow-sm rounded-3 overflow-hidden">
-                <div class="image-wrapper position-relative bg-secondary-subtle">
-                    <img src="nail_collection/nail10.png" class="card-img-top w-100 h-100 object-fit-cover" alt="3D Jelly Nails">
-                    <span class="badge bg-dark bg-opacity-75 text-white position-absolute top-0 end-0 m-3 px-2 py-1 rounded-pill text-uppercase">Custom Art</span>
-                </div>
-                <div class="card-body d-flex flex-column p-4">
-                    <h3 class="card-title h5 fw-bold text-dark">3D Y2K Jelly Sculpt</h3>
-                    <p class="card-text text-muted small">Translucent pink jelly base layered with raised 3D gel swirls and charms.</p>
-                    <div class="mt-auto pt-3 border-top d-flex justify-content-between align-items-center">
-                        <span class="fw-semibold text-pink small">Tech: @NailArtistry</span>
-                        <span class="text-secondary small">2 hrs</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Card 8 -->
-        <div class="col gallery-card" data-category="art">
-            <div class="card h-100 border-0 shadow-sm rounded-3 overflow-hidden">
-                <div class="image-wrapper position-relative bg-secondary-subtle">
-                    <img src="nail_collection/nail11.png" class="card-img-top w-100 h-100 object-fit-cover" alt="3D Jelly Nails">
-                    <span class="badge bg-dark bg-opacity-75 text-white position-absolute top-0 end-0 m-3 px-2 py-1 rounded-pill text-uppercase">Custom Art</span>
-                </div>
-                <div class="card-body d-flex flex-column p-4">
-                    <h3 class="card-title h5 fw-bold text-dark">3D Y2K Jelly Sculpt</h3>
-                    <p class="card-text text-muted small">Translucent pink jelly base layered with raised 3D gel swirls and charms.</p>
-                    <div class="mt-auto pt-3 border-top d-flex justify-content-between align-items-center">
-                        <span class="fw-semibold text-pink small">Tech: @NailArtistry</span>
-                        <span class="text-secondary small">2 hrs</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Card 9 -->
-        <div class="col gallery-card" data-category="art">
-            <div class="card h-100 border-0 shadow-sm rounded-3 overflow-hidden">
-                <div class="image-wrapper position-relative bg-secondary-subtle">
-                    <img src="nail_collection/nail12.png" class="card-img-top w-100 h-100 object-fit-cover" alt="3D Jelly Nails">
-                    <span class="badge bg-dark bg-opacity-75 text-white position-absolute top-0 end-0 m-3 px-2 py-1 rounded-pill text-uppercase">Custom Art</span>
-                </div>
-                <div class="card-body d-flex flex-column p-4">
-                    <h3 class="card-title h5 fw-bold text-dark">3D Y2K Jelly Sculpt</h3>
-                    <p class="card-text text-muted small">Translucent pink jelly base layered with raised 3D gel swirls and charms.</p>
-                    <div class="mt-auto pt-3 border-top d-flex justify-content-between align-items-center">
-                        <span class="fw-semibold text-pink small">Tech: @NailArtistry</span>
-                        <span class="text-secondary small">2 hrs</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Card 10 -->
-        <div class="col gallery-card" data-category="art">
-            <div class="card h-100 border-0 shadow-sm rounded-3 overflow-hidden">
-                <div class="image-wrapper position-relative bg-secondary-subtle">
-                    <img src="nail_collection/nail13.png" class="card-img-top w-100 h-100 object-fit-cover" alt="3D Jelly Nails">
-                    <span class="badge bg-dark bg-opacity-75 text-white position-absolute top-0 end-0 m-3 px-2 py-1 rounded-pill text-uppercase">Custom Art</span>
-                </div>
-                <div class="card-body d-flex flex-column p-4">
-                    <h3 class="card-title h5 fw-bold text-dark">3D Y2K Jelly Sculpt</h3>
-                    <p class="card-text text-muted small">Translucent pink jelly base layered with raised 3D gel swirls and charms.</p>
-                    <div class="mt-auto pt-3 border-top d-flex justify-content-between align-items-center">
-                        <span class="fw-semibold text-pink small">Tech: @NailArtistry</span>
-                        <span class="text-secondary small">2 hrs</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Card 11 -->
-        <div class="col gallery-card" data-category="art">
-            <div class="card h-100 border-0 shadow-sm rounded-3 overflow-hidden">
-                <div class="image-wrapper position-relative bg-secondary-subtle">
-                    <img src="nail_collection/nail2.png" class="card-img-top w-100 h-100 object-fit-cover" alt="3D Jelly Nails">
-                    <span class="badge bg-dark bg-opacity-75 text-white position-absolute top-0 end-0 m-3 px-2 py-1 rounded-pill text-uppercase">Custom Art</span>
-                </div>
-                <div class="card-body d-flex flex-column p-4">
-                    <h3 class="card-title h5 fw-bold text-dark">3D Y2K Jelly Sculpt</h3>
-                    <p class="card-text text-muted small">Translucent pink jelly base layered with raised 3D gel swirls and charms.</p>
-                    <div class="mt-auto pt-3 border-top d-flex justify-content-between align-items-center">
-                        <span class="fw-semibold text-pink small">Tech: @NailArtistry</span>
-                        <span class="text-secondary small">2 hrs</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Card 12 -->
-        <div class="col gallery-card" data-category="art">
-            <div class="card h-100 border-0 shadow-sm rounded-3 overflow-hidden">
-                <div class="image-wrapper position-relative bg-secondary-subtle">
-                    <img src="nail_collection/nail3.png" class="card-img-top w-100 h-100 object-fit-cover" alt="3D Jelly Nails">
-                    <span class="badge bg-dark bg-opacity-75 text-white position-absolute top-0 end-0 m-3 px-2 py-1 rounded-pill text-uppercase">Custom Art</span>
-                </div>
-                <div class="card-body d-flex flex-column p-4">
-                    <h3 class="card-title h5 fw-bold text-dark">3D Y2K Jelly Sculpt</h3>
-                    <p class="card-text text-muted small">Translucent pink jelly base layered with raised 3D gel swirls and charms.</p>
-                    <div class="mt-auto pt-3 border-top d-flex justify-content-between align-items-center">
-                        <span class="fw-semibold text-pink small">Tech: @NailArtistry</span>
-                        <span class="text-secondary small">2 hrs</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
+        <!-- Populated dynamically via /api/showcase -->
     </div>
 </main>
+
+<!-- Admin Add/Edit Showcase Modal -->
+<div class="modal fade" id="showcaseModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow rounded-4">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title fw-bold text-dark" id="showcaseModalTitle">Add Completed Nail Work</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body py-4">
+                <form id="showcaseForm">
+                    <input type="hidden" id="itemId">
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Upload Picture (from Computer / Phone)</label>
+                        <input type="file" class="form-control" id="imageFileInput" accept="image/*">
+                        <small class="text-muted d-block mt-1">Or enter an existing image path/URL below:</small>
+                        <input type="text" class="form-control form-control-sm mt-1" id="imageUrlInput" placeholder="e.g., nail_collection/nail4.png">
+                    </div>
+
+                    <div class="text-center mb-3 d-none" id="previewContainer">
+                        <img id="imagePreview" src="" alt="Preview" class="img-fluid border shadow-sm">
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="itemTitle" class="form-label fw-semibold">Design Title</label>
+                        <input type="text" class="form-control" id="itemTitle" required placeholder="e.g., Short Almond Chrome">
+                    </div>
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label for="itemCategory" class="form-label fw-semibold">Filter Category</label>
+                            <select class="form-select" id="itemCategory" onchange="syncBadgeFromCategory()">
+                                <option value="gel">Bio Gel</option>
+                                <option value="acrylic">Acrylic Sets</option>
+                                <option value="art">Custom Art</option>
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <label for="itemBadge" class="form-label fw-semibold">Badge Label</label>
+                            <input type="text" class="form-control" id="itemBadge" placeholder="e.g., Gel-X, Custom Art">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="itemDescription" class="form-label fw-semibold">Description</label>
+                        <textarea class="form-control" id="itemDescription" rows="2" placeholder="Describe the base, finish, or art details..."></textarea>
+                    </div>
+
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <label for="itemTech" class="form-label fw-semibold">Technician</label>
+                            <input type="text" class="form-control" id="itemTech" value="@NailArtistry" placeholder="@NailArtistry">
+                        </div>
+                        <div class="col-6">
+                            <label for="itemDuration" class="form-label fw-semibold">Duration</label>
+                            <input type="text" class="form-control" id="itemDuration" value="1 hr 30 mins" placeholder="e.g., 1 hr 30 mins">
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer border-0 pt-0">
+                <button type="button" class="btn btn-light btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-pink btn-sm px-4 fw-semibold" onclick="saveShowcaseItem()">Save Work</button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <!-- Footer -->
 <footer class="bg-white border-top text-center py-3 mt-auto">
@@ -352,6 +217,11 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
+    let isAdminUser = false;
+    let showcaseItemsCache = [];
+    let currentCategoryFilter = 'all';
+    let showcaseModalInstance = null;
+
     // Helper function to decode JWT claims safely and check expiration
     function parseJwt(token) {
         try {
@@ -372,7 +242,19 @@
     }
 
     document.addEventListener('DOMContentLoaded', () => {
-        // Fallback-safe token retrieval matching all storage keys in the project
+        showcaseModalInstance = new bootstrap.Modal(document.getElementById('showcaseModal'));
+
+        // Setup image file upload -> compress via canvas -> preview & fill data URL
+        document.getElementById('imageFileInput').addEventListener('change', handleImageFileSelect);
+        document.getElementById('imageUrlInput').addEventListener('input', (e) => {
+            const val = e.target.value.trim();
+            if (val) {
+                showPreview(val);
+            } else {
+                document.getElementById('previewContainer').classList.add('d-none');
+            }
+        });
+
         const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
         const storedUser = localStorage.getItem('username');
         const userBadge = document.getElementById('userBadge');
@@ -382,26 +264,21 @@
         const decodedToken = token ? parseJwt(token) : null;
 
         if (token && decodedToken) {
-            let activeUser = storedUser;
-            if (!activeUser) {
-                activeUser = decodedToken.sub || decodedToken.username || 'Client';
-            }
+            let activeUser = storedUser || decodedToken.sub || decodedToken.username || 'Client';
 
-            // Extract role to determine if user is admin
-            const role = decodedToken.role || decodedToken.authorities || (decodedToken.roles ? decodedToken.roles[0] : 'ROLE_USER');
-            const isAdmin = role === 'ROLE_ADMIN' || role === 'ADMIN';
+            const role = decodedToken.role || decodedToken.authorities || (decodedToken.roles ? decodedToken.roles[0] : null) || localStorage.getItem('userRole') || 'ROLE_USER';
+            isAdminUser = (role === 'ROLE_ADMIN' || role === 'ADMIN');
 
-            // Display User Badge
             if (userBadge && usernameDisplay) {
                 usernameDisplay.textContent = activeUser;
                 userBadge.classList.remove('d-none');
                 userBadge.classList.add('d-inline-flex');
             }
 
-            // Build Logged-In Header Links (Includes Admin Portal link if admin)
             let adminLinkHtml = '';
-            if (isAdmin) {
+            if (isAdminUser) {
                 adminLinkHtml = `<a href="./admin-dashboard.html" class="nav-link fw-bold text-danger"><i class="bi bi-shield-lock-fill me-1"></i>Admin Portal</a>`;
+                document.getElementById('adminControls').classList.remove('d-none');
             }
 
             if (authNav) {
@@ -415,14 +292,12 @@
                 `;
             }
         } else {
-            // Clear expired or invalid token if present
             if (token) {
                 localStorage.removeItem('accessToken');
                 localStorage.removeItem('token');
                 localStorage.removeItem('username');
             }
 
-            // Guest Header Links
             if (userBadge) {
                 userBadge.classList.add('d-none');
                 userBadge.classList.remove('d-inline-flex');
@@ -436,7 +311,245 @@
                 `;
             }
         }
+
+        loadShowcaseItems();
     });
+
+    async function loadShowcaseItems() {
+        const grid = document.getElementById('galleryGrid');
+        try {
+            const response = await fetch('/api/showcase');
+            if (!response.ok) throw new Error('Failed to load showcase');
+            showcaseItemsCache = await response.json();
+            renderGallery();
+        } catch (err) {
+            console.error('Error loading showcase items:', err);
+            grid.innerHTML = `<div class="col-12 text-center text-muted py-5">Unable to load showcase items right now.</div>`;
+        }
+    }
+
+    function renderGallery() {
+        const grid = document.getElementById('galleryGrid');
+        grid.innerHTML = '';
+
+        const filtered = showcaseItemsCache.filter(item =>
+            currentCategoryFilter === 'all' || item.category === currentCategoryFilter
+        );
+
+        if (filtered.length === 0) {
+            grid.innerHTML = `<div class="col-12 text-center text-muted py-5">No completed nail sets found in this category.</div>`;
+            return;
+        }
+
+        filtered.forEach(item => {
+            const adminActionButtons = isAdminUser ? `
+                <div class="position-absolute top-0 start-0 m-3 d-flex gap-1" style="z-index: 2;">
+                    <button class="btn btn-light btn-sm shadow-sm rounded-circle" title="Edit Work" onclick="openEditShowcaseModal(${item.id})">
+                        <i class="bi bi-pencil-fill text-dark"></i>
+                    </button>
+                    <button class="btn btn-danger btn-sm shadow-sm rounded-circle" title="Delete Work" onclick="deleteShowcaseItem(${item.id})">
+                        <i class="bi bi-trash-fill"></i>
+                    </button>
+                </div>
+            ` : '';
+
+            const techLabel = (item.techName || '@NailArtistry').startsWith('Tech:')
+                ? item.techName
+                : `Tech: ${item.techName || '@NailArtistry'}`;
+
+            grid.innerHTML += `
+                <div class="col gallery-card" data-category="${item.category || 'art'}">
+                    <div class="card h-100 border-0 shadow-sm rounded-3 overflow-hidden">
+                        <div class="image-wrapper position-relative bg-secondary-subtle">
+                            ${adminActionButtons}
+                            <img src="${item.imageUrl}" class="card-img-top w-100 h-100 object-fit-cover" alt="${item.title}">
+                            <span class="badge bg-dark bg-opacity-75 text-white position-absolute top-0 end-0 m-3 px-2 py-1 rounded-pill text-uppercase">${item.badgeText || 'Custom Art'}</span>
+                        </div>
+                        <div class="card-body d-flex flex-column p-4">
+                            <h3 class="card-title h5 fw-bold text-dark">${item.title}</h3>
+                            <p class="card-text text-muted small">${item.description || ''}</p>
+                            <div class="mt-auto pt-3 border-top d-flex justify-content-between align-items-center">
+                                <span class="fw-semibold text-pink small">${techLabel}</span>
+                                <span class="text-secondary small">${item.duration || '1 hr 30 mins'}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+    }
+
+    function filterGallery(evt, category) {
+        currentCategoryFilter = category;
+        const buttons = document.querySelectorAll('.filter-btn');
+        buttons.forEach(btn => btn.classList.remove('active'));
+        evt.target.classList.add('active');
+        renderGallery();
+    }
+
+    function syncBadgeFromCategory() {
+        const cat = document.getElementById('itemCategory').value;
+        const badgeInput = document.getElementById('itemBadge');
+        if (!badgeInput.value || ['Gel-X', 'Bio Gel', 'Acrylic', 'Custom Art'].includes(badgeInput.value)) {
+            if (cat === 'gel') badgeInput.value = 'Gel-X';
+            else if (cat === 'acrylic') badgeInput.value = 'Acrylic';
+            else badgeInput.value = 'Custom Art';
+        }
+    }
+
+    function handleImageFileSelect(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const img = new Image();
+            img.onload = function() {
+                // Resize/compress to max 900px so uploads are fast and never hit proxy limits
+                const maxDim = 900;
+                let width = img.width;
+                let height = img.height;
+                if (width > maxDim || height > maxDim) {
+                    if (width > height) {
+                        height = Math.round((height * maxDim) / width);
+                        width = maxDim;
+                    } else {
+                        width = Math.round((width * maxDim) / height);
+                        height = maxDim;
+                    }
+                }
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+                document.getElementById('imageUrlInput').value = dataUrl;
+                showPreview(dataUrl);
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function showPreview(src) {
+        const preview = document.getElementById('imagePreview');
+        const container = document.getElementById('previewContainer');
+        preview.src = src;
+        container.classList.remove('d-none');
+    }
+
+    function openAddShowcaseModal() {
+        document.getElementById('itemId').value = '';
+        document.getElementById('imageFileInput').value = '';
+        document.getElementById('imageUrlInput').value = '';
+        document.getElementById('itemTitle').value = '';
+        document.getElementById('itemCategory').value = 'gel';
+        document.getElementById('itemBadge').value = 'Gel-X';
+        document.getElementById('itemDescription').value = '';
+        document.getElementById('itemTech').value = '@NailArtistry';
+        document.getElementById('itemDuration').value = '1 hr 30 mins';
+        document.getElementById('previewContainer').classList.add('d-none');
+        document.getElementById('showcaseModalTitle').innerText = 'Add Completed Nail Work';
+        showcaseModalInstance.show();
+    }
+
+    function openEditShowcaseModal(id) {
+        const item = showcaseItemsCache.find(i => i.id === id);
+        if (!item) return;
+
+        document.getElementById('itemId').value = item.id;
+        document.getElementById('imageFileInput').value = '';
+        document.getElementById('imageUrlInput').value = item.imageUrl || '';
+        document.getElementById('itemTitle').value = item.title || '';
+        document.getElementById('itemCategory').value = item.category || 'art';
+        document.getElementById('itemBadge').value = item.badgeText || 'Custom Art';
+        document.getElementById('itemDescription').value = item.description || '';
+        document.getElementById('itemTech').value = item.techName || '@NailArtistry';
+        document.getElementById('itemDuration').value = item.duration || '1 hr 30 mins';
+
+        if (item.imageUrl) {
+            showPreview(item.imageUrl);
+        } else {
+            document.getElementById('previewContainer').classList.add('d-none');
+        }
+
+        document.getElementById('showcaseModalTitle').innerText = 'Edit Completed Nail Work';
+        showcaseModalInstance.show();
+    }
+
+    async function saveShowcaseItem() {
+        const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
+        const id = document.getElementById('itemId').value;
+        const title = document.getElementById('itemTitle').value.trim();
+        const imageUrl = document.getElementById('imageUrlInput').value.trim();
+        const category = document.getElementById('itemCategory').value;
+        const badgeText = document.getElementById('itemBadge').value.trim() || 'Custom Art';
+        const description = document.getElementById('itemDescription').value.trim();
+        const techName = document.getElementById('itemTech').value.trim() || '@NailArtistry';
+        const duration = document.getElementById('itemDuration').value.trim() || '1 hr 30 mins';
+
+        if (!title || !imageUrl) {
+            alert('Please provide a Design Title and upload/select a Picture.');
+            return;
+        }
+
+        const method = id ? 'PUT' : 'POST';
+        const url = id ? `/api/showcase/${id}` : '/api/showcase';
+
+        try {
+            const response = await fetch(url, {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + token
+                },
+                body: JSON.stringify({
+                    title,
+                    description,
+                    category,
+                    badgeText,
+                    techName,
+                    duration,
+                    imageUrl
+                })
+            });
+
+            if (response.ok) {
+                if (document.activeElement) document.activeElement.blur();
+                showcaseModalInstance.hide();
+                loadShowcaseItems();
+            } else {
+                const text = await response.text();
+                alert('Failed to save showcase work: ' + (text || response.statusText));
+            }
+        } catch (err) {
+            console.error('Error saving showcase item:', err);
+            alert('Server connection error.');
+        }
+    }
+
+    async function deleteShowcaseItem(id) {
+        if (!confirm('Are you sure you want to delete this showcase item?')) return;
+        const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
+
+        try {
+            const response = await fetch(`/api/showcase/${id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+
+            if (response.ok) {
+                loadShowcaseItems();
+            } else {
+                alert('Failed to delete showcase item.');
+            }
+        } catch (err) {
+            console.error('Error deleting showcase item:', err);
+            alert('Server connection error.');
+        }
+    }
 
     function handleLogout() {
         localStorage.removeItem('accessToken');
@@ -444,24 +557,6 @@
         localStorage.removeItem('username');
         localStorage.removeItem('userRole');
         window.location.href = './login.html';
-    }
-
-    // Category Filter Logic
-    function filterGallery(evt, category) {
-        const cards = document.querySelectorAll('.gallery-card');
-        const buttons = document.querySelectorAll('.filter-btn');
-
-        buttons.forEach(btn => btn.classList.remove('active'));
-        evt.target.classList.add('active');
-
-        cards.forEach(card => {
-            const cardCategory = card.getAttribute('data-category');
-            if (category === 'all' || cardCategory === category) {
-                card.classList.remove('d-none');
-            } else {
-                card.classList.add('d-none');
-            }
-        });
     }
 </script>
 </body>

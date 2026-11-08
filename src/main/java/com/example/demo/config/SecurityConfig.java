@@ -105,6 +105,11 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/nail-techs", "/api/nail-techs/**").hasAnyAuthority("ROLE_ADMIN", "ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/nail-techs", "/api/nail-techs/**").hasAnyAuthority("ROLE_ADMIN", "ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/nail-techs", "/api/nail-techs/**").hasAnyAuthority("ROLE_ADMIN", "ADMIN")
+                        // Showcase gallery rules (public GET, admin-only POST/PUT/DELETE)
+                        .requestMatchers(HttpMethod.GET, "/api/showcase", "/api/showcase/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/showcase", "/api/showcase/**").hasAnyAuthority("ROLE_ADMIN", "ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/showcase", "/api/showcase/**").hasAnyAuthority("ROLE_ADMIN", "ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/showcase", "/api/showcase/**").hasAnyAuthority("ROLE_ADMIN", "ADMIN")
                         // Customers admin API rules
                         .requestMatchers("/api/customers", "/api/customers/**").hasAnyAuthority("ROLE_ADMIN", "ADMIN")
                         // Subscribers rules for connection

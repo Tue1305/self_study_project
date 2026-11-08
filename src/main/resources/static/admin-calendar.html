@@ -143,6 +143,17 @@
 
         const calendar = new FullCalendar.Calendar(calendarEl, {
             initialView: 'timeGridWeek',
+            slotMinTime: '10:00:00',
+            slotMaxTime: '19:00:00',
+            slotDuration: '00:15:00',
+            slotLabelInterval: '00:30:00',
+            allDaySlot: false,
+            expandRows: true,
+            businessHours: {
+                daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
+                startTime: '10:00',
+                endTime: '19:00'
+            },
             headerToolbar: {
                 left: 'prev,next today',
                 center: 'title',

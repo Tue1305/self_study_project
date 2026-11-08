@@ -115,9 +115,20 @@
                             </select>
                         </div>
 
-                        <div class="mb-4">
-                            <label for="appointmentTime" class="form-label fw-semibold">Date & Time</label>
-                            <input type="datetime-local" class="form-control" id="appointmentTime" required>
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-6">
+                                <label for="appointmentDate" class="form-label fw-semibold">Appointment Date</label>
+                                <input type="date" class="form-control" id="appointmentDate" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="appointmentTimeSlot" class="form-label fw-semibold">Time Slot (10:00 AM – 7:00 PM)</label>
+                                <select class="form-select" id="appointmentTimeSlot" required>
+                                    <option value="">-- Choose a Time --</option>
+                                </select>
+                            </div>
+                            <div class="col-12 mt-1">
+                                <small class="text-muted"><i class="bi bi-clock me-1"></i>Store Hours: 10:00 AM – 7:00 PM (15-minute intervals)</small>
+                            </div>
                         </div>
 
                         <button type="submit" class="btn btn-pink w-100 btn-lg rounded-3 fw-bold">Confirm Booking Submission</button>
@@ -254,6 +265,31 @@
         } catch (err) {
             console.error('Error loading nail techs:', err);
         }
+        // 3. Populate 15-minute Time Slots between 10:00 AM and 7:00 PM (19:00)
+        const dateInput = document.getElementById('appointmentDate');
+        const todayStr = new Date().toISOString().split('T')[0];
+        dateInput.min = todayStr;
+        dateInput.value = todayStr;
+
+        const timeSelect = document.getElementById('appointmentTimeSlot');
+        timeSelect.innerHTML = '<option value="">-- Choose a Time --</option>';
+        for (let hour = 10; hour <= 19; hour++) {
+            const maxMinute = (hour === 19) ? 0 : 45;
+            for (let min = 0; min <= maxMinute; min += 15) {
+                const hh = String(hour).padStart(2, '0');
+                const mm = String(min).padStart(2, '0');
+                const value24 = `${hh}:${mm}:00`;
+
+                const period = hour >= 12 ? 'PM' : 'AM';
+                const hour12 = hour > 12 ? hour - 12 : (hour === 0 ? 12 : hour);
+                const label12 = `${hour12}:${mm} ${period}`;
+
+                const opt = document.createElement('option');
+                opt.value = value24;
+                opt.textContent = label12;
+                timeSelect.appendChild(opt);
+            }
+        }
     });
 
     // Handle form submit
@@ -261,6 +297,13 @@
         e.preventDefault();
 
         const selectedTechId = document.getElementById('nailTechSelect').value;
+        const selectedDate = document.getElementById('appointmentDate').value;
+        const selectedTime = document.getElementById('appointmentTimeSlot').value;
+
+        if (!selectedDate || !selectedTime) {
+            alert('Please select both an appointment date and a 15-minute time slot between 10:00 AM and 7:00 PM.');
+            return;
+        }
 
         const bookingData = {
             customerName: document.getElementById('customerName').value,
@@ -268,7 +311,7 @@
             customerEmail: document.getElementById('customerEmail').value,
             service: { id: parseInt(document.getElementById('serviceSelect').value) },
             nailTech: selectedTechId ? { id: parseInt(selectedTechId) } : null,
-            appointmentTime: document.getElementById('appointmentTime').value
+            appointmentTime: `${selectedDate}T${selectedTime}`
         };
 
         const headers = { 'Content-Type': 'application/json' };

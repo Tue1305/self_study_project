@@ -245,6 +245,41 @@
             box-shadow: 0 6px 20px rgba(233, 30, 99, 0.45) !important;
             color: #ffffff !important;
         }
+
+        /* Floating Next Button Bar in Step 1 */
+        .floating-action-bar {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%) translateY(120px);
+            z-index: 1050;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(8px);
+            padding: 0.85rem 1.75rem;
+            border-radius: 50rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(233, 30, 99, 0.2);
+            transition: transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.35s ease;
+            opacity: 0;
+            pointer-events: none;
+            display: flex;
+            align-items: center;
+            gap: 1.25rem;
+            max-width: 90%;
+        }
+        .floating-action-bar.visible {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .floating-btn-glow {
+            background: linear-gradient(135deg, #e91e63, #ff4081) !important;
+            box-shadow: 0 4px 15px rgba(233, 30, 99, 0.4) !important;
+            transition: all 0.2s ease !important;
+        }
+        .floating-btn-glow:hover {
+            transform: scale(1.04);
+            box-shadow: 0 6px 20px rgba(233, 30, 99, 0.5) !important;
+        }
     </style>
 </head>
 <body class="bg-light d-flex flex-column min-vh-100">
@@ -322,9 +357,27 @@
                             </div>
                         </div>
 
+                        <!-- Regular Inline Next Button at bottom of Step 1 -->
                         <div class="d-flex justify-content-end">
                             <button type="button" class="btn btn-pink px-4 py-2 fw-semibold rounded-3" id="step1NextBtn" onclick="goToStep(2)" disabled>
                                 Next: Select Staff <i class="bi bi-arrow-right ms-1"></i>
+                            </button>
+                        </div>
+
+                        <!-- Dynamic Floating Action Bar: Pops up instantly when a service is selected -->
+                        <div id="floatingActionBar" class="floating-action-bar">
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="badge bg-success-subtle text-success border border-success-subtle rounded-circle p-1">
+                                    <i class="bi bi-check-lg fs-6"></i>
+                                </span>
+                                <div>
+                                    <div class="fw-bold text-dark small" id="floatingServiceName">Service Selected</div>
+                                    <div class="text-pink small fw-semibold" id="floatingServicePrice">—</div>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-pink rounded-pill px-4 py-2 fw-bold floating-btn-glow d-flex align-items-center gap-2" onclick="goToStep(2)">
+                                <span>Select Staff</span>
+                                <i class="bi bi-arrow-right"></i>
                             </button>
                         </div>
                     </section>
@@ -821,6 +874,16 @@
         badge.classList.remove('d-none');
 
         document.getElementById('step1NextBtn').disabled = false;
+
+        // Show and update Floating Action Bar immediately (no scrolling needed)
+        const floatingBar = document.getElementById('floatingActionBar');
+        const floatingName = document.getElementById('floatingServiceName');
+        const floatingPrice = document.getElementById('floatingServicePrice');
+        if (floatingBar && floatingName && floatingPrice) {
+            floatingName.textContent = found.name;
+            floatingPrice.textContent = `$${Number(found.price).toFixed(2)} • ${found.durationMinutes || 45} mins`;
+            floatingBar.classList.add('visible');
+        }
     }
 
     // ==================== STEP 2: LOAD & SELECT QUALIFIED STAFF (NAMES ONLY) ====================
@@ -969,6 +1032,22 @@
         document.getElementById('step3Panel').classList.toggle('d-none', step !== 3);
         document.getElementById('confirmationPanel').classList.add('d-none');
         document.getElementById('wizardStepper').classList.remove('d-none');
+
+        // Only show floating bar during step 1 if a service is actively chosen
+        const floatingBar = document.getElementById('floatingActionBar');
+        if (floatingBar) {
+            if (step === 1 && bookingState.selectedService) {
+                floatingBar.classList.add('visible');
+            } else {
+                floatingBar.classList.remove('visible');
+            }
+        }
+
+        // Scroll to wizard stepper on step change for a smooth transition
+        const stepper = document.getElementById('wizardStepper');
+        if (stepper) {
+            stepper.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
 
         for (let i = 1; i <= 3; i++) {
             const indicator = document.getElementById(`stepIndicator${i}`);
@@ -1126,6 +1205,8 @@
 
         document.querySelectorAll('.service-select-row').forEach(c => c.classList.remove('selected'));
         document.getElementById('selectedServiceBadge').classList.add('d-none');
+        const floatingBar = document.getElementById('floatingActionBar');
+        if (floatingBar) floatingBar.classList.remove('visible');
         document.getElementById('step1NextBtn').disabled = true;
         document.getElementById('step2NextBtn').disabled = true;
         document.getElementById('appointmentTimeSlot').value = '';

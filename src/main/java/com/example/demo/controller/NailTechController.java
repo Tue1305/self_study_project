@@ -11,8 +11,11 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/nail-techs")
@@ -46,33 +49,90 @@ public class NailTechController {
             return allTechs;
         }
 
-        String serviceNameLower = service.getName().toLowerCase();
-        String[] keywords = serviceNameLower.split("\\s+");
+        String targetCategory = categorizeService(service.getName());
 
         List<UserEntity> qualifiedTechs = allTechs.stream()
-                .filter(tech -> {
-                    String spec = tech.getSpecialty();
-                    if (spec == null || spec.isBlank()
-                            || spec.equalsIgnoreCase("general")
-                            || spec.equalsIgnoreCase("all")
-                            || spec.toLowerCase().contains("all services")) {
-                        return true;
-                    }
-                    String specLower = spec.toLowerCase();
-                    if (specLower.contains(serviceNameLower) || serviceNameLower.contains(specLower)) {
-                        return true;
-                    }
-                    for (String word : keywords) {
-                        if (word.length() >= 3 && specLower.contains(word)) {
-                            return true;
-                        }
-                    }
-                    return false;
-                })
+                .filter(tech -> isTechQualifiedForCategory(tech, targetCategory))
                 .toList();
 
         // Fallback: if no specific specialty match, return all available nail technicians
         return qualifiedTechs.isEmpty() ? allTechs : qualifiedTechs;
+    }
+
+    /**
+     * Determines the operational category of a service based on its name.
+     */
+    private String categorizeService(String serviceName) {
+        String lower = serviceName.toLowerCase().trim();
+
+        // 1. Pedicures (Universal - all staff qualified)
+        if (lower.contains("pedicure") || lower.contains("combo")) {
+            return "PEDICURE";
+        }
+        // 2. Kid Services (Universal - all staff qualified)
+        if (lower.contains("kid") || lower.contains("kids")) {
+            return "KID_SERVICES";
+        }
+        // 3. Body Massage
+        if (lower.contains("massage") || lower.contains("hot stone")) {
+            return "BODY_MASSAGE";
+        }
+        // 4. Waxing
+        if (lower.contains("wax") || lower.contains("waxing")) {
+            return "WAXING";
+        }
+        // 5. Facial Treatments
+        if (lower.contains("facial") || lower.contains("babor") || lower.contains("collagen")) {
+            return "FACIAL";
+        }
+        // 6. Nail Enhancement & Art (Strict: only Staff with NAIL_ART)
+        if (lower.contains("bio sculpture") || lower.contains("gel powder") || lower.contains("dipping powder")
+                || lower.contains("nail art") || lower.contains("french tip") || lower.contains("ombre")
+                || lower.contains("chrome") || lower.contains("take off") || lower.contains("extension")
+                || lower.contains("refill") || lower.contains("cuticle") || lower.contains("paraffin")
+                || lower.contains("nail cut") || lower.contains("nail repair") || lower.contains("shellac")) {
+            return "NAIL_ART";
+        }
+        // 7. Manicures
+        if (lower.contains("manicure")) {
+            return "MANICURE";
+        }
+        // 8. Specialty / Tinting / Packages
+        if (lower.contains("tint") || lower.contains("tinting")) {
+            return "FACIAL"; // Grouped under aesthetic/facial specialists
+        }
+        if (lower.contains("rejuvenation") || lower.contains("executive") || lower.contains("package")) {
+            return "ALL"; // Package spans multiple services, full capability staff
+        }
+
+        return "MANICURE";
+    }
+
+    /**
+     * Verifies if a technician is qualified for the given category according to store capability rules.
+     */
+    private boolean isTechQualifiedForCategory(UserEntity tech, String category) {
+        // Universal Rule: EVERY staff member can perform Pedicures and Kid Services
+        if ("PEDICURE".equals(category) || "KID_SERVICES".equals(category)) {
+            return true;
+        }
+
+        String spec = tech.getSpecialty();
+        if (spec == null || spec.isBlank()) {
+            return false;
+        }
+
+        Set<String> capabilityTags = Arrays.stream(spec.split(","))
+                .map(String::trim)
+                .map(String::toUpperCase)
+                .collect(Collectors.toSet());
+
+        // Universal staff capability tag
+        if (capabilityTags.contains("ALL") || capabilityTags.contains("FULL EVERYTHING") || capabilityTags.contains("GENERAL")) {
+            return true;
+        }
+
+        return capabilityTags.contains(category);
     }
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ADMIN')")

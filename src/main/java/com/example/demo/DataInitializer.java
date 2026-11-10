@@ -56,28 +56,8 @@ public class DataInitializer implements CommandLineRunner {
         // Sync all existing ROLE_USER accounts into the Customer database
         userRepository.findAll().forEach(customerService::syncUserToCustomer);
 
-        // Seed default Nail Technicians if none exist yet
-        boolean hasNailTech = userRepository.findAll().stream()
-                .anyMatch(u -> "ROLE_NAIL_TECH".equals(u.getRole()));
-        if (!hasNailTech) {
-            UserEntity tech1 = new UserEntity("jenny@jennysnailstudio.com", passwordEncoder.encode("defaultPassword123"), "ROLE_NAIL_TECH");
-            tech1.setName("Jenny Tran");
-            tech1.setEmail("jenny@jennysnailstudio.com");
-            tech1.setSpecialty("Manicures, Nail Enhancement, Custom Art");
-
-            UserEntity tech2 = new UserEntity("sophia@jennysnailstudio.com", passwordEncoder.encode("defaultPassword123"), "ROLE_NAIL_TECH");
-            tech2.setName("Sophia Nguyen");
-            tech2.setEmail("sophia@jennysnailstudio.com");
-            tech2.setSpecialty("Pedicures, Waxing, Bio Sculpture Gel");
-
-            UserEntity tech3 = new UserEntity("chloe@jennysnailstudio.com", passwordEncoder.encode("defaultPassword123"), "ROLE_NAIL_TECH");
-            tech3.setName("Chloe Kim");
-            tech3.setEmail("chloe@jennysnailstudio.com");
-            tech3.setSpecialty("Facials, Body Massage, Kid Services, Gift Packages");
-
-            userRepository.saveAll(List.of(tech1, tech2, tech3));
-            System.out.println("✅ Sample nail technicians seeded into the database!");
-        }
+        // Seed or update the 10 Staff Members with specific capabilities
+        seedOrUpdateStaffMembers();
 
         // Seed full salon services menu into database if count < 10
         if (serviceRepository.count() < 10) {
@@ -125,6 +105,7 @@ public class DataInitializer implements CommandLineRunner {
                     new ServiceEntity("Ombre Airbrush French Tip Add-On", "Smooth gradient airbrushed French ombre effect.", new BigDecimal("15.00"), 20),
                     new ServiceEntity("Chrome Finish Add-On", "Mirror chrome, glazed donut, or iridescent metallic powder overlay.", new BigDecimal("10.00"), 15),
                     new ServiceEntity("Nail Cut for Hands", "Hand nail trim, reshape, and clean.", new BigDecimal("8.00"), 10),
+                    new ServiceEntity("Nail Cut for Toes", "Toe nail trim and edge filing.", new BigDecimal("12.00"), 10),
                     new ServiceEntity("Nail Cut for Toes", "Toe nail trim and edge filing.", new BigDecimal("12.00"), 15),
                     new ServiceEntity("Nail Repair", "Individual nail fix for broken, cracked, or split nails.", new BigDecimal("10.00"), 15),
                     new ServiceEntity("Cuticle Trim", "Gentle cuticle softening, pushback, and precise clean-up.", new BigDecimal("12.00"), 15),
@@ -204,5 +185,65 @@ public class DataInitializer implements CommandLineRunner {
             ));
             System.out.println("✅ Default showcase items seeded into the database!");
         }
+    }
+
+    /**
+     * Seeds or synchronizes the 10 technicians according to exact store service capabilities:
+     * - Tony: ALL services (regular staff in UI, can do Nail Art 1 of 2)
+     * - Jenny Tran: ALL services (can do Nail Art 2 of 2)
+     * - Michael Chen, David Nguyen: ALL services (except Nail Art: Manicure, Pedicure, Kids, Massage, Waxing, Facial)
+     * - Jessica Miller, Lisa Anderson (Female): Body Massage (+ Pedicures & Kid Services)
+     * - Hannah Brown: Waxing (+ Pedicures & Kid Services)
+     * - Olivia Taylor: Facial Treatments (+ Pedicures & Kid Services)
+     * - Emily Davis, Sarah Wilson: Manicures (+ Pedicures & Kid Services)
+     */
+    private void seedOrUpdateStaffMembers() {
+        record StaffConfig(String username, String name, String email, String specialty) {}
+
+        List<StaffConfig> staffConfigs = List.of(
+                // 1. Tony: Can perform EVERY service (Nail Art Specialist 1 of 2)
+                new StaffConfig("tony@jennysnailstudio.com", "Tony", "tony@jennysnailstudio.com", "ALL, NAIL_ART"),
+
+                // 2. Jenny Tran: Full everything (Nail Art Specialist 2 of 2)
+                new StaffConfig("jenny@jennysnailstudio.com", "Jenny Tran", "jenny@jennysnailstudio.com", "ALL, NAIL_ART"),
+
+                // 3. Michael Chen: Full everything (all services except Nail Art)
+                new StaffConfig("michael@jennysnailstudio.com", "Michael Chen", "michael@jennysnailstudio.com", "MANICURE, BODY_MASSAGE, WAXING, FACIAL"),
+
+                // 4. David Nguyen: Full everything (all services except Nail Art)
+                new StaffConfig("david@jennysnailstudio.com", "David Nguyen", "david@jennysnailstudio.com", "MANICURE, BODY_MASSAGE, WAXING, FACIAL"),
+
+                // 5. Jessica Miller (Female): Body Massage (+ Pedicures & Kid Services)
+                new StaffConfig("jessica@jennysnailstudio.com", "Jessica Miller", "jessica@jennysnailstudio.com", "BODY_MASSAGE"),
+
+                // 6. Lisa Anderson (Female): Body Massage (+ Pedicures & Kid Services)
+                new StaffConfig("lisa@jennysnailstudio.com", "Lisa Anderson", "lisa@jennysnailstudio.com", "BODY_MASSAGE"),
+
+                // 7. Hannah Brown: Waxing (+ Pedicures & Kid Services)
+                new StaffConfig("hannah@jennysnailstudio.com", "Hannah Brown", "hannah@jennysnailstudio.com", "WAXING"),
+
+                // 8. Olivia Taylor: Facial Treatments (+ Pedicures & Kid Services)
+                new StaffConfig("olivia@jennysnailstudio.com", "Olivia Taylor", "olivia@jennysnailstudio.com", "FACIAL"),
+
+                // 9. Emily Davis: Manicures (+ Pedicures & Kid Services)
+                new StaffConfig("emily@jennysnailstudio.com", "Emily Davis", "emily@jennysnailstudio.com", "MANICURE"),
+
+                // 10. Sarah Wilson: Manicures (+ Pedicures & Kid Services)
+                new StaffConfig("sarah@jennysnailstudio.com", "Sarah Wilson", "sarah@jennysnailstudio.com", "MANICURE")
+        );
+
+        for (StaffConfig config : staffConfigs) {
+            UserEntity tech = userRepository.findByUsername(config.username()).orElseGet(UserEntity::new);
+            tech.setUsername(config.username());
+            tech.setName(config.name());
+            tech.setEmail(config.email());
+            tech.setSpecialty(config.specialty());
+            tech.setRole("ROLE_NAIL_TECH");
+            if (tech.getPassword() == null || tech.getPassword().isEmpty()) {
+                tech.setPassword(passwordEncoder.encode("defaultPassword123"));
+            }
+            userRepository.save(tech);
+        }
+        System.out.println("✅ Configured all 10 salon technicians with customized service capabilities!");
     }
 }

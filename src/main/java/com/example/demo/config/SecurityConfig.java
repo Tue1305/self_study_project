@@ -83,7 +83,6 @@ public class SecurityConfig {
                                 "/admin-customers.html",
                                 "/nail-techs.html",
                                 "/dashboard.html",
-                                "/products.html",
                                 "/services.html",
                                 "/api/appointments",
                                 "/api/appointments/**",

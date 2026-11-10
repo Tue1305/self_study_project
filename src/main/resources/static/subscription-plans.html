@@ -68,6 +68,27 @@
             background-color: var(--bs-primary-pink);
             letter-spacing: 0.5px;
         }
+
+        /* Standout Booking Nav Button */
+        .nav-btn-book {
+            background: linear-gradient(135deg, #e91e63, #ff4081) !important;
+            color: #ffffff !important;
+            font-weight: 700 !important;
+            padding: 0.5rem 1.35rem !important;
+            border-radius: 50rem !important;
+            box-shadow: 0 4px 14px rgba(233, 30, 99, 0.35) !important;
+            transition: all 0.25s ease-in-out !important;
+            border: none !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            gap: 0.35rem !important;
+            text-decoration: none !important;
+        }
+        .nav-btn-book:hover {
+            transform: translateY(-2px) scale(1.03) !important;
+            box-shadow: 0 6px 20px rgba(233, 30, 99, 0.45) !important;
+            color: #ffffff !important;
+        }
     </style>
 </head>
 <body class="bg-light d-flex flex-column min-vh-100">
@@ -201,10 +222,16 @@
     </div>
 </main>
 
-<!-- Footer -->
-<footer class="bg-white border-top text-center py-3 mt-auto">
-    <div class="container">
-        <small class="text-muted">&copy; Jenny's Nail Studio — Custom Nail Sculpting &amp; Artistry</small>
+<!-- Footer with Store Hours -->
+<footer class="bg-white border-top py-4 mt-auto">
+    <div class="container text-center">
+        <div class="d-inline-flex align-items-center gap-2 px-3 py-1 bg-light border rounded-pill mb-2">
+            <i class="bi bi-clock-fill text-pink"></i>
+            <span class="small fw-semibold text-dark">Store Hours: Monday – Saturday: 10:00 AM – 7:00 PM | Sunday: Closed</span>
+        </div>
+        <div>
+            <small class="text-muted">&copy; Jenny's Nail Studio — Custom Nail Sculpting &amp; Artistry</small>
+        </div>
     </div>
 </footer>
 
@@ -260,9 +287,8 @@
             authNav.innerHTML = `
                 <a href="./index.html" class="nav-link fw-semibold text-dark">Home</a>
                 <a href="./dashboard.html" class="nav-link fw-semibold text-dark">Showcase</a>
-                <a href="./products.html" class="nav-link fw-semibold text-dark">Products</a>
                 <a href="./services.html" class="nav-link fw-semibold text-dark">Services</a>
-                <a href="./booking.html" class="nav-link fw-semibold text-dark">Book Now</a>
+                <a href="./booking.html" class="nav-btn-book"><i class="bi bi-calendar2-check-fill"></i>Book Now</a>
                 ${adminLinkHtml}
                 <a href="./profile.html" class="nav-link fw-semibold text-dark">Profile</a>
                 <a href="#" onclick="handleLogout()" class="nav-link fw-semibold text-dark">Logout</a>
@@ -284,9 +310,8 @@
             authNav.innerHTML = `
                 <a href="./index.html" class="nav-link fw-semibold text-dark">Home</a>
                 <a href="./dashboard.html" class="nav-link fw-semibold text-dark">Showcase</a>
-                <a href="./products.html" class="nav-link fw-semibold text-dark">Products</a>
                 <a href="./services.html" class="nav-link fw-semibold text-dark">Services</a>
-                <a href="./booking.html" class="nav-link fw-semibold text-dark">Book Now</a>
+                <a href="./booking.html" class="nav-btn-book"><i class="bi bi-calendar2-check-fill"></i>Book Now</a>
                 <a href="./login.html" class="nav-link fw-semibold text-dark">Log in</a>
                 <a href="./signup.html" class="nav-link fw-semibold text-dark">Sign up</a>
             `;

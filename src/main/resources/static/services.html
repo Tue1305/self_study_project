@@ -46,43 +46,48 @@
             box-shadow: 0 2px 5px rgba(233, 30, 99, 0.15);
         }
 
-        /* Category Big Card Styles */
+        /* Compact Category Cards that expand */
         .category-card {
-            border: 1px solid #f1f3f5;
-            border-radius: 1.25rem;
+            border: 1px solid #edf0f2;
+            border-radius: 1.15rem;
             background: #ffffff;
-            transition: transform 0.25s ease, box-shadow 0.25s ease;
+            transition: all 0.25s ease;
             overflow: hidden;
+            height: 100%;
         }
         .category-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08) !important;
+            border-color: #f8bbd0;
+            box-shadow: 0 8px 24px rgba(233, 30, 99, 0.08) !important;
+        }
+        .category-card.is-open {
+            border-color: var(--bs-primary-pink);
+            box-shadow: 0 10px 28px rgba(233, 30, 99, 0.12) !important;
         }
         .category-card-header {
             cursor: pointer;
-            padding: 1.5rem 1.75rem;
+            padding: 1.25rem 1.4rem;
             background: #fff;
             user-select: none;
             transition: background-color 0.2s ease;
         }
         .category-card-header:hover {
-            background-color: #fafbfc;
+            background-color: #fdf7f9;
         }
         .category-icon {
-            width: 52px;
-            height: 52px;
-            border-radius: 1rem;
+            width: 48px;
+            height: 48px;
+            border-radius: 0.9rem;
             background: linear-gradient(135deg, rgba(233, 30, 99, 0.12), rgba(233, 30, 99, 0.22));
             color: var(--bs-primary-pink);
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.55rem;
+            font-size: 1.45rem;
             flex-shrink: 0;
         }
         .chevron-icon {
             transition: transform 0.3s ease;
-            font-size: 1.25rem;
+            font-size: 1.15rem;
             color: #6c757d;
         }
         .category-card.is-open .chevron-icon {
@@ -90,7 +95,7 @@
             color: var(--bs-primary-pink);
         }
         .service-item-row {
-            padding: 1.1rem 1.5rem;
+            padding: 1rem 1.4rem;
             border-top: 1px solid #f1f3f5;
             transition: background-color 0.2s ease;
         }
@@ -98,7 +103,7 @@
             background-color: #fff9fb;
         }
         .service-price-tag {
-            font-size: 1.2rem;
+            font-size: 1.15rem;
             font-weight: 700;
             color: var(--bs-primary-pink);
             white-space: nowrap;
@@ -138,7 +143,7 @@
     <div class="text-center mb-5">
         <h1 class="display-6 fw-bold text-dark mb-2">Studio Services &amp; Pricing Menu</h1>
         <p class="lead text-muted mx-auto" style="max-width: 720px;">
-            Explore our curated menu by category. Click any category card to view full services, pricing, and servicing time, then click <strong>Book This Service</strong> to book directly!
+            Click on any category card to expand its services menu, pricing, and timing. Choose any service to book directly online!
         </p>
 
         <!-- Admin Controls (Only visible when logged in as ROLE_ADMIN) -->
@@ -149,8 +154,8 @@
         </div>
     </div>
 
-    <!-- Category Dropdown Big Cards Container -->
-    <div class="row g-4" id="categoriesContainer">
+    <!-- Category Dropdown Cards Container (Compact Grid that expands) -->
+    <div class="row g-3" id="categoriesContainer">
         <!-- Rendered dynamically via JavaScript -->
     </div>
 </main>
@@ -209,12 +214,12 @@
     let serviceModalInstance = null;
     let backendServices = [];
 
-    // Comprehensive Service Menu Organized by Categories as requested
+    // Comprehensive Service Menu Organized by Categories
     const serviceCategories = [
         {
             id: 'manicures',
             title: 'Manicures',
-            subtitle: 'Express, Essential, and Deluxe hand treatments & shellac',
+            subtitle: 'Express, Essential & Deluxe hand treatments & shellac',
             icon: 'bi-hand-index-thumb-fill',
             services: [
                 {
@@ -398,7 +403,7 @@
         {
             id: 'nail-enhancement',
             title: 'Nail Enhancement & Art',
-            subtitle: 'Bio Sculpture Gel, Dipping Powder, Extensions, and Custom Art',
+            subtitle: 'Bio Sculpture Gel, Dipping Powder, Extensions & Art',
             icon: 'bi-stars',
             services: [
                 {
@@ -589,8 +594,8 @@
         },
         {
             id: 'body-massage',
-            title: 'Body Massage & Relaxation',
-            subtitle: 'Hot Stone therapy, full body relaxation & targeted massages',
+            title: 'Body Massage',
+            subtitle: 'Hot Stone therapy & full body tension relief',
             icon: 'bi-heart-pulse-fill',
             services: [
                 {
@@ -638,7 +643,7 @@
         {
             id: 'waxing',
             title: 'Waxing & Combos',
-            subtitle: 'Smooth, clean hair removal for face, body, and combo packages',
+            subtitle: 'Smooth, clean hair removal for face, body & combos',
             icon: 'bi-feather',
             services: [
                 { name: 'Eyebrows Waxing', duration: '15 mins', price: '$14 & Up', priceNum: 14, durationMins: 15, description: 'Precise brow shaping and waxing.' },
@@ -672,7 +677,7 @@
         {
             id: 'facial',
             title: 'Facial Treatments (Babor®)',
-            subtitle: 'Partnered with award-winning Babor® skincare products',
+            subtitle: 'Award-winning Babor® skincare hydration & collagen',
             icon: 'bi-flower1',
             services: [
                 {
@@ -848,17 +853,16 @@
         fetchBackendServices();
     });
 
-    // Render big cards with collapsible dropdown list
+    // Render compact cards that expand when clicked
     function renderCategoryCards() {
         const container = document.getElementById('categoriesContainer');
         container.innerHTML = '';
 
-        serviceCategories.forEach((cat, index) => {
+        serviceCategories.forEach((cat) => {
             const count = cat.services.length;
             const collapseId = `collapseCat_${cat.id}`;
             const cardId = `categoryCard_${cat.id}`;
-            // Open first two categories (Manicures and Pedicures) by default
-            const isOpenDefault = index < 2;
+            const wrapperId = `colWrapper_${cat.id}`;
 
             let servicesListHtml = '';
             cat.services.forEach(srv => {
@@ -886,36 +890,33 @@
             });
 
             const col = document.createElement('div');
-            col.className = 'col-12';
+            col.className = 'col-md-6 col-lg-4 category-col-item';
+            col.id = wrapperId;
             col.innerHTML = `
-                <div class="category-card shadow-sm ${isOpenDefault ? 'is-open' : ''}" id="${cardId}">
+                <div class="category-card shadow-sm" id="${cardId}">
                     <div class="category-card-header d-flex justify-content-between align-items-center"
                          data-bs-toggle="collapse"
                          data-bs-target="#${collapseId}"
-                         aria-expanded="${isOpenDefault ? 'true' : 'false'}"
-                         onclick="toggleCardState('${cardId}')">
+                         aria-expanded="false"
+                         onclick="toggleCardState('${cat.id}')">
                         <div class="d-flex align-items-center gap-3">
                             <div class="category-icon">
                                 <i class="bi ${cat.icon}"></i>
                             </div>
                             <div>
-                                <h4 class="fw-bold text-dark mb-1 d-flex align-items-center gap-2">
+                                <h5 class="fw-bold text-dark mb-1 d-flex align-items-center gap-2">
                                     ${cat.title}
-                                    <span class="badge bg-danger-subtle text-pink border border-danger-subtle rounded-pill fs-6 px-2 py-1">
-                                        ${count} items
-                                    </span>
-                                </h4>
-                                <p class="text-muted small mb-0">${cat.subtitle}</p>
+                                </h5>
+                                <span class="badge bg-danger-subtle text-pink border border-danger-subtle rounded-pill small px-2 py-0">
+                                    ${count} services
+                                </span>
                             </div>
                         </div>
-                        <div class="d-flex align-items-center gap-2">
-                            <span class="d-none d-sm-inline text-muted small">View Menu</span>
-                            <i class="bi bi-chevron-down chevron-icon"></i>
-                        </div>
+                        <i class="bi bi-chevron-down chevron-icon ms-2"></i>
                     </div>
 
-                    <div class="collapse ${isOpenDefault ? 'show' : ''}" id="${collapseId}">
-                        <div class="category-card-body">
+                    <div class="collapse" id="${collapseId}">
+                        <div class="category-card-body border-top">
                             ${servicesListHtml}
                         </div>
                     </div>
@@ -925,21 +926,29 @@
         });
     }
 
-    function toggleCardState(cardId) {
-        const card = document.getElementById(cardId);
-        if (card) {
-            setTimeout(() => {
-                const isExpanded = card.querySelector('[data-bs-toggle="collapse"]').getAttribute('aria-expanded') === 'true';
-                if (isExpanded) {
-                    card.classList.add('is-open');
-                } else {
-                    card.classList.remove('is-open');
-                }
-            }, 150);
-        }
+    // Expand small card into full-width big card when opened
+    function toggleCardState(catId) {
+        const card = document.getElementById(`categoryCard_${catId}`);
+        const col = document.getElementById(`colWrapper_${catId}`);
+        if (!card || !col) return;
+
+        setTimeout(() => {
+            const collapseEl = document.getElementById(`collapseCat_${catId}`);
+            const isShown = collapseEl.classList.contains('show');
+
+            if (isShown) {
+                card.classList.add('is-open');
+                col.classList.remove('col-md-6', 'col-lg-4');
+                col.classList.add('col-12');
+                col.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            } else {
+                card.classList.remove('is-open');
+                col.classList.remove('col-12');
+                col.classList.add('col-md-6', 'col-lg-4');
+            }
+        }, 350);
     }
 
-    // Connect with backend to ensure the service exists in the DB before redirecting to booking.html
     async function fetchBackendServices() {
         try {
             const res = await fetch('/api/services');
@@ -952,13 +961,10 @@
     }
 
     async function bookServiceDirectly(serviceName, priceNum, durationMins, description) {
-        // Save selected service in localStorage
         localStorage.setItem('selectedDesign', serviceName);
 
-        // Check if service already exists in database
         const existing = backendServices.find(s => s.name.toLowerCase() === serviceName.toLowerCase());
         if (!existing) {
-            // Automatically ensure it is saved in the database
             try {
                 const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
                 const headers = { 'Content-Type': 'application/json' };
@@ -979,11 +985,9 @@
             }
         }
 
-        // Redirect to booking wizard
         window.location.href = './booking.html';
     }
 
-    // Admin Custom Service Creation Modal Handlers
     function openAddServiceModal() {
         document.getElementById('serviceId').value = '';
         document.getElementById('serviceName').value = '';

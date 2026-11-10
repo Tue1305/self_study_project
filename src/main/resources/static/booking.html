@@ -109,27 +109,73 @@
             color: #198754;
         }
 
-        /* Selectable Service & Staff Cards */
-        .selectable-card {
-            border: 2px solid #e9ecef;
+        /* Category Cards in Step 1 */
+        .category-card {
+            border: 1px solid #edf0f2;
             border-radius: 1rem;
+            background: #ffffff;
+            transition: all 0.25s ease;
+            overflow: hidden;
+            height: 100%;
+        }
+        .category-card:hover {
+            border-color: #f8bbd0;
+            box-shadow: 0 6px 18px rgba(233, 30, 99, 0.08) !important;
+        }
+        .category-card.is-open {
+            border-color: var(--bs-primary-pink);
+            box-shadow: 0 8px 24px rgba(233, 30, 99, 0.12) !important;
+        }
+        .category-card-header {
+            cursor: pointer;
+            padding: 1.15rem 1.3rem;
+            background: #fff;
+            user-select: none;
+            transition: background-color 0.2s ease;
+        }
+        .category-card-header:hover {
+            background-color: #fdf7f9;
+        }
+        .category-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 0.8rem;
+            background: linear-gradient(135deg, rgba(233, 30, 99, 0.12), rgba(233, 30, 99, 0.22));
+            color: var(--bs-primary-pink);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.35rem;
+            flex-shrink: 0;
+        }
+        .chevron-icon {
+            transition: transform 0.3s ease;
+            font-size: 1.1rem;
+            color: #6c757d;
+        }
+        .category-card.is-open .chevron-icon {
+            transform: rotate(180deg);
+            color: var(--bs-primary-pink);
+        }
+
+        /* Service row inside category dropdown */
+        .service-select-row {
+            padding: 0.95rem 1.3rem;
+            border-top: 1px solid #f1f3f5;
             transition: all 0.2s ease;
             cursor: pointer;
-            background: #fff;
         }
-        .selectable-card:hover {
-            border-color: #f48fb1;
-            transform: translateY(-3px);
-            box-shadow: 0 8px 20px rgba(233, 30, 99, 0.08);
+        .service-select-row:hover {
+            background-color: #fff5f8;
         }
-        .selectable-card.selected {
-            border-color: var(--bs-primary-pink);
+        .service-select-row.selected {
             background-color: var(--bs-soft-pink);
-            box-shadow: 0 8px 22px rgba(233, 30, 99, 0.15);
+            border-left: 4px solid var(--bs-primary-pink);
         }
-        .selectable-card .check-indicator {
-            width: 26px;
-            height: 26px;
+
+        .check-indicator {
+            width: 24px;
+            height: 24px;
             border-radius: 50%;
             border: 2px solid #ced4da;
             display: inline-flex;
@@ -137,22 +183,44 @@
             justify-content: center;
             color: transparent;
             transition: all 0.2s ease;
+            flex-shrink: 0;
         }
-        .selectable-card.selected .check-indicator {
+        .service-select-row.selected .check-indicator,
+        .staff-card.selected .check-indicator {
             background-color: var(--bs-primary-pink);
             border-color: var(--bs-primary-pink);
             color: #fff;
         }
+
+        /* Staff Cards (Clean, just the technician's name) */
+        .staff-card {
+            border: 2px solid #e9ecef;
+            border-radius: 1rem;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            background: #fff;
+            padding: 1.25rem 1.4rem;
+        }
+        .staff-card:hover {
+            border-color: #f48fb1;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 18px rgba(233, 30, 99, 0.08);
+        }
+        .staff-card.selected {
+            border-color: var(--bs-primary-pink);
+            background-color: var(--bs-soft-pink);
+            box-shadow: 0 6px 20px rgba(233, 30, 99, 0.12);
+        }
         .staff-avatar {
-            width: 54px;
-            height: 54px;
+            width: 50px;
+            height: 50px;
             border-radius: 50%;
             background: linear-gradient(135deg, #e91e63, #ff80ab);
             color: #fff;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.35rem;
+            font-size: 1.3rem;
             font-weight: 700;
             flex-shrink: 0;
         }
@@ -188,7 +256,7 @@
 
 <main class="container my-5 flex-grow-1">
     <div class="row justify-content-center">
-        <div class="col-lg-9 col-xl-8">
+        <div class="col-lg-10 col-xl-9">
             <div class="card shadow-sm border-0 rounded-4">
                 <div class="card-body p-4 p-md-5">
                     <h2 class="text-center text-pink mb-1 fw-bold">Book Your Appointment</h2>
@@ -216,17 +284,20 @@
                         <span id="wizardAlertText"></span>
                     </div>
 
-                    <!-- ==================== STEP 1: SELECT SERVICE ==================== -->
+                    <!-- ==================== STEP 1: SELECT SERVICE (CATEGORY DROPDOWNS) ==================== -->
                     <section id="step1Panel">
                         <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h5 class="fw-bold mb-0"><i class="bi bi-stars text-pink me-2"></i>Step 1: Choose a Nail Service</h5>
-                            <span class="badge bg-light text-secondary border" id="serviceCountBadge">Loading...</span>
+                            <h5 class="fw-bold mb-0"><i class="bi bi-stars text-pink me-2"></i>Step 1: Choose a Service Category</h5>
+                            <span class="badge bg-danger-subtle text-pink border border-danger-subtle rounded-pill px-3 py-2 d-none" id="selectedServiceBadge">
+                                Selected: <strong id="selectedServiceNameDisplay">—</strong>
+                            </span>
                         </div>
 
-                        <div id="servicesGrid" class="row g-3 mb-4">
+                        <!-- Compact Category Cards Grid that expand into big dropdowns -->
+                        <div id="categoriesGrid" class="row g-3 mb-4">
                             <div class="col-12 text-center py-5">
                                 <div class="spinner-border text-pink" role="status"></div>
-                                <p class="text-muted mt-2 mb-0">Loading available services...</p>
+                                <p class="text-muted mt-2 mb-0">Loading available service categories...</p>
                             </div>
                         </div>
 
@@ -241,14 +312,14 @@
                     <section id="step2Panel" class="d-none">
                         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
                             <div>
-                                <h5 class="fw-bold mb-1"><i class="bi bi-person-badge text-pink me-2"></i>Step 2: Choose Your Nail Technician</h5>
-                                <small class="text-muted" id="step2Subtitle">Showing specialists qualified for your selected service</small>
+                                <h5 class="fw-bold mb-1"><i class="bi bi-person-badge text-pink me-2"></i>Step 2: Choose Your Technician</h5>
+                                <small class="text-muted">Select an available technician for your appointment</small>
                             </div>
                             <span class="badge bg-danger-subtle text-pink border border-danger-subtle px-3 py-2" id="step2ServicePill"></span>
                         </div>
 
                         <div id="staffGrid" class="row g-3 mb-4">
-                            <!-- Injected dynamically from GET /api/nail-techs?serviceId={id} -->
+                            <!-- Injected dynamically with only names -->
                         </div>
 
                         <div class="d-flex justify-content-between">
@@ -277,7 +348,6 @@
                                     <div class="col-md-6 border-start-md">
                                         <div class="small text-muted">Selected Technician</div>
                                         <div class="fw-bold text-dark" id="summaryStaffName">—</div>
-                                        <div class="small text-muted" id="summaryStaffSpecialty">—</div>
                                     </div>
                                 </div>
                             </div>
@@ -318,7 +388,7 @@
 
                             <div class="mb-4">
                                 <label for="appointmentNotes" class="form-label fw-semibold">Appointment Notes / Special Requests <span class="text-muted fw-normal">(Optional)</span></label>
-                                <textarea class="form-control" id="appointmentNotes" rows="3" placeholder="e.g., Nail shape preference, design reference, allergies, or removal needed..."></textarea>
+                                <textarea class="form-control" id="appointmentNotes" rows="3" placeholder="e.g., Nail shape preference, design reference, or allergies..."></textarea>
                             </div>
 
                             <div class="d-flex justify-content-between align-items-center pt-2">
@@ -378,12 +448,70 @@
     const bookingState = {
         currentStep: 1,
         selectedService: null, // { id, name, description, price, durationMinutes }
-        selectedStaff: null,   // { id, name, username, specialty, isAnyoneAvailable }
+        selectedStaff: null,   // { id, name, isAnyoneAvailable }
         servicesList: [],
         staffList: []
     };
 
     const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
+
+    // Service categories list matching services.html
+    const serviceCategoryConfigs = [
+        {
+            id: 'manicures',
+            title: 'Manicures',
+            icon: 'bi-hand-index-thumb-fill',
+            keywords: ['manicure']
+        },
+        {
+            id: 'pedicures',
+            title: 'Pedicures & Combos',
+            icon: 'bi-gem',
+            keywords: ['pedicure', 'combo']
+        },
+        {
+            id: 'kid-services',
+            title: 'Kid Services (10 & Under)',
+            icon: 'bi-balloon-heart-fill',
+            keywords: ['kid', 'kids']
+        },
+        {
+            id: 'nail-enhancement',
+            title: 'Nail Enhancement & Art',
+            icon: 'bi-stars',
+            keywords: ['bio sculpture', 'gel powder', 'dipping powder', 'nail art', 'french tip', 'ombre', 'chrome', 'cuticle', 'paraffin', 'take off', 'polish change', 'nail cut', 'nail repair', 'shellac']
+        },
+        {
+            id: 'body-massage',
+            title: 'Body Massage',
+            icon: 'bi-heart-pulse-fill',
+            keywords: ['massage', 'hot stone']
+        },
+        {
+            id: 'waxing',
+            title: 'Waxing & Combos',
+            icon: 'bi-feather',
+            keywords: ['wax', 'waxing']
+        },
+        {
+            id: 'facial',
+            title: 'Facial Treatments (Babor®)',
+            icon: 'bi-flower1',
+            keywords: ['facial', 'babor']
+        },
+        {
+            id: 'specialty-services',
+            title: 'Specialty Services',
+            icon: 'bi-eye-fill',
+            keywords: ['tinting', 'tint']
+        },
+        {
+            id: 'gift-packages',
+            title: 'Gift Packages',
+            icon: 'bi-gift-fill',
+            keywords: ['rejuvenation', 'executive', 'package']
+        }
+    ];
 
     function parseJwt(jwtToken) {
         try {
@@ -474,10 +602,10 @@
 
         const selectedDesign = localStorage.getItem('selectedDesign');
         if (selectedDesign) {
-            document.getElementById('selectedDesignBanner').textContent = `Booking for requested style: "${selectedDesign}"`;
+            document.getElementById('selectedDesignBanner').textContent = `Booking for requested service: "${selectedDesign}"`;
             const notesInput = document.getElementById('appointmentNotes');
             if (notesInput && !notesInput.value) {
-                notesInput.value = `Requested style: ${selectedDesign}`;
+                notesInput.value = `Requested: ${selectedDesign}`;
             }
         }
     }
@@ -509,70 +637,143 @@
         }
     }
 
-    // ==================== STEP 1: LOAD & SELECT SERVICE ====================
+    // ==================== STEP 1: LOAD & SELECT SERVICE (CATEGORIES) ====================
     async function loadServicesStep1() {
-        const grid = document.getElementById('servicesGrid');
-        const badge = document.getElementById('serviceCountBadge');
+        const grid = document.getElementById('categoriesGrid');
         try {
             const response = await fetch('/api/services');
             if (!response.ok) throw new Error('Failed to load services');
             const services = await response.json();
             bookingState.servicesList = services;
-            badge.textContent = `${services.length} Service${services.length === 1 ? '' : 's'} Available`;
 
             if (services.length === 0) {
                 grid.innerHTML = `<div class="col-12 text-center text-muted py-4">No services are currently listed.</div>`;
                 return;
             }
 
-            const selectedDesign = localStorage.getItem('selectedDesign');
+            // Categorize services based on name matching
+            const categorized = {};
+            serviceCategoryConfigs.forEach(cat => categorized[cat.id] = []);
+            const uncategorized = [];
+
+            services.forEach(srv => {
+                const sNameLower = (srv.name || '').toLowerCase();
+                let matched = false;
+
+                for (const cat of serviceCategoryConfigs) {
+                    if (cat.keywords.some(kw => sNameLower.includes(kw))) {
+                        categorized[cat.id].push(srv);
+                        matched = true;
+                        break;
+                    }
+                }
+                if (!matched) uncategorized.push(srv);
+            });
+
             grid.innerHTML = '';
+            const selectedDesign = localStorage.getItem('selectedDesign');
+            let matchedServiceToSelect = null;
 
-            services.forEach(service => {
-                const col = document.createElement('div');
-                col.className = 'col-md-6';
+            serviceCategoryConfigs.forEach((cat) => {
+                const catServices = categorized[cat.id] || [];
+                if (catServices.length === 0) return;
 
-                const priceFormatted = Number(service.price || 0).toFixed(2);
-                const duration = service.durationMinutes || 60;
+                const collapseId = `bookingCollapse_${cat.id}`;
+                const cardId = `bookingCatCard_${cat.id}`;
+                const colId = `bookingCol_${cat.id}`;
 
-                col.innerHTML = `
-                    <div class="selectable-card p-3 h-100 d-flex flex-column justify-content-between"
-                         id="serviceCard-${service.id}"
-                         onclick="selectService(${service.id})">
-                        <div>
-                            <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
-                                <h6 class="fw-bold text-dark mb-0">${service.name}</h6>
-                                <span class="check-indicator"><i class="bi bi-check-lg"></i></span>
+                let rowsHtml = '';
+                catServices.forEach(srv => {
+                    const priceFormatted = Number(srv.price || 0).toFixed(2);
+                    const duration = srv.durationMinutes || 45;
+
+                    if (selectedDesign && srv.name.toLowerCase().trim() === selectedDesign.toLowerCase().trim()) {
+                        matchedServiceToSelect = srv;
+                    }
+
+                    rowsHtml += `
+                        <div class="service-select-row d-flex justify-content-between align-items-center"
+                             id="serviceRow-${srv.id}"
+                             onclick="selectService(${srv.id}, '${cat.id}')">
+                            <div class="pe-2">
+                                <h6 class="fw-bold text-dark mb-1">${srv.name}</h6>
+                                <div class="text-muted small">
+                                    <span class="fw-semibold text-pink">$${priceFormatted}</span> &bull; <span>${duration} mins</span>
+                                </div>
                             </div>
-                            <p class="text-muted small mb-3">${service.description || 'Professional nail care and artistry tailored to your style.'}</p>
+                            <span class="check-indicator"><i class="bi bi-check-lg"></i></span>
                         </div>
-                        <div class="d-flex justify-content-between align-items-center pt-2 border-top">
-                            <span class="fw-bold text-pink fs-5">$${priceFormatted}</span>
-                            <span class="badge bg-light text-secondary border"><i class="bi bi-clock me-1"></i>${duration} mins</span>
+                    `;
+                });
+
+                const col = document.createElement('div');
+                col.className = 'col-md-6 col-lg-4 booking-category-col';
+                col.id = colId;
+                col.innerHTML = `
+                    <div class="category-card shadow-sm" id="${cardId}">
+                        <div class="category-card-header d-flex justify-content-between align-items-center"
+                             data-bs-toggle="collapse"
+                             data-bs-target="#${collapseId}"
+                             aria-expanded="false"
+                             onclick="toggleBookingCategoryCard('${cat.id}')">
+                            <div class="d-flex align-items-center gap-3">
+                                <div class="category-icon">
+                                    <i class="bi ${cat.icon}"></i>
+                                </div>
+                                <div>
+                                    <h6 class="fw-bold text-dark mb-1">${cat.title}</h6>
+                                    <span class="badge bg-danger-subtle text-pink border border-danger-subtle rounded-pill small px-2 py-0">
+                                        ${catServices.length} items
+                                    </span>
+                                </div>
+                            </div>
+                            <i class="bi bi-chevron-down chevron-icon ms-2"></i>
+                        </div>
+                        <div class="collapse" id="${collapseId}">
+                            <div class="border-top">
+                                ${rowsHtml}
+                            </div>
                         </div>
                     </div>
                 `;
                 grid.appendChild(col);
-
-                if (selectedDesign && service.name.toLowerCase().trim() === selectedDesign.toLowerCase().trim()) {
-                    selectService(service.id);
-                } else if (selectedDesign && !bookingState.selectedService && service.name.toLowerCase().includes(selectedDesign.toLowerCase())) {
-                    selectService(service.id);
-                }
             });
+
+            // Auto-select if redirected from services.html
+            if (matchedServiceToSelect) {
+                selectService(matchedServiceToSelect.id);
+            }
         } catch (err) {
             console.error('Error loading services:', err);
-            badge.textContent = 'Unavailable';
             grid.innerHTML = `<div class="col-12 text-center text-danger py-4">Unable to load services. Please refresh the page.</div>`;
         }
     }
 
-    function selectService(serviceId) {
+    function toggleBookingCategoryCard(catId) {
+        const card = document.getElementById(`bookingCatCard_${catId}`);
+        const col = document.getElementById(`bookingCol_${catId}`);
+        if (!card || !col) return;
+
+        setTimeout(() => {
+            const collapseEl = document.getElementById(`bookingCollapse_${catId}`);
+            const isShown = collapseEl.classList.contains('show');
+            if (isShown) {
+                card.classList.add('is-open');
+                col.classList.remove('col-md-6', 'col-lg-4');
+                col.classList.add('col-12');
+            } else {
+                card.classList.remove('is-open');
+                col.classList.remove('col-12');
+                col.classList.add('col-md-6', 'col-lg-4');
+            }
+        }, 300);
+    }
+
+    function selectService(serviceId, catId) {
         hideAlert();
         const found = bookingState.servicesList.find(s => s.id === serviceId);
         if (!found) return;
 
-        // If changing service, clear previous staff selection so Step 2 re-validates
         if (!bookingState.selectedService || bookingState.selectedService.id !== found.id) {
             bookingState.selectedStaff = null;
             document.getElementById('step2NextBtn').disabled = true;
@@ -580,30 +781,43 @@
 
         bookingState.selectedService = found;
 
-        // Highlight selected card
-        document.querySelectorAll('#servicesGrid .selectable-card').forEach(card => {
-            card.classList.remove('selected');
-        });
-        const activeCard = document.getElementById(`serviceCard-${serviceId}`);
-        if (activeCard) activeCard.classList.add('selected');
+        // If card is collapsed, expand it
+        if (catId) {
+            const collapseEl = document.getElementById(`bookingCollapse_${catId}`);
+            if (collapseEl && !collapseEl.classList.contains('show')) {
+                const bsCollapse = new bootstrap.Collapse(collapseEl, { show: true });
+                toggleBookingCategoryCard(catId);
+            }
+        }
+
+        // Highlight selected service row
+        document.querySelectorAll('.service-select-row').forEach(row => row.classList.remove('selected'));
+        const activeRow = document.getElementById(`serviceRow-${serviceId}`);
+        if (activeRow) activeRow.classList.add('selected');
+
+        // Display selected service badge at top of step 1
+        const badge = document.getElementById('selectedServiceBadge');
+        const badgeName = document.getElementById('selectedServiceNameDisplay');
+        badgeName.textContent = `${found.name} ($${Number(found.price).toFixed(2)})`;
+        badge.classList.remove('d-none');
 
         document.getElementById('step1NextBtn').disabled = false;
     }
 
-    // ==================== STEP 2: LOAD & SELECT QUALIFIED STAFF ====================
+    // ==================== STEP 2: LOAD & SELECT QUALIFIED STAFF (NAMES ONLY) ====================
     async function loadStaffForService(serviceId) {
         const staffGrid = document.getElementById('staffGrid');
         const servicePill = document.getElementById('step2ServicePill');
         const s = bookingState.selectedService;
 
         if (s) {
-            servicePill.innerHTML = `<i class="bi bi-sparkles me-1"></i>${s.name} ($${Number(s.price).toFixed(2)})`;
+            servicePill.textContent = `${s.name} ($${Number(s.price).toFixed(2)})`;
         }
 
         staffGrid.innerHTML = `
             <div class="col-12 text-center py-4">
                 <div class="spinner-border text-pink" role="status"></div>
-                <p class="text-muted mt-2 mb-0">Filtering qualified technicians...</p>
+                <p class="text-muted mt-2 mb-0">Finding available technicians...</p>
             </div>
         `;
 
@@ -614,54 +828,51 @@
 
             staffGrid.innerHTML = '';
 
-            // Option 0: "Anyone Available (No Preference)" card
+            // Option 0: Anyone Available (No Preference)
             const anyoneCol = document.createElement('div');
             anyoneCol.className = 'col-md-6';
             anyoneCol.innerHTML = `
-                <div class="selectable-card p-3 h-100 d-flex align-items-center gap-3"
+                <div class="staff-card d-flex align-items-center justify-content-between"
                      id="staffCard-anyone"
                      onclick="selectStaff('anyone')">
-                    <div class="staff-avatar" style="background: linear-gradient(135deg, #6c757d, #adb5bd);">
-                        <i class="bi bi-people-fill"></i>
-                    </div>
-                    <div class="flex-grow-1">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <h6 class="fw-bold text-dark mb-1">Anyone Available</h6>
-                            <span class="check-indicator"><i class="bi bi-check-lg"></i></span>
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="staff-avatar" style="background: linear-gradient(135deg, #6c757d, #adb5bd);">
+                            <i class="bi bi-people-fill"></i>
                         </div>
-                        <div class="small text-muted">First available qualified technician for ${s ? s.name : 'your service'}</div>
+                        <div>
+                            <h5 class="fw-bold text-dark mb-0">Anyone Available</h5>
+                            <small class="text-muted">No preference</small>
+                        </div>
                     </div>
+                    <span class="check-indicator"><i class="bi bi-check-lg"></i></span>
                 </div>
             `;
             staffGrid.appendChild(anyoneCol);
 
-            // Filtered Nail Tech Cards
+            // Available Technicians (JUST NAMES, no specialty tags or "qualified" labels)
             techs.forEach(tech => {
-                const displayName = tech.name || tech.username || 'Nail Specialist';
+                const displayName = tech.name || tech.username || 'Nail Technician';
                 const initials = displayName.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
-                const specialty = tech.specialty || 'All Nail Services';
 
                 const col = document.createElement('div');
                 col.className = 'col-md-6';
                 col.innerHTML = `
-                    <div class="selectable-card p-3 h-100 d-flex align-items-center gap-3"
+                    <div class="staff-card d-flex align-items-center justify-content-between"
                          id="staffCard-${tech.id}"
                          onclick="selectStaff(${tech.id})">
-                        <div class="staff-avatar">${initials}</div>
-                        <div class="flex-grow-1">
-                            <div class="d-flex justify-content-between align-items-start">
-                                <h6 class="fw-bold text-dark mb-1">${displayName}</h6>
-                                <span class="check-indicator"><i class="bi bi-check-lg"></i></span>
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="staff-avatar">${initials}</div>
+                            <div>
+                                <h5 class="fw-bold text-dark mb-0">${displayName}</h5>
                             </div>
-                            <span class="badge bg-light text-dark border mb-1"><i class="bi bi-award text-pink me-1"></i>${specialty}</span>
-                            <div class="small text-success"><i class="bi bi-check-circle-fill me-1"></i>Qualified for ${s ? s.name : 'this service'}</div>
                         </div>
+                        <span class="check-indicator"><i class="bi bi-check-lg"></i></span>
                     </div>
                 `;
                 staffGrid.appendChild(col);
             });
 
-            // Restore selection if user navigated back
+            // Restore selection if returning to step 2
             if (bookingState.selectedStaff) {
                 if (bookingState.selectedStaff.isAnyoneAvailable) {
                     selectStaff('anyone');
@@ -672,13 +883,13 @@
             }
         } catch (err) {
             console.error('Error loading staff:', err);
-            staffGrid.innerHTML = `<div class="col-12 text-center text-danger py-4">Unable to load nail technicians. Please try again.</div>`;
+            staffGrid.innerHTML = `<div class="col-12 text-center text-danger py-4">Unable to load technicians. Please try again.</div>`;
         }
     }
 
     function selectStaff(staffIdentifier) {
         hideAlert();
-        document.querySelectorAll('#staffGrid .selectable-card').forEach(card => {
+        document.querySelectorAll('#staffGrid .staff-card').forEach(card => {
             card.classList.remove('selected');
         });
 
@@ -686,7 +897,6 @@
             bookingState.selectedStaff = {
                 id: null,
                 name: 'Anyone Available (No Preference)',
-                specialty: 'Matched automatically upon arrival',
                 isAnyoneAvailable: true
             };
             const card = document.getElementById('staffCard-anyone');
@@ -697,7 +907,6 @@
             bookingState.selectedStaff = {
                 id: found.id,
                 name: found.name || found.username,
-                specialty: found.specialty || 'All Nail Services',
                 isAnyoneAvailable: false
             };
             const card = document.getElementById(`staffCard-${found.id}`);
@@ -725,7 +934,7 @@
                 return;
             }
             if (!bookingState.selectedStaff) {
-                showAlert('Please select a nail technician in Step 2 before proceeding.');
+                showAlert('Please select a technician in Step 2 before proceeding.');
                 return;
             }
             populateStep3Summary();
@@ -769,7 +978,6 @@
             : '—';
 
         document.getElementById('summaryStaffName').textContent = t ? t.name : '—';
-        document.getElementById('summaryStaffSpecialty').textContent = t ? t.specialty : '—';
     }
 
     // ==================== STEP 3: SUBMIT BOOKING ====================
@@ -871,7 +1079,7 @@
                 <span class="fw-bold text-pink">${bookingState.selectedService.name} ($${Number(bookingState.selectedService.price).toFixed(2)})</span>
             </div>
             <div class="d-flex justify-content-between border-bottom pb-2 mb-2">
-                <span class="text-muted">Nail Technician</span>
+                <span class="text-muted">Technician</span>
                 <span class="fw-semibold text-dark">${bookingState.selectedStaff.name}</span>
             </div>
             <div class="d-flex justify-content-between border-bottom pb-2 mb-2">
@@ -897,7 +1105,8 @@
         bookingState.selectedService = null;
         bookingState.selectedStaff = null;
 
-        document.querySelectorAll('#servicesGrid .selectable-card').forEach(c => c.classList.remove('selected'));
+        document.querySelectorAll('.service-select-row').forEach(c => c.classList.remove('selected'));
+        document.getElementById('selectedServiceBadge').classList.add('d-none');
         document.getElementById('step1NextBtn').disabled = true;
         document.getElementById('step2NextBtn').disabled = true;
         document.getElementById('appointmentTimeSlot').value = '';

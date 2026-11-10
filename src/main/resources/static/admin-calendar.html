@@ -191,7 +191,8 @@
                                     email: apt.customerEmail,
                                     status: apt.status,
                                     serviceName: serviceName,
-                                    techName: techName
+                                    techName: techName,
+                                    notes: apt.notes || ''
                                 }
                             };
                         });
@@ -216,6 +217,7 @@
                     <p class="mb-2"><strong>Service:</strong> ${props.serviceName}</p>
                     <p class="mb-2"><strong>Nail Technician:</strong> ${props.techName || 'Anyone Available'}</p>
                     <p class="mb-2"><strong>Time:</strong> ${info.event.start.toLocaleString()}</p>
+                    ${props.notes ? `<p class="mb-2"><strong>Notes:</strong> ${props.notes}</p>` : ''}
                     <p class="mb-0"><strong>Status:</strong> <span class="badge bg-secondary">${props.status}</span></p>
                 `;
 

@@ -56,6 +56,29 @@ public class DataInitializer implements CommandLineRunner {
         // Sync all existing ROLE_USER accounts into the Customer database
         userRepository.findAll().forEach(customerService::syncUserToCustomer);
 
+        // Seed default Nail Technicians if none exist yet
+        boolean hasNailTech = userRepository.findAll().stream()
+                .anyMatch(u -> "ROLE_NAIL_TECH".equals(u.getRole()));
+        if (!hasNailTech) {
+            UserEntity tech1 = new UserEntity("jenny@jennysnailstudio.com", passwordEncoder.encode("defaultPassword123"), "ROLE_NAIL_TECH");
+            tech1.setName("Jenny Tran");
+            tech1.setEmail("jenny@jennysnailstudio.com");
+            tech1.setSpecialty("Gel Manicure, Nail Art Add-On, Custom Art");
+
+            UserEntity tech2 = new UserEntity("sophia@jennysnailstudio.com", passwordEncoder.encode("defaultPassword123"), "ROLE_NAIL_TECH");
+            tech2.setName("Sophia Nguyen");
+            tech2.setEmail("sophia@jennysnailstudio.com");
+            tech2.setSpecialty("Acrylic Full Set, Gel Manicure, Sculpting");
+
+            UserEntity tech3 = new UserEntity("chloe@jennysnailstudio.com", passwordEncoder.encode("defaultPassword123"), "ROLE_NAIL_TECH");
+            tech3.setName("Chloe Kim");
+            tech3.setEmail("chloe@jennysnailstudio.com");
+            tech3.setSpecialty("Pedicure Deluxe, Gel Manicure, Spa Care");
+
+            userRepository.saveAll(List.of(tech1, tech2, tech3));
+            System.out.println("✅ Sample nail technicians seeded into the database!");
+        }
+
         if (serviceRepository.count() == 0) {
             serviceRepository.save(new ServiceEntity("Gel Manicure", "Long-lasting gel polish with cuticle care and hand massage.", new BigDecimal("45.00"), 45));
             serviceRepository.save(new ServiceEntity("Acrylic Full Set", "Full set of custom length acrylic extensions with choice of shape.", new BigDecimal("65.00"), 75));

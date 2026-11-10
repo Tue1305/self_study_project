@@ -23,6 +23,9 @@ public class Appointment {
     @Column(nullable = false)
     private LocalDateTime appointmentTime;
 
+    @Column(length = 1000)
+    private String notes;
+
     @ManyToOne
     @JoinColumn(name = "service_id", nullable = false)
     private ServiceEntity service;
@@ -56,6 +59,9 @@ public class Appointment {
 
     public LocalDateTime getAppointmentTime() { return appointmentTime; }
     public void setAppointmentTime(LocalDateTime appointmentTime) { this.appointmentTime = appointmentTime; }
+
+    public String getNotes() { return notes; }
+    public void setNotes(String notes) { this.notes = notes; }
 
     public ServiceEntity getService() { return service; }
     public void setService(ServiceEntity service) { this.service = service; }

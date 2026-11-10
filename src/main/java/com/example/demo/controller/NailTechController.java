@@ -1,6 +1,8 @@
 package com.example.demo.controller;
 
+import com.example.demo.entity.ServiceEntity;
 import com.example.demo.entity.UserEntity;
+import com.example.demo.repository.ServiceRepository;
 import com.example.demo.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -21,16 +23,56 @@ public class NailTechController {
     private UserRepository userRepository;
 
     @Autowired
+    private ServiceRepository serviceRepository;
+
+    @Autowired
     private PasswordEncoder passwordEncoder;
 
     // Public or authenticated so booking page & admin can fetch the list of nail techs
+    // Supports optional ?serviceId={id} filtering for the multi-step booking wizard
     @GetMapping
-    public List<UserEntity> getAllNailTechs() {
-        // Only return users who are actually nail technicians
-        return userRepository.findAll()
+    public List<UserEntity> getAllNailTechs(@RequestParam(required = false) Long serviceId) {
+        List<UserEntity> allTechs = userRepository.findAll()
                 .stream()
                 .filter(u -> "ROLE_NAIL_TECH".equals(u.getRole()))
                 .toList();
+
+        if (serviceId == null) {
+            return allTechs;
+        }
+
+        ServiceEntity service = serviceRepository.findById(serviceId).orElse(null);
+        if (service == null || service.getName() == null) {
+            return allTechs;
+        }
+
+        String serviceNameLower = service.getName().toLowerCase();
+        String[] keywords = serviceNameLower.split("\\s+");
+
+        List<UserEntity> qualifiedTechs = allTechs.stream()
+                .filter(tech -> {
+                    String spec = tech.getSpecialty();
+                    if (spec == null || spec.isBlank()
+                            || spec.equalsIgnoreCase("general")
+                            || spec.equalsIgnoreCase("all")
+                            || spec.toLowerCase().contains("all services")) {
+                        return true;
+                    }
+                    String specLower = spec.toLowerCase();
+                    if (specLower.contains(serviceNameLower) || serviceNameLower.contains(specLower)) {
+                        return true;
+                    }
+                    for (String word : keywords) {
+                        if (word.length() >= 3 && specLower.contains(word)) {
+                            return true;
+                        }
+                    }
+                    return false;
+                })
+                .toList();
+
+        // Fallback: if no specific specialty match, return all available nail technicians
+        return qualifiedTechs.isEmpty() ? allTechs : qualifiedTechs;
     }
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ADMIN')")

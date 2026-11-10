@@ -14,6 +14,7 @@
         :root {
             --bs-primary-pink: #e91e63;
             --bs-primary-pink-hover: #d81b60;
+            --bs-soft-pink: #fce4ec;
         }
         .text-pink { color: var(--bs-primary-pink) !important; }
         .bg-pink { background-color: var(--bs-primary-pink) !important; }
@@ -22,8 +23,17 @@
             color: #fff;
             border: none;
         }
-        .btn-pink:hover {
+        .btn-pink:hover, .btn-pink:focus {
             background-color: var(--bs-primary-pink-hover);
+            color: #fff;
+        }
+        .btn-outline-pink {
+            color: var(--bs-primary-pink);
+            border: 1px solid var(--bs-primary-pink);
+            background-color: transparent;
+        }
+        .btn-outline-pink:hover {
+            background-color: var(--bs-primary-pink);
             color: #fff;
         }
         .user-badge-link {
@@ -36,12 +46,115 @@
             background-color: #f8d7da !important;
             box-shadow: 0 2px 5px rgba(233, 30, 99, 0.15);
         }
-        .teaser-card {
-            transition: transform 0.25s ease, box-shadow 0.25s ease;
+
+        /* Wizard Stepper Styles */
+        .wizard-stepper {
+            display: flex;
+            justify-content: space-between;
+            position: relative;
+            margin-bottom: 2.25rem;
         }
-        .teaser-card:hover {
-            transform: translateY(-6px);
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.12) !important;
+        .wizard-stepper::before {
+            content: "";
+            position: absolute;
+            top: 22px;
+            left: 12%;
+            right: 12%;
+            height: 3px;
+            background-color: #e9ecef;
+            z-index: 0;
+        }
+        .wizard-step {
+            position: relative;
+            z-index: 1;
+            text-align: center;
+            flex: 1;
+        }
+        .step-circle {
+            width: 46px;
+            height: 46px;
+            border-radius: 50%;
+            background-color: #fff;
+            border: 3px solid #dee2e6;
+            color: #6c757d;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 1.05rem;
+            transition: all 0.25s ease;
+        }
+        .wizard-step.active .step-circle {
+            background-color: var(--bs-primary-pink);
+            border-color: var(--bs-primary-pink);
+            color: #fff;
+            box-shadow: 0 0 0 5px rgba(233, 30, 99, 0.18);
+        }
+        .wizard-step.completed .step-circle {
+            background-color: #198754;
+            border-color: #198754;
+            color: #fff;
+        }
+        .step-label {
+            display: block;
+            margin-top: 0.5rem;
+            font-size: 0.88rem;
+            font-weight: 600;
+            color: #6c757d;
+        }
+        .wizard-step.active .step-label {
+            color: var(--bs-primary-pink);
+        }
+        .wizard-step.completed .step-label {
+            color: #198754;
+        }
+
+        /* Selectable Service & Staff Cards */
+        .selectable-card {
+            border: 2px solid #e9ecef;
+            border-radius: 1rem;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            background: #fff;
+        }
+        .selectable-card:hover {
+            border-color: #f48fb1;
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(233, 30, 99, 0.08);
+        }
+        .selectable-card.selected {
+            border-color: var(--bs-primary-pink);
+            background-color: var(--bs-soft-pink);
+            box-shadow: 0 8px 22px rgba(233, 30, 99, 0.15);
+        }
+        .selectable-card .check-indicator {
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            border: 2px solid #ced4da;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: transparent;
+            transition: all 0.2s ease;
+        }
+        .selectable-card.selected .check-indicator {
+            background-color: var(--bs-primary-pink);
+            border-color: var(--bs-primary-pink);
+            color: #fff;
+        }
+        .staff-avatar {
+            width: 54px;
+            height: 54px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #e91e63, #ff80ab);
+            color: #fff;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.35rem;
+            font-weight: 700;
+            flex-shrink: 0;
         }
     </style>
 </head>
@@ -75,64 +188,175 @@
 
 <main class="container my-5 flex-grow-1">
     <div class="row justify-content-center">
-        <div class="col-md-8 col-lg-6">
-            <div class="card shadow-sm border-0 rounded-4 teaser-card">
+        <div class="col-lg-9 col-xl-8">
+            <div class="card shadow-sm border-0 rounded-4">
                 <div class="card-body p-4 p-md-5">
-                    <h2 class="text-center text-pink mb-2 fw-bold">Book Your Appointment</h2>
-                    <p class="text-center text-muted mb-4" id="selectedDesignBanner">Secure your time slot online!</p>
+                    <h2 class="text-center text-pink mb-1 fw-bold">Book Your Appointment</h2>
+                    <p class="text-center text-muted mb-4" id="selectedDesignBanner">Complete the 3 easy steps below to reserve your visit</p>
 
-                    <div id="successMessage" class="alert alert-success d-none text-center" role="alert">
-                        🎉 Appointment booked successfully! We look forward to seeing you.
+                    <!-- Multi-Step Progress Indicator -->
+                    <div class="wizard-stepper" id="wizardStepper">
+                        <div class="wizard-step active" id="stepIndicator1">
+                            <span class="step-circle" id="stepCircle1">1</span>
+                            <span class="step-label">1. Select Service</span>
+                        </div>
+                        <div class="wizard-step" id="stepIndicator2">
+                            <span class="step-circle" id="stepCircle2">2</span>
+                            <span class="step-label">2. Select Staff</span>
+                        </div>
+                        <div class="wizard-step" id="stepIndicator3">
+                            <span class="step-circle" id="stepCircle3">3</span>
+                            <span class="step-label">3. Details & Confirm</span>
+                        </div>
                     </div>
 
-                    <form id="bookingForm">
-                        <div class="mb-3">
-                            <label for="customerName" class="form-label fw-semibold">Full Name</label>
-                            <input type="text" class="form-control" id="customerName" required placeholder="Jane Doe">
+                    <!-- Global Alert Box for Validation or Errors -->
+                    <div id="wizardAlert" class="alert alert-danger d-none align-items-center" role="alert">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                        <span id="wizardAlertText"></span>
+                    </div>
+
+                    <!-- ==================== STEP 1: SELECT SERVICE ==================== -->
+                    <section id="step1Panel">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="fw-bold mb-0"><i class="bi bi-stars text-pink me-2"></i>Step 1: Choose a Nail Service</h5>
+                            <span class="badge bg-light text-secondary border" id="serviceCountBadge">Loading...</span>
                         </div>
 
-                        <div class="mb-3">
-                            <label for="customerPhone" class="form-label fw-semibold">Phone Number</label>
-                            <input type="tel" class="form-control" id="customerPhone" required placeholder="(555) 000-0000">
-                        </div>
-
-                        <div class="mb-3">
-                            <label for="customerEmail" class="form-label fw-semibold">Email Address</label>
-                            <input type="email" class="form-control" id="customerEmail" required placeholder="jane@example.com">
-                        </div>
-
-                        <div class="mb-3">
-                            <label for="serviceSelect" class="form-label fw-semibold">Select Nail Service / Design</label>
-                            <select class="form-select" id="serviceSelect" required>
-                                <option value="">Loading services...</option>
-                            </select>
-                        </div>
-
-                        <div class="mb-3">
-                            <label for="nailTechSelect" class="form-label fw-semibold">Preferred Nail Technician</label>
-                            <select class="form-select" id="nailTechSelect">
-                                <option value="">Anyone Available (No Preference)</option>
-                            </select>
-                        </div>
-
-                        <div class="row g-3 mb-4">
-                            <div class="col-md-6">
-                                <label for="appointmentDate" class="form-label fw-semibold">Appointment Date</label>
-                                <input type="date" class="form-control" id="appointmentDate" required>
-                            </div>
-                            <div class="col-md-6">
-                                <label for="appointmentTimeSlot" class="form-label fw-semibold">Time Slot (10:00 AM – 7:00 PM)</label>
-                                <select class="form-select" id="appointmentTimeSlot" required>
-                                    <option value="">-- Choose a Time --</option>
-                                </select>
-                            </div>
-                            <div class="col-12 mt-1">
-                                <small class="text-muted"><i class="bi bi-clock me-1"></i>Store Hours: 10:00 AM – 7:00 PM (15-minute intervals)</small>
+                        <div id="servicesGrid" class="row g-3 mb-4">
+                            <div class="col-12 text-center py-5">
+                                <div class="spinner-border text-pink" role="status"></div>
+                                <p class="text-muted mt-2 mb-0">Loading available services...</p>
                             </div>
                         </div>
 
-                        <button type="submit" class="btn btn-pink w-100 btn-lg rounded-3 fw-bold">Confirm Booking Submission</button>
-                    </form>
+                        <div class="d-flex justify-content-end">
+                            <button type="button" class="btn btn-pink px-4 py-2 fw-semibold rounded-3" id="step1NextBtn" onclick="goToStep(2)" disabled>
+                                Next: Select Staff <i class="bi bi-arrow-right ms-1"></i>
+                            </button>
+                        </div>
+                    </section>
+
+                    <!-- ==================== STEP 2: SELECT STAFF ==================== -->
+                    <section id="step2Panel" class="d-none">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                            <div>
+                                <h5 class="fw-bold mb-1"><i class="bi bi-person-badge text-pink me-2"></i>Step 2: Choose Your Nail Technician</h5>
+                                <small class="text-muted" id="step2Subtitle">Showing specialists qualified for your selected service</small>
+                            </div>
+                            <span class="badge bg-danger-subtle text-pink border border-danger-subtle px-3 py-2" id="step2ServicePill"></span>
+                        </div>
+
+                        <div id="staffGrid" class="row g-3 mb-4">
+                            <!-- Injected dynamically from GET /api/nail-techs?serviceId={id} -->
+                        </div>
+
+                        <div class="d-flex justify-content-between">
+                            <button type="button" class="btn btn-outline-secondary px-4 py-2 fw-semibold rounded-3" onclick="goToStep(1)">
+                                <i class="bi bi-arrow-left me-1"></i> Back to Services
+                            </button>
+                            <button type="button" class="btn btn-pink px-4 py-2 fw-semibold rounded-3" id="step2NextBtn" onclick="goToStep(3)" disabled>
+                                Next: Your Information <i class="bi bi-arrow-right ms-1"></i>
+                            </button>
+                        </div>
+                    </section>
+
+                    <!-- ==================== STEP 3: CUSTOMER INFO & CONFIRMATION ==================== -->
+                    <section id="step3Panel" class="d-none">
+                        <h5 class="fw-bold mb-3"><i class="bi bi-clipboard2-check text-pink me-2"></i>Step 3: Customer Information & Confirmation</h5>
+
+                        <!-- Booking Summary Card -->
+                        <div class="card bg-light border-0 rounded-3 mb-4">
+                            <div class="card-body py-3 px-4">
+                                <div class="row g-2 align-items-center">
+                                    <div class="col-md-6">
+                                        <div class="small text-muted">Selected Service</div>
+                                        <div class="fw-bold text-dark" id="summaryServiceName">—</div>
+                                        <div class="small text-pink fw-semibold" id="summaryServiceMeta">—</div>
+                                    </div>
+                                    <div class="col-md-6 border-start-md">
+                                        <div class="small text-muted">Selected Technician</div>
+                                        <div class="fw-bold text-dark" id="summaryStaffName">—</div>
+                                        <div class="small text-muted" id="summaryStaffSpecialty">—</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <form id="bookingForm" novalidate>
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-6">
+                                    <label for="customerName" class="form-label fw-semibold">Full Name <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="customerName" required placeholder="Jane Doe">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="customerPhone" class="form-label fw-semibold">Phone Number <span class="text-danger">*</span></label>
+                                    <input type="tel" class="form-control" id="customerPhone" required placeholder="(555) 000-0000">
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="customerEmail" class="form-label fw-semibold">Email Address <span class="text-danger">*</span></label>
+                                <input type="email" class="form-control" id="customerEmail" required placeholder="jane@example.com">
+                            </div>
+
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-6">
+                                    <label for="appointmentDate" class="form-label fw-semibold">Appointment Date <span class="text-danger">*</span></label>
+                                    <input type="date" class="form-control" id="appointmentDate" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="appointmentTimeSlot" class="form-label fw-semibold">Time Slot (10:00 AM – 7:00 PM) <span class="text-danger">*</span></label>
+                                    <select class="form-select" id="appointmentTimeSlot" required>
+                                        <option value="">-- Choose a Time --</option>
+                                    </select>
+                                </div>
+                                <div class="col-12 mt-1">
+                                    <small class="text-muted"><i class="bi bi-clock me-1"></i>Store Hours: 10:00 AM – 7:00 PM (15-minute intervals)</small>
+                                </div>
+                            </div>
+
+                            <div class="mb-4">
+                                <label for="appointmentNotes" class="form-label fw-semibold">Appointment Notes / Special Requests <span class="text-muted fw-normal">(Optional)</span></label>
+                                <textarea class="form-control" id="appointmentNotes" rows="3" placeholder="e.g., Nail shape preference, design reference, allergies, or removal needed..."></textarea>
+                            </div>
+
+                            <div class="d-flex justify-content-between align-items-center pt-2">
+                                <button type="button" class="btn btn-outline-secondary px-4 py-2 fw-semibold rounded-3" onclick="goToStep(2)">
+                                    <i class="bi bi-arrow-left me-1"></i> Back to Staff
+                                </button>
+                                <button type="submit" class="btn btn-pink px-5 py-2 btn-lg rounded-3 fw-bold" id="confirmSubmitBtn">
+                                    <i class="bi bi-calendar2-check me-1"></i> Confirm Booking
+                                </button>
+                            </div>
+                        </form>
+                    </section>
+
+                    <!-- ==================== CONFIRMATION SCREEN ==================== -->
+                    <section id="confirmationPanel" class="d-none text-center py-4">
+                        <div class="mb-3">
+                            <span class="d-inline-flex align-items-center justify-content-center rounded-circle bg-success-subtle text-success" style="width: 72px; height: 72px; font-size: 2.2rem;">
+                                <i class="bi bi-check-lg"></i>
+                            </span>
+                        </div>
+                        <h3 class="fw-bold text-dark mb-2">Appointment Confirmed!</h3>
+                        <p class="text-muted mb-4">Thank you for booking with Jenny's Nail Studio. Here is your reservation summary:</p>
+
+                        <div class="card bg-light border-0 rounded-4 text-start mx-auto mb-4" style="max-width: 520px;">
+                            <div class="card-body p-4" id="confirmationReceipt">
+                                <!-- Populated dynamically on booking success -->
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-center gap-3 flex-wrap">
+                            <button type="button" class="btn btn-pink px-4 py-2 fw-semibold rounded-3" onclick="resetWizard()">
+                                <i class="bi bi-plus-circle me-1"></i> Book Another Appointment
+                            </button>
+                            <a href="./index.html" class="btn btn-outline-secondary px-4 py-2 fw-semibold rounded-3">
+                                Return to Home
+                            </a>
+                        </div>
+                    </section>
                 </div>
             </div>
         </div>
@@ -150,9 +374,20 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
-    function parseJwt(token) {
+    // ==================== CENTRALIZED BOOKING WIZARD STATE ====================
+    const bookingState = {
+        currentStep: 1,
+        selectedService: null, // { id, name, description, price, durationMinutes }
+        selectedStaff: null,   // { id, name, username, specialty, isAnyoneAvailable }
+        servicesList: [],
+        staffList: []
+    };
+
+    const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
+
+    function parseJwt(jwtToken) {
         try {
-            const base64Url = token.split('.')[1];
+            const base64Url = jwtToken.split('.')[1];
             const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
             const jsonPayload = decodeURIComponent(atob(base64).split('').map(c => {
                 return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
@@ -166,11 +401,29 @@
         }
     }
 
-    const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
+    function showAlert(message) {
+        const alertEl = document.getElementById('wizardAlert');
+        const alertText = document.getElementById('wizardAlertText');
+        alertText.textContent = message;
+        alertEl.classList.remove('d-none');
+        alertEl.classList.add('d-flex');
+        alertEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
 
-    // Fetch services, nail techs, and setup header on load
+    function hideAlert() {
+        const alertEl = document.getElementById('wizardAlert');
+        alertEl.classList.add('d-none');
+        alertEl.classList.remove('d-flex');
+    }
+
+    // ==================== INITIALIZATION ====================
     window.addEventListener('DOMContentLoaded', async () => {
-        // Setup Header Auth state
+        setupHeaderNav();
+        populateStoreTimeSlots();
+        await loadServicesStep1();
+    });
+
+    function setupHeaderNav() {
         const authNav = document.getElementById('authNav');
         const userBadge = document.getElementById('userBadge');
         const usernameDisplay = document.getElementById('usernameDisplay');
@@ -187,7 +440,7 @@
                 userBadge.classList.add('d-inline-flex');
             }
 
-            let adminLinkHtml = isAdmin ? `<a href="./admin-dashboard.html" class="nav-link fw-bold text-danger"><i class="bi bi-shield-lock-fill me-1"></i>Admin Portal</a>` : '';
+            const adminLinkHtml = isAdmin ? `<a href="./admin-dashboard.html" class="nav-link fw-bold text-danger"><i class="bi bi-shield-lock-fill me-1"></i>Admin Portal</a>` : '';
             authNav.innerHTML = `
                 <a href="./index.html" class="nav-link fw-semibold text-dark">Home</a>
                 <a href="./dashboard.html" class="nav-link fw-semibold text-dark">Showcase</a>
@@ -200,10 +453,11 @@
                 <a href="./subscription-plans.html" class="btn btn-pink rounded-pill px-4 py-2 fw-semibold">Subscription Plans</a>
             `;
 
-            // Pre-fill user details if available in localStorage or profile API
             document.getElementById('customerName').value = activeUser;
             if (decodedToken.email) {
                 document.getElementById('customerEmail').value = decodedToken.email;
+            } else if (activeUser.includes('@')) {
+                document.getElementById('customerEmail').value = activeUser;
             }
         } else {
             authNav.innerHTML = `
@@ -218,54 +472,17 @@
             `;
         }
 
-        // Check if user selected a design from the product catalog
         const selectedDesign = localStorage.getItem('selectedDesign');
         if (selectedDesign) {
-            document.getElementById('selectedDesignBanner').textContent = `Booking for selected style: "${selectedDesign}"`;
-        }
-
-        // 1. Load Services
-        try {
-            const response = await fetch('/api/services');
-            const services = await response.json();
-            const select = document.getElementById('serviceSelect');
-
-            select.innerHTML = '<option value="">-- Choose a Service --</option>';
-            services.forEach(service => {
-                const option = document.createElement('option');
-                option.value = service.id;
-                option.textContent = `${service.name} ($${service.price} - ${service.durationMinutes || 60} mins)`;
-
-                // Pre-select if matches selectedDesign
-                if (selectedDesign && service.name.toLowerCase().includes(selectedDesign.toLowerCase())) {
-                    option.selected = true;
-                }
-                select.appendChild(option);
-            });
-        } catch (err) {
-            console.error('Error loading services:', err);
-            document.getElementById('serviceSelect').innerHTML = '<option value="">Error loading services</option>';
-        }
-
-        // 2. Load Nail Technicians (Staff) with "Anyone Available" as default
-        const techSelect = document.getElementById('nailTechSelect');
-        techSelect.innerHTML = '<option value="">Anyone Available (No Preference)</option>';
-        try {
-            const response = await fetch('/api/nail-techs');
-            if (response.ok) {
-                const techs = await response.json();
-                techs.forEach(tech => {
-                    const option = document.createElement('option');
-                    option.value = tech.id;
-                    const specialtyText = tech.specialty ? ` (${tech.specialty})` : '';
-                    option.textContent = `${tech.name || tech.username}${specialtyText}`;
-                    techSelect.appendChild(option);
-                });
+            document.getElementById('selectedDesignBanner').textContent = `Booking for requested style: "${selectedDesign}"`;
+            const notesInput = document.getElementById('appointmentNotes');
+            if (notesInput && !notesInput.value) {
+                notesInput.value = `Requested style: ${selectedDesign}`;
             }
-        } catch (err) {
-            console.error('Error loading nail techs:', err);
         }
-        // 3. Populate 15-minute Time Slots between 10:00 AM and 7:00 PM (19:00)
+    }
+
+    function populateStoreTimeSlots() {
         const dateInput = document.getElementById('appointmentDate');
         const todayStr = new Date().toISOString().split('T')[0];
         dateInput.min = todayStr;
@@ -290,27 +507,305 @@
                 timeSelect.appendChild(opt);
             }
         }
-    });
+    }
 
-    // Handle form submit
+    // ==================== STEP 1: LOAD & SELECT SERVICE ====================
+    async function loadServicesStep1() {
+        const grid = document.getElementById('servicesGrid');
+        const badge = document.getElementById('serviceCountBadge');
+        try {
+            const response = await fetch('/api/services');
+            if (!response.ok) throw new Error('Failed to load services');
+            const services = await response.json();
+            bookingState.servicesList = services;
+            badge.textContent = `${services.length} Service${services.length === 1 ? '' : 's'} Available`;
+
+            if (services.length === 0) {
+                grid.innerHTML = `<div class="col-12 text-center text-muted py-4">No services are currently listed.</div>`;
+                return;
+            }
+
+            const selectedDesign = localStorage.getItem('selectedDesign');
+            grid.innerHTML = '';
+
+            services.forEach(service => {
+                const col = document.createElement('div');
+                col.className = 'col-md-6';
+
+                const priceFormatted = Number(service.price || 0).toFixed(2);
+                const duration = service.durationMinutes || 60;
+
+                col.innerHTML = `
+                    <div class="selectable-card p-3 h-100 d-flex flex-column justify-content-between"
+                         id="serviceCard-${service.id}"
+                         onclick="selectService(${service.id})">
+                        <div>
+                            <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                                <h6 class="fw-bold text-dark mb-0">${service.name}</h6>
+                                <span class="check-indicator"><i class="bi bi-check-lg"></i></span>
+                            </div>
+                            <p class="text-muted small mb-3">${service.description || 'Professional nail care and artistry tailored to your style.'}</p>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center pt-2 border-top">
+                            <span class="fw-bold text-pink fs-5">$${priceFormatted}</span>
+                            <span class="badge bg-light text-secondary border"><i class="bi bi-clock me-1"></i>${duration} mins</span>
+                        </div>
+                    </div>
+                `;
+                grid.appendChild(col);
+
+                if (selectedDesign && service.name.toLowerCase().includes(selectedDesign.toLowerCase())) {
+                    selectService(service.id);
+                }
+            });
+        } catch (err) {
+            console.error('Error loading services:', err);
+            badge.textContent = 'Unavailable';
+            grid.innerHTML = `<div class="col-12 text-center text-danger py-4">Unable to load services. Please refresh the page.</div>`;
+        }
+    }
+
+    function selectService(serviceId) {
+        hideAlert();
+        const found = bookingState.servicesList.find(s => s.id === serviceId);
+        if (!found) return;
+
+        // If changing service, clear previous staff selection so Step 2 re-validates
+        if (!bookingState.selectedService || bookingState.selectedService.id !== found.id) {
+            bookingState.selectedStaff = null;
+            document.getElementById('step2NextBtn').disabled = true;
+        }
+
+        bookingState.selectedService = found;
+
+        // Highlight selected card
+        document.querySelectorAll('#servicesGrid .selectable-card').forEach(card => {
+            card.classList.remove('selected');
+        });
+        const activeCard = document.getElementById(`serviceCard-${serviceId}`);
+        if (activeCard) activeCard.classList.add('selected');
+
+        document.getElementById('step1NextBtn').disabled = false;
+    }
+
+    // ==================== STEP 2: LOAD & SELECT QUALIFIED STAFF ====================
+    async function loadStaffForService(serviceId) {
+        const staffGrid = document.getElementById('staffGrid');
+        const servicePill = document.getElementById('step2ServicePill');
+        const s = bookingState.selectedService;
+
+        if (s) {
+            servicePill.innerHTML = `<i class="bi bi-sparkles me-1"></i>${s.name} ($${Number(s.price).toFixed(2)})`;
+        }
+
+        staffGrid.innerHTML = `
+            <div class="col-12 text-center py-4">
+                <div class="spinner-border text-pink" role="status"></div>
+                <p class="text-muted mt-2 mb-0">Filtering qualified technicians...</p>
+            </div>
+        `;
+
+        try {
+            const response = await fetch(`/api/nail-techs?serviceId=${encodeURIComponent(serviceId)}`);
+            const techs = response.ok ? await response.json() : [];
+            bookingState.staffList = techs;
+
+            staffGrid.innerHTML = '';
+
+            // Option 0: "Anyone Available (No Preference)" card
+            const anyoneCol = document.createElement('div');
+            anyoneCol.className = 'col-md-6';
+            anyoneCol.innerHTML = `
+                <div class="selectable-card p-3 h-100 d-flex align-items-center gap-3"
+                     id="staffCard-anyone"
+                     onclick="selectStaff('anyone')">
+                    <div class="staff-avatar" style="background: linear-gradient(135deg, #6c757d, #adb5bd);">
+                        <i class="bi bi-people-fill"></i>
+                    </div>
+                    <div class="flex-grow-1">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <h6 class="fw-bold text-dark mb-1">Anyone Available</h6>
+                            <span class="check-indicator"><i class="bi bi-check-lg"></i></span>
+                        </div>
+                        <div class="small text-muted">First available qualified technician for ${s ? s.name : 'your service'}</div>
+                    </div>
+                </div>
+            `;
+            staffGrid.appendChild(anyoneCol);
+
+            // Filtered Nail Tech Cards
+            techs.forEach(tech => {
+                const displayName = tech.name || tech.username || 'Nail Specialist';
+                const initials = displayName.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
+                const specialty = tech.specialty || 'All Nail Services';
+
+                const col = document.createElement('div');
+                col.className = 'col-md-6';
+                col.innerHTML = `
+                    <div class="selectable-card p-3 h-100 d-flex align-items-center gap-3"
+                         id="staffCard-${tech.id}"
+                         onclick="selectStaff(${tech.id})">
+                        <div class="staff-avatar">${initials}</div>
+                        <div class="flex-grow-1">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <h6 class="fw-bold text-dark mb-1">${displayName}</h6>
+                                <span class="check-indicator"><i class="bi bi-check-lg"></i></span>
+                            </div>
+                            <span class="badge bg-light text-dark border mb-1"><i class="bi bi-award text-pink me-1"></i>${specialty}</span>
+                            <div class="small text-success"><i class="bi bi-check-circle-fill me-1"></i>Qualified for ${s ? s.name : 'this service'}</div>
+                        </div>
+                    </div>
+                `;
+                staffGrid.appendChild(col);
+            });
+
+            // Restore selection if user navigated back
+            if (bookingState.selectedStaff) {
+                if (bookingState.selectedStaff.isAnyoneAvailable) {
+                    selectStaff('anyone');
+                } else {
+                    const stillPresent = techs.some(t => t.id === bookingState.selectedStaff.id);
+                    if (stillPresent) selectStaff(bookingState.selectedStaff.id);
+                }
+            }
+        } catch (err) {
+            console.error('Error loading staff:', err);
+            staffGrid.innerHTML = `<div class="col-12 text-center text-danger py-4">Unable to load nail technicians. Please try again.</div>`;
+        }
+    }
+
+    function selectStaff(staffIdentifier) {
+        hideAlert();
+        document.querySelectorAll('#staffGrid .selectable-card').forEach(card => {
+            card.classList.remove('selected');
+        });
+
+        if (staffIdentifier === 'anyone') {
+            bookingState.selectedStaff = {
+                id: null,
+                name: 'Anyone Available (No Preference)',
+                specialty: 'Matched automatically upon arrival',
+                isAnyoneAvailable: true
+            };
+            const card = document.getElementById('staffCard-anyone');
+            if (card) card.classList.add('selected');
+        } else {
+            const found = bookingState.staffList.find(t => t.id === staffIdentifier);
+            if (!found) return;
+            bookingState.selectedStaff = {
+                id: found.id,
+                name: found.name || found.username,
+                specialty: found.specialty || 'All Nail Services',
+                isAnyoneAvailable: false
+            };
+            const card = document.getElementById(`staffCard-${found.id}`);
+            if (card) card.classList.add('selected');
+        }
+
+        document.getElementById('step2NextBtn').disabled = false;
+    }
+
+    // ==================== WIZARD STEP NAVIGATION ====================
+    async function goToStep(targetStep) {
+        hideAlert();
+
+        if (targetStep === 2) {
+            if (!bookingState.selectedService) {
+                showAlert('Please select a service in Step 1 before proceeding.');
+                return;
+            }
+            await loadStaffForService(bookingState.selectedService.id);
+        }
+
+        if (targetStep === 3) {
+            if (!bookingState.selectedService) {
+                showAlert('Please select a service first.');
+                return;
+            }
+            if (!bookingState.selectedStaff) {
+                showAlert('Please select a nail technician in Step 2 before proceeding.');
+                return;
+            }
+            populateStep3Summary();
+        }
+
+        bookingState.currentStep = targetStep;
+        updateWizardUI(targetStep);
+    }
+
+    function updateWizardUI(step) {
+        document.getElementById('step1Panel').classList.toggle('d-none', step !== 1);
+        document.getElementById('step2Panel').classList.toggle('d-none', step !== 2);
+        document.getElementById('step3Panel').classList.toggle('d-none', step !== 3);
+        document.getElementById('confirmationPanel').classList.add('d-none');
+        document.getElementById('wizardStepper').classList.remove('d-none');
+
+        for (let i = 1; i <= 3; i++) {
+            const indicator = document.getElementById(`stepIndicator${i}`);
+            const circle = document.getElementById(`stepCircle${i}`);
+            indicator.classList.remove('active', 'completed');
+
+            if (i < step) {
+                indicator.classList.add('completed');
+                circle.innerHTML = '<i class="bi bi-check-lg"></i>';
+            } else if (i === step) {
+                indicator.classList.add('active');
+                circle.textContent = i;
+            } else {
+                circle.textContent = i;
+            }
+        }
+    }
+
+    function populateStep3Summary() {
+        const s = bookingState.selectedService;
+        const t = bookingState.selectedStaff;
+
+        document.getElementById('summaryServiceName').textContent = s ? s.name : '—';
+        document.getElementById('summaryServiceMeta').textContent = s
+            ? `$${Number(s.price).toFixed(2)} • ${s.durationMinutes || 60} mins`
+            : '—';
+
+        document.getElementById('summaryStaffName').textContent = t ? t.name : '—';
+        document.getElementById('summaryStaffSpecialty').textContent = t ? t.specialty : '—';
+    }
+
+    // ==================== STEP 3: SUBMIT BOOKING ====================
     document.getElementById('bookingForm').addEventListener('submit', async (e) => {
         e.preventDefault();
+        hideAlert();
 
-        const selectedTechId = document.getElementById('nailTechSelect').value;
+        const customerName = document.getElementById('customerName').value.trim();
+        const customerPhone = document.getElementById('customerPhone').value.trim();
+        const customerEmail = document.getElementById('customerEmail').value.trim();
         const selectedDate = document.getElementById('appointmentDate').value;
         const selectedTime = document.getElementById('appointmentTimeSlot').value;
+        const notes = document.getElementById('appointmentNotes').value.trim();
 
-        if (!selectedDate || !selectedTime) {
-            alert('Please select both an appointment date and a 15-minute time slot between 10:00 AM and 7:00 PM.');
+        if (!customerName || !customerPhone || !customerEmail) {
+            showAlert('Please fill in your Full Name, Phone Number, and Email Address.');
             return;
         }
 
-        const bookingData = {
-            customerName: document.getElementById('customerName').value,
-            customerPhone: document.getElementById('customerPhone').value,
-            customerEmail: document.getElementById('customerEmail').value,
-            service: { id: parseInt(document.getElementById('serviceSelect').value) },
-            nailTech: selectedTechId ? { id: parseInt(selectedTechId) } : null,
+        if (!selectedDate || !selectedTime) {
+            showAlert('Please select both an Appointment Date and a 15-minute Time Slot (10:00 AM – 7:00 PM).');
+            return;
+        }
+
+        const submitBtn = document.getElementById('confirmSubmitBtn');
+        const originalBtnHtml = submitBtn.innerHTML;
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Submitting...`;
+
+        const bookingPayload = {
+            customerName: customerName,
+            customerPhone: customerPhone,
+            customerEmail: customerEmail,
+            notes: notes,
+            service: { id: bookingState.selectedService.id },
+            nailTech: (bookingState.selectedStaff && bookingState.selectedStaff.id)
+                ? { id: bookingState.selectedStaff.id }
+                : null,
             appointmentTime: `${selectedDate}T${selectedTime}`
         };
 
@@ -320,25 +815,94 @@
         }
 
         try {
-            const response = await fetch('/api/appointments', {
+            const response = await fetch('/api/bookings', {
                 method: 'POST',
                 headers: headers,
-                body: JSON.stringify(bookingData)
+                body: JSON.stringify(bookingPayload)
             });
 
             if (response.ok) {
-                document.getElementById('bookingForm').reset();
-                document.getElementById('successMessage').classList.remove('d-none');
+                const savedBooking = await response.json();
                 localStorage.removeItem('selectedDesign');
+                showConfirmationScreen(bookingPayload, savedBooking);
             } else {
-                const errText = await response.text();
-                alert('Failed to book appointment: ' + (errText || 'Please try again.'));
+                let errorMsg = 'Unable to complete booking. Please verify your details and try again.';
+                try {
+                    const errJson = await response.json();
+                    if (errJson && errJson.message) errorMsg = errJson.message;
+                } catch (_) {
+                    const errText = await response.text();
+                    if (errText) errorMsg = errText;
+                }
+                showAlert(errorMsg);
             }
         } catch (err) {
             console.error('Error submitting booking:', err);
-            alert('An error occurred while connecting to the server.');
+            showAlert('A network error occurred while connecting to the server. Please try again.');
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalBtnHtml;
         }
     });
+
+    function showConfirmationScreen(payload, savedBooking) {
+        document.getElementById('step1Panel').classList.add('d-none');
+        document.getElementById('step2Panel').classList.add('d-none');
+        document.getElementById('step3Panel').classList.add('d-none');
+        document.getElementById('wizardStepper').classList.add('d-none');
+
+        const confirmPanel = document.getElementById('confirmationPanel');
+        const receipt = document.getElementById('confirmationReceipt');
+
+        const dt = new Date(payload.appointmentTime);
+        const formattedDate = isNaN(dt.getTime())
+            ? payload.appointmentTime
+            : dt.toLocaleString([], { dateStyle: 'full', timeStyle: 'short' });
+
+        receipt.innerHTML = `
+            <div class="d-flex justify-content-between border-bottom pb-2 mb-2">
+                <span class="text-muted">Booking Reference</span>
+                <span class="fw-bold text-dark">#${savedBooking.id || 'NEW'}</span>
+            </div>
+            <div class="d-flex justify-content-between border-bottom pb-2 mb-2">
+                <span class="text-muted">Service</span>
+                <span class="fw-bold text-pink">${bookingState.selectedService.name} ($${Number(bookingState.selectedService.price).toFixed(2)})</span>
+            </div>
+            <div class="d-flex justify-content-between border-bottom pb-2 mb-2">
+                <span class="text-muted">Nail Technician</span>
+                <span class="fw-semibold text-dark">${bookingState.selectedStaff.name}</span>
+            </div>
+            <div class="d-flex justify-content-between border-bottom pb-2 mb-2">
+                <span class="text-muted">Date & Time</span>
+                <span class="fw-semibold text-dark">${formattedDate}</span>
+            </div>
+            <div class="d-flex justify-content-between border-bottom pb-2 mb-2">
+                <span class="text-muted">Customer</span>
+                <span class="fw-semibold text-dark">${payload.customerName} (${payload.customerPhone})</span>
+            </div>
+            ${payload.notes ? `
+            <div class="pt-1">
+                <span class="text-muted d-block small">Notes</span>
+                <span class="text-dark small">${payload.notes}</span>
+            </div>` : ''}
+        `;
+
+        confirmPanel.classList.remove('d-none');
+    }
+
+    function resetWizard() {
+        bookingState.currentStep = 1;
+        bookingState.selectedService = null;
+        bookingState.selectedStaff = null;
+
+        document.querySelectorAll('#servicesGrid .selectable-card').forEach(c => c.classList.remove('selected'));
+        document.getElementById('step1NextBtn').disabled = true;
+        document.getElementById('step2NextBtn').disabled = true;
+        document.getElementById('appointmentTimeSlot').value = '';
+        document.getElementById('appointmentNotes').value = '';
+
+        updateWizardUI(1);
+    }
 
     function handleLogout() {
         localStorage.removeItem('accessToken');

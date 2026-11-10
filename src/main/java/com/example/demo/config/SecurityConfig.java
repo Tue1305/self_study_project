@@ -87,6 +87,8 @@ public class SecurityConfig {
                                 "/services.html",
                                 "/api/appointments",
                                 "/api/appointments/**",
+                                "/api/bookings",
+                                "/api/bookings/**",
                                 "/favicon.ico",
                                 "/*.css",
                                 "/*.js",

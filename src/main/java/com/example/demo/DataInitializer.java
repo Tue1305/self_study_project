@@ -63,28 +63,128 @@ public class DataInitializer implements CommandLineRunner {
             UserEntity tech1 = new UserEntity("jenny@jennysnailstudio.com", passwordEncoder.encode("defaultPassword123"), "ROLE_NAIL_TECH");
             tech1.setName("Jenny Tran");
             tech1.setEmail("jenny@jennysnailstudio.com");
-            tech1.setSpecialty("Gel Manicure, Nail Art Add-On, Custom Art");
+            tech1.setSpecialty("Manicures, Nail Enhancement, Custom Art");
 
             UserEntity tech2 = new UserEntity("sophia@jennysnailstudio.com", passwordEncoder.encode("defaultPassword123"), "ROLE_NAIL_TECH");
             tech2.setName("Sophia Nguyen");
             tech2.setEmail("sophia@jennysnailstudio.com");
-            tech2.setSpecialty("Acrylic Full Set, Gel Manicure, Sculpting");
+            tech2.setSpecialty("Pedicures, Waxing, Bio Sculpture Gel");
 
             UserEntity tech3 = new UserEntity("chloe@jennysnailstudio.com", passwordEncoder.encode("defaultPassword123"), "ROLE_NAIL_TECH");
             tech3.setName("Chloe Kim");
             tech3.setEmail("chloe@jennysnailstudio.com");
-            tech3.setSpecialty("Pedicure Deluxe, Gel Manicure, Spa Care");
+            tech3.setSpecialty("Facials, Body Massage, Kid Services, Gift Packages");
 
             userRepository.saveAll(List.of(tech1, tech2, tech3));
             System.out.println("✅ Sample nail technicians seeded into the database!");
         }
 
-        if (serviceRepository.count() == 0) {
-            serviceRepository.save(new ServiceEntity("Gel Manicure", "Long-lasting gel polish with cuticle care and hand massage.", new BigDecimal("45.00"), 45));
-            serviceRepository.save(new ServiceEntity("Acrylic Full Set", "Full set of custom length acrylic extensions with choice of shape.", new BigDecimal("65.00"), 75));
-            serviceRepository.save(new ServiceEntity("Pedicure Deluxe", "Soak, scrub, nail shaping, mask, and regular polish.", new BigDecimal("55.00"), 60));
-            serviceRepository.save(new ServiceEntity("Nail Art Add-On", "Custom hand-painted designs, foils, or charms per nail.", new BigDecimal("15.00"), 20));
-            System.out.println("✅ Sample nail services seeded into the database!");
+        // Seed full salon services menu into database if count < 10
+        if (serviceRepository.count() < 10) {
+            List<ServiceEntity> menuServices = List.of(
+                    // Manicures
+                    new ServiceEntity("Express Manicure", "Warm hand soak, nail trim, shape, buff, cuticle clean, polish application.", new BigDecimal("23.00"), 25),
+                    new ServiceEntity("Express Manicure with Shellac", "Express manicure with long-lasting Shellac polish. ($5 extra for removal)", new BigDecimal("38.00"), 35),
+                    new ServiceEntity("Essential Manicure", "Warm hand soak, trim, shape, buff, cuticle clean, sugar scrub hand massage, polish.", new BigDecimal("28.00"), 30),
+                    new ServiceEntity("Essential Manicure with Shellac", "Essential manicure with sugar scrub hand massage and Shellac. ($5 extra for removal)", new BigDecimal("43.00"), 40),
+                    new ServiceEntity("Deluxe Manicure", "Warm hand soak, trim, buff, cuticle clean, sugar scrub, paraffin, hand massage, polish.", new BigDecimal("38.00"), 40),
+                    new ServiceEntity("Deluxe Manicure with Shellac", "Deluxe manicure with warm paraffin treatment, massage, and Shellac polish.", new BigDecimal("53.00"), 50),
+
+                    // Pedicures & Combos
+                    new ServiceEntity("Express Pedicure", "Warm spa soak, nail trim, shape, buff, cuticle clean, heels rub, polish.", new BigDecimal("34.00"), 25),
+                    new ServiceEntity("Express Pedicure with Shellac", "Express pedicure with Shellac gel application.", new BigDecimal("49.00"), 35),
+                    new ServiceEntity("Essential Pedicure", "Warm spa soak, trim, buff, cuticle clean, heels rub, callus remove, sugar scrub, foot massage.", new BigDecimal("40.00"), 40),
+                    new ServiceEntity("Essential Pedicure with Shellac", "Essential pedicure with callus removal, scrub, foot massage & Shellac polish.", new BigDecimal("55.00"), 50),
+                    new ServiceEntity("Deluxe Pedicure", "Warm spa soak, trim & shape, buff, heels rub, callus remove, sugar scrub, paraffin, feet massage.", new BigDecimal("52.00"), 50),
+                    new ServiceEntity("Deluxe Pedicure with Shellac", "Deluxe spa pedicure with warm paraffin wrap, foot massage, and Shellac polish.", new BigDecimal("67.00"), 60),
+                    new ServiceEntity("Express Pedicure-Manicure Combo", "Complete express manicure and express pedicure combo.", new BigDecimal("52.00"), 50),
+                    new ServiceEntity("Essential Pedicure-Manicure Combo", "Essential manicure and pedicure combo with scrub and massage.", new BigDecimal("63.00"), 70),
+                    new ServiceEntity("Deluxe Pedicure-Manicure Combo", "Full luxury deluxe manicure and pedicure combo with paraffin treatment.", new BigDecimal("85.00"), 90),
+                    new ServiceEntity("Shellac Add-On for Hands or Feet to Any Combo", "Shellac upgrade addition for hands or feet to any combination service.", new BigDecimal("15.00"), 15),
+
+                    // Kid Services
+                    new ServiceEntity("Kids Hands & Toes Polish", "Fun polish application on little hands and toes (10 & under).", new BigDecimal("20.00"), 20),
+                    new ServiceEntity("Kids Manicure", "Gentle hand soak, light shaping, massage, and polish (10 & under).", new BigDecimal("18.00"), 20),
+                    new ServiceEntity("Kids Pedicure", "Gentle foot soak, light nail trim/shape, lotion, and polish (10 & under).", new BigDecimal("25.00"), 25),
+                    new ServiceEntity("Kids Pedicure-Manicure Combo", "Full pampering mani-pedi duo for kids 10 and under.", new BigDecimal("40.00"), 40),
+
+                    // Nail Enhancement & Art
+                    new ServiceEntity("Shellac Polish Change", "Shape, buff, and Shellac application. ($5 extra for removal)", new BigDecimal("27.00"), 25),
+                    new ServiceEntity("Bio Sculpture Gel New Set (with Plastic Tips Extension)", "Healthy Bio Sculpture Gel full set with plastic tips extension.", new BigDecimal("65.00"), 75),
+                    new ServiceEntity("Bio Sculpture Gel New Set (with Sculpting Extension)", "Custom hand-sculpted Bio Sculpture Gel extensions.", new BigDecimal("80.00"), 90),
+                    new ServiceEntity("Bio Sculpture Gel New Set (No Extension)", "Bio Sculpture Gel overlay on natural nails.", new BigDecimal("50.00"), 60),
+                    new ServiceEntity("Bio Sculpture Gel Refill", "Refill maintenance for Bio Sculpture Gel sets.", new BigDecimal("50.00"), 60),
+                    new ServiceEntity("Gel Powder New Set (with Shellac Color)", "Full set gel powder extensions with choice of vibrant Shellac color.", new BigDecimal("65.00"), 75),
+                    new ServiceEntity("Gel Powder Refill (with Shellac Color)", "Refill for gel powder with new Shellac color.", new BigDecimal("50.00"), 60),
+                    new ServiceEntity("Dipping Powder New Set with Extension", "Dipping powder full set with extension tips.", new BigDecimal("65.00"), 75),
+                    new ServiceEntity("Dipping Powder New Set with No Extension", "Dipping powder overlay on natural nails.", new BigDecimal("50.00"), 50),
+                    new ServiceEntity("Nail Polish Change for Hands", "Quick reshape and fresh regular polish application on hands.", new BigDecimal("14.00"), 15),
+                    new ServiceEntity("Nail Polish Change for Feet", "Quick reshape and fresh regular polish application on toes.", new BigDecimal("18.00"), 15),
+                    new ServiceEntity("Nail Art Design", "Custom hand-painted designs, accents, or gems.", new BigDecimal("5.00"), 20),
+                    new ServiceEntity("Hand Paint French Tip Add-On", "Classic or custom hand-painted crisp French tips.", new BigDecimal("10.00"), 15),
+                    new ServiceEntity("Ombre Airbrush French Tip Add-On", "Smooth gradient airbrushed French ombre effect.", new BigDecimal("15.00"), 20),
+                    new ServiceEntity("Chrome Finish Add-On", "Mirror chrome, glazed donut, or iridescent metallic powder overlay.", new BigDecimal("10.00"), 15),
+                    new ServiceEntity("Nail Cut for Hands", "Hand nail trim, reshape, and clean.", new BigDecimal("8.00"), 10),
+                    new ServiceEntity("Nail Cut for Toes", "Toe nail trim and edge filing.", new BigDecimal("12.00"), 15),
+                    new ServiceEntity("Nail Repair", "Individual nail fix for broken, cracked, or split nails.", new BigDecimal("10.00"), 15),
+                    new ServiceEntity("Cuticle Trim", "Gentle cuticle softening, pushback, and precise clean-up.", new BigDecimal("12.00"), 15),
+                    new ServiceEntity("Paraffin Treatment (Hands/Feet)", "Warm soothing paraffin wax bath for hands ($12) or feet ($14).", new BigDecimal("14.00"), 15),
+                    new ServiceEntity("Shellac Removal Take Off", "Gentle, non-damaging Shellac polish removal.", new BigDecimal("15.00"), 15),
+                    new ServiceEntity("Bio Gel Take Off", "Safe soak-off and clean removal of Bio Sculpture Gel.", new BigDecimal("20.00"), 20),
+                    new ServiceEntity("Acrylic / Dipping Powder Take Off", "Complete removal of acrylic or dipping powder extensions.", new BigDecimal("25.00"), 25),
+
+                    // Body Massage
+                    new ServiceEntity("Hot Stone Therapy Massage", "Basalt hot stones placed along tension points to melt muscle fatigue.", new BigDecimal("110.00"), 75),
+                    new ServiceEntity("Professional Relaxing Massage (Non RMT) Full Body", "Full body restorative relaxation massage.", new BigDecimal("90.00"), 60),
+                    new ServiceEntity("Hand / Foot / Shoulder Massage (10 mins)", "Targeted express massage for hands, feet, or shoulders.", new BigDecimal("17.00"), 10),
+                    new ServiceEntity("Hand / Foot / Shoulder Massage (15 mins)", "Invigorating 15-minute tension relief massage.", new BigDecimal("25.00"), 15),
+                    new ServiceEntity("Hand / Foot / Shoulder Massage (1/2 hour)", "Deep therapeutic 30-minute focus on hands, feet, or shoulders.", new BigDecimal("45.00"), 30),
+
+                    // Waxing & Combos
+                    new ServiceEntity("Eyebrows Waxing", "Precise brow shaping and waxing.", new BigDecimal("14.00"), 15),
+                    new ServiceEntity("Upper Lip Waxing", "Gentle upper lip hair removal.", new BigDecimal("8.00"), 10),
+                    new ServiceEntity("Chin Waxing", "Quick chin waxing.", new BigDecimal("8.00"), 10),
+                    new ServiceEntity("Side Burns Waxing", "Clean sideburn line definition.", new BigDecimal("12.00"), 10),
+                    new ServiceEntity("Ears Waxing", "Ear hair removal.", new BigDecimal("12.00"), 10),
+                    new ServiceEntity("Jaw Line Waxing", "Jaw line hair removal.", new BigDecimal("12.00"), 10),
+                    new ServiceEntity("Neck Waxing", "Smooth neck wax.", new BigDecimal("15.00"), 15),
+                    new ServiceEntity("Full Face Waxing", "Complete full face waxing including brows, lip, chin, and cheeks.", new BigDecimal("35.00"), 30),
+                    new ServiceEntity("Underarms Waxing", "Quick and gentle underarm waxing.", new BigDecimal("15.00"), 15),
+                    new ServiceEntity("Shoulders Waxing", "Shoulder hair removal.", new BigDecimal("20.00"), 15),
+                    new ServiceEntity("Chest Waxing", "Smooth chest waxing.", new BigDecimal("30.00"), 20),
+                    new ServiceEntity("Stomach Waxing", "Stomach hair removal.", new BigDecimal("15.00"), 15),
+                    new ServiceEntity("Full Back Waxing", "Complete upper and lower back waxing.", new BigDecimal("45.00"), 30),
+                    new ServiceEntity("Half Arms Waxing", "Forearm or upper arm wax.", new BigDecimal("20.00"), 20),
+                    new ServiceEntity("Full Arms Waxing", "Entire arm hair removal.", new BigDecimal("30.00"), 30),
+                    new ServiceEntity("Half Legs Waxing", "Lower or upper legs wax.", new BigDecimal("30.00"), 25),
+                    new ServiceEntity("Full Legs Waxing", "Complete leg waxing.", new BigDecimal("45.00"), 40),
+                    new ServiceEntity("Bikini Lines Waxing", "Clean bikini line tidy-up.", new BigDecimal("25.00"), 20),
+                    new ServiceEntity("Brazilian Waxing", "Complete Brazilian waxing.", new BigDecimal("35.00"), 30),
+                    new ServiceEntity("Toes Waxing", "Toe hair removal.", new BigDecimal("10.00"), 10),
+                    new ServiceEntity("Knuckles Waxing", "Finger knuckles waxing.", new BigDecimal("10.00"), 10),
+                    new ServiceEntity("Half Legs & Bikini Lines Combo", "Half legs wax paired with bikini line.", new BigDecimal("50.00"), 35),
+                    new ServiceEntity("Full Legs & Bikini Lines Combo", "Full legs waxing paired with bikini line.", new BigDecimal("65.00"), 45),
+                    new ServiceEntity("Half Legs & Brazilian Combo", "Half legs waxing paired with Brazilian.", new BigDecimal("60.00"), 45),
+                    new ServiceEntity("Full Legs & Brazilian Combo", "Full legs waxing paired with full Brazilian.", new BigDecimal("75.00"), 55),
+                    new ServiceEntity("Full Body Wax", "All-inclusive full body smooth waxing service.", new BigDecimal("160.00"), 90),
+
+                    // Facials (Babor®)
+                    new ServiceEntity("Express Facial", "Fast refreshing cleansing, gentle exfoliation, and replenishing hydration (Approx. 40 mins).", new BigDecimal("85.00"), 40),
+                    new ServiceEntity("Hydra & Plump Facial", "Repairs moisture deficits in the skin, leaving skin thoroughly hydrated, plump and smooth.", new BigDecimal("110.00"), 60),
+                    new ServiceEntity("Calm & Soothe Facial", "Designed for extremely dry sensitive skin, rosacea and dermatitis.", new BigDecimal("110.00"), 60),
+                    new ServiceEntity("Collagen Infusion Facial", "Plump and densify skin with collagen boosting therapy & hyaluronic acid.", new BigDecimal("130.00"), 75),
+
+                    // Specialty Services
+                    new ServiceEntity("Eyelash Tinting", "Semi-permanent lash tinting for rich lashes.", new BigDecimal("17.00"), 20),
+                    new ServiceEntity("Eyebrow Tinting", "Custom tinted eyebrows to naturally define and frame your eyes.", new BigDecimal("17.00"), 15),
+
+                    // Gift Packages
+                    new ServiceEntity("Rejuvenation for Him/Her", "Hydra & Plump Facial & Essential Manicure-Pedicure (Approx. 2.5 hrs).", new BigDecimal("165.00"), 150),
+                    new ServiceEntity("Executive for Him/Her", "Essential Manicure-Pedicure & 60 Minutes Relaxing Body Massage (Approx. 2.5 hrs).", new BigDecimal("147.00"), 150)
+            );
+
+            serviceRepository.saveAll(menuServices);
+            System.out.println("✅ Full salon services menu seeded into database!");
         }
 
         if (showcaseRepository.count() == 0) {

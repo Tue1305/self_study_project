@@ -554,7 +554,9 @@
                 `;
                 grid.appendChild(col);
 
-                if (selectedDesign && service.name.toLowerCase().includes(selectedDesign.toLowerCase())) {
+                if (selectedDesign && service.name.toLowerCase().trim() === selectedDesign.toLowerCase().trim()) {
+                    selectService(service.id);
+                } else if (selectedDesign && !bookingState.selectedService && service.name.toLowerCase().includes(selectedDesign.toLowerCase())) {
                     selectService(service.id);
                 }
             });

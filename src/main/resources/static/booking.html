@@ -14,7 +14,12 @@
         :root {
             --bs-primary-pink: #e91e63;
             --bs-primary-pink-hover: #d81b60;
+            --bs-secondary-accent: #343a40;
             --bs-soft-pink: #fce4ec;
+            --tenant-font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        }
+        body {
+            font-family: var(--tenant-font-family);
         }
         .text-pink { color: var(--bs-primary-pink) !important; }
         .bg-pink { background-color: var(--bs-primary-pink) !important; }
@@ -215,7 +220,7 @@
             width: 50px;
             height: 50px;
             border-radius: 50%;
-            background: linear-gradient(135deg, #e91e63, #ff80ab);
+            background: linear-gradient(135deg, var(--bs-primary-pink), var(--bs-primary-pink-hover));
             color: #fff;
             display: inline-flex;
             align-items: center;
@@ -227,12 +232,12 @@
 
         /* Standout Booking Nav Button */
         .nav-btn-book {
-            background: linear-gradient(135deg, #e91e63, #ff4081) !important;
+            background: linear-gradient(135deg, var(--bs-primary-pink), var(--bs-primary-pink-hover)) !important;
             color: #ffffff !important;
             font-weight: 700 !important;
             padding: 0.5rem 1.35rem !important;
             border-radius: 50rem !important;
-            box-shadow: 0 4px 14px rgba(233, 30, 99, 0.35) !important;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.16) !important;
             transition: all 0.25s ease-in-out !important;
             border: none !important;
             display: inline-flex !important;
@@ -242,8 +247,33 @@
         }
         .nav-btn-book:hover {
             transform: translateY(-2px) scale(1.03) !important;
-            box-shadow: 0 6px 20px rgba(233, 30, 99, 0.45) !important;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.22) !important;
             color: #ffffff !important;
+        }
+
+        /* Tenant Branding & Layout Variants */
+        .tenant-logo-img {
+            max-height: 40px;
+            max-width: 140px;
+            object-fit: contain;
+        }
+        .tenant-banner-wrapper {
+            width: 100%;
+            max-height: 200px;
+            overflow: hidden;
+            border-radius: 1rem 1rem 0 0;
+        }
+        .tenant-banner-wrapper img {
+            width: 100%;
+            height: 180px;
+            object-fit: cover;
+            display: block;
+        }
+        .layout-luxe .wizard-card {
+            border-top: 5px solid var(--bs-primary-pink) !important;
+        }
+        .layout-compact .wizard-card-body {
+            padding: 1.75rem !important;
         }
 
         /* Floating Next Button Bar in Step 1 */
@@ -257,7 +287,7 @@
             backdrop-filter: blur(8px);
             padding: 0.85rem 1.75rem;
             border-radius: 50rem;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(233, 30, 99, 0.2);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18), 0 0 0 1px var(--bs-primary-pink);
             transition: transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.35s ease;
             opacity: 0;
             pointer-events: none;
@@ -272,13 +302,13 @@
             pointer-events: auto;
         }
         .floating-btn-glow {
-            background: linear-gradient(135deg, #e91e63, #ff4081) !important;
-            box-shadow: 0 4px 15px rgba(233, 30, 99, 0.4) !important;
+            background: linear-gradient(135deg, var(--bs-primary-pink), var(--bs-primary-pink-hover)) !important;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.22) !important;
             transition: all 0.2s ease !important;
         }
         .floating-btn-glow:hover {
             transform: scale(1.04);
-            box-shadow: 0 6px 20px rgba(233, 30, 99, 0.5) !important;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.28) !important;
         }
     </style>
 </head>
@@ -288,7 +318,10 @@
 <header class="navbar navbar-expand-lg bg-white shadow-sm sticky-top px-3 px-lg-4">
     <div class="container-fluid">
         <div class="d-flex align-items-center gap-3">
-            <a href="index.html" class="navbar-brand fw-bold text-pink fs-4 mb-0">Jenny's Nail Studio</a>
+            <a href="index.html" class="navbar-brand fw-bold text-pink fs-4 mb-0 d-inline-flex align-items-center gap-2" id="salonBrandLink">
+                <img id="tenantLogoImg" src="" alt="Salon Logo" class="tenant-logo-img d-none">
+                <span id="salonBrandName">Jenny's Nail Studio</span>
+            </a>
             <a href="profile.html"
                id="userBadge"
                class="badge bg-danger-subtle text-pink border border-danger-subtle rounded-pill px-3 py-2 fs-6 d-none align-items-center gap-1 user-badge-link"
@@ -310,29 +343,19 @@
     </div>
 </header>
 
-<main class="container my-5 flex-grow-1">
+<main class="container my-5 flex-grow-1" id="wizardMainContainer">
     <div class="row justify-content-center">
         <div class="col-lg-10 col-xl-9">
-            <div class="card shadow-sm border-0 rounded-4">
-                <div class="card-body p-4 p-md-5">
+            <div class="card shadow-sm border-0 rounded-4 wizard-card">
+                <div id="tenantBannerBox" class="tenant-banner-wrapper d-none">
+                    <img id="tenantBannerImg" src="" alt="Salon Banner">
+                </div>
+                <div class="card-body p-4 p-md-5 wizard-card-body">
                     <h2 class="text-center text-pink mb-1 fw-bold">Book Your Appointment</h2>
-                    <p class="text-center text-muted mb-4" id="selectedDesignBanner">Complete the 3 easy steps below to reserve your visit</p>
+                    <p class="text-center text-muted mb-4" id="selectedDesignBanner">Complete the steps below to reserve your visit</p>
 
-                    <!-- Multi-Step Progress Indicator -->
-                    <div class="wizard-stepper" id="wizardStepper">
-                        <div class="wizard-step active" id="stepIndicator1">
-                            <span class="step-circle" id="stepCircle1">1</span>
-                            <span class="step-label">1. Select Service</span>
-                        </div>
-                        <div class="wizard-step" id="stepIndicator2">
-                            <span class="step-circle" id="stepCircle2">2</span>
-                            <span class="step-label">2. Select Staff</span>
-                        </div>
-                        <div class="wizard-step" id="stepIndicator3">
-                            <span class="step-circle" id="stepCircle3">3</span>
-                            <span class="step-label">3. Details & Confirm</span>
-                        </div>
-                    </div>
+                    <!-- Multi-Step Progress Indicator (Rendered dynamically from tenantConfig.wizard.stepOrder) -->
+                    <div class="wizard-stepper" id="wizardStepper"></div>
 
                     <!-- Global Alert Box for Validation or Errors -->
                     <div id="wizardAlert" class="alert alert-danger d-none align-items-center" role="alert">
@@ -359,8 +382,8 @@
 
                         <!-- Regular Inline Next Button at bottom of Step 1 -->
                         <div class="d-flex justify-content-end">
-                            <button type="button" class="btn btn-pink px-4 py-2 fw-semibold rounded-3" id="step1NextBtn" onclick="goToStep(2)" disabled>
-                                Next: Select Staff <i class="bi bi-arrow-right ms-1"></i>
+                            <button type="button" class="btn btn-pink px-4 py-2 fw-semibold rounded-3" id="step1NextBtn" onclick="goNextStep()" disabled>
+                                <span id="step1NextLabel">Next: Select Staff</span> <i class="bi bi-arrow-right ms-1"></i>
                             </button>
                         </div>
 
@@ -375,8 +398,8 @@
                                     <div class="text-pink small fw-semibold" id="floatingServicePrice">—</div>
                                 </div>
                             </div>
-                            <button type="button" class="btn btn-pink rounded-pill px-4 py-2 fw-bold floating-btn-glow d-flex align-items-center gap-2" onclick="goToStep(2)">
-                                <span>Select Staff</span>
+                            <button type="button" class="btn btn-pink rounded-pill px-4 py-2 fw-bold floating-btn-glow d-flex align-items-center gap-2" onclick="goNextStep()">
+                                <span id="floatingNextLabel">Select Staff</span>
                                 <i class="bi bi-arrow-right"></i>
                             </button>
                         </div>
@@ -386,7 +409,7 @@
                     <section id="step2Panel" class="d-none">
                         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
                             <div>
-                                <h5 class="fw-bold mb-1"><i class="bi bi-person-badge text-pink me-2"></i>Step 2: Choose Your Technician</h5>
+                                <h5 class="fw-bold mb-1"><i class="bi bi-person-badge text-pink me-2"></i><span id="stepStaffTitle">Choose Your Technician</span></h5>
                                 <small class="text-muted">Select an available technician for your appointment</small>
                             </div>
                             <span class="badge bg-danger-subtle text-pink border border-danger-subtle px-3 py-2" id="step2ServicePill"></span>
@@ -397,31 +420,58 @@
                         </div>
 
                         <div class="d-flex justify-content-between">
-                            <button type="button" class="btn btn-outline-secondary px-4 py-2 fw-semibold rounded-3" onclick="goToStep(1)">
-                                <i class="bi bi-arrow-left me-1"></i> Back to Services
+                            <button type="button" class="btn btn-outline-secondary px-4 py-2 fw-semibold rounded-3" onclick="goPrevStep()">
+                                <i class="bi bi-arrow-left me-1"></i> <span id="step2BackLabel">Back</span>
                             </button>
-                            <button type="button" class="btn btn-pink px-4 py-2 fw-semibold rounded-3" id="step2NextBtn" onclick="goToStep(3)" disabled>
-                                Next: Your Information <i class="bi bi-arrow-right ms-1"></i>
+                            <button type="button" class="btn btn-pink px-4 py-2 fw-semibold rounded-3" id="step2NextBtn" onclick="goNextStep()" disabled>
+                                <span id="step2NextLabel">Next</span> <i class="bi bi-arrow-right ms-1"></i>
                             </button>
                         </div>
                     </section>
 
-                    <!-- ==================== STEP 3: CUSTOMER INFO & CONFIRMATION ==================== -->
+                    <!-- ==================== OPTIONAL STEP: STATION / ROOM SELECTION ==================== -->
+                    <section id="stepStationPanel" class="d-none">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                            <div>
+                                <h5 class="fw-bold mb-1"><i class="bi bi-door-open text-pink me-2"></i><span id="stepStationTitle">Choose Station / Room</span></h5>
+                                <small class="text-muted">Select a seating station or private treatment room (when enabled by salon)</small>
+                            </div>
+                        </div>
+
+                        <div id="stationGrid" class="row g-3 mb-4">
+                            <!-- Injected dynamically from tenantConfig.wizard.availableStations -->
+                        </div>
+
+                        <div class="d-flex justify-content-between">
+                            <button type="button" class="btn btn-outline-secondary px-4 py-2 fw-semibold rounded-3" onclick="goPrevStep()">
+                                <i class="bi bi-arrow-left me-1"></i> Back
+                            </button>
+                            <button type="button" class="btn btn-pink px-4 py-2 fw-semibold rounded-3" id="stepStationNextBtn" onclick="goNextStep()">
+                                <span id="stepStationNextLabel">Next: Your Information</span> <i class="bi bi-arrow-right ms-1"></i>
+                            </button>
+                        </div>
+                    </section>
+
+                    <!-- ==================== FINAL STEP: CUSTOMER INFO & CONFIRMATION ==================== -->
                     <section id="step3Panel" class="d-none">
-                        <h5 class="fw-bold mb-3"><i class="bi bi-clipboard2-check text-pink me-2"></i>Step 3: Customer Information & Confirmation</h5>
+                        <h5 class="fw-bold mb-3"><i class="bi bi-clipboard2-check text-pink me-2"></i><span id="stepDetailsTitle">Customer Information & Confirmation</span></h5>
 
                         <!-- Booking Summary Card -->
                         <div class="card bg-light border-0 rounded-3 mb-4">
                             <div class="card-body py-3 px-4">
                                 <div class="row g-2 align-items-center">
-                                    <div class="col-md-6">
+                                    <div class="col-md-5">
                                         <div class="small text-muted">Selected Service</div>
                                         <div class="fw-bold text-dark" id="summaryServiceName">—</div>
                                         <div class="small text-pink fw-semibold" id="summaryServiceMeta">—</div>
                                     </div>
-                                    <div class="col-md-6 border-start-md">
+                                    <div class="col-md-4 border-start-md">
                                         <div class="small text-muted">Selected Technician</div>
                                         <div class="fw-bold text-dark" id="summaryStaffName">—</div>
+                                    </div>
+                                    <div class="col-md-3 border-start-md d-none" id="summaryStationBox">
+                                        <div class="small text-muted">Station / Room</div>
+                                        <div class="fw-bold text-dark" id="summaryStationName">—</div>
                                     </div>
                                 </div>
                             </div>
@@ -460,14 +510,14 @@
                                 </div>
                             </div>
 
-                            <div class="mb-4">
+                            <div class="mb-4" id="appointmentNotesWrapper">
                                 <label for="appointmentNotes" class="form-label fw-semibold">Appointment Notes / Special Requests <span class="text-muted fw-normal">(Optional)</span></label>
                                 <textarea class="form-control" id="appointmentNotes" rows="3" placeholder="e.g., Nail shape preference, design reference, or allergies..."></textarea>
                             </div>
 
                             <div class="d-flex justify-content-between align-items-center pt-2">
-                                <button type="button" class="btn btn-outline-secondary px-4 py-2 fw-semibold rounded-3" onclick="goToStep(2)">
-                                    <i class="bi bi-arrow-left me-1"></i> Back to Staff
+                                <button type="button" class="btn btn-outline-secondary px-4 py-2 fw-semibold rounded-3" onclick="goPrevStep()">
+                                    <i class="bi bi-arrow-left me-1"></i> Back
                                 </button>
                                 <button type="submit" class="btn btn-pink px-5 py-2 btn-lg rounded-3 fw-bold" id="confirmSubmitBtn">
                                     <i class="bi bi-calendar2-check me-1"></i> Confirm Booking
@@ -484,7 +534,7 @@
                             </span>
                         </div>
                         <h3 class="fw-bold text-dark mb-2">Appointment Confirmed!</h3>
-                        <p class="text-muted mb-4">Thank you for booking with Jenny's Nail Studio. Here is your reservation summary:</p>
+                        <p class="text-muted mb-4" id="confirmationThankYouText">Thank you for booking with Jenny's Nail Studio. Here is your reservation summary:</p>
 
                         <div class="card bg-light border-0 rounded-4 text-start mx-auto mb-4" style="max-width: 520px;">
                             <div class="card-body p-4" id="confirmationReceipt">
@@ -525,10 +575,20 @@
 
 <script>
     // ==================== CENTRALIZED BOOKING WIZARD STATE ====================
+    const STEP_META = {
+        SERVICE: { label: 'Select Service', panelId: 'step1Panel' },
+        STAFF: { label: 'Select Staff', panelId: 'step2Panel' },
+        STATION: { label: 'Station / Room', panelId: 'stepStationPanel' },
+        DETAILS: { label: 'Details & Confirm', panelId: 'step3Panel' }
+    };
+
     const bookingState = {
         currentStep: 1,
+        stepOrder: ['SERVICE', 'STAFF', 'DETAILS'],
+        tenantConfig: null,
         selectedService: null, // { id, name, description, price, durationMinutes }
         selectedStaff: null,   // { id, name, isAnyoneAvailable }
+        selectedStation: null, // string name e.g. 'Private Zen Suite A'
         servicesList: [],
         staffList: []
     };
@@ -624,12 +684,167 @@
         alertEl.classList.remove('d-flex');
     }
 
-    // ==================== INITIALIZATION ====================
+    // ==================== INITIALIZATION & TENANT CONFIG ====================
     window.addEventListener('DOMContentLoaded', async () => {
         setupHeaderNav();
+        await loadTenantConfig();
         populateStoreTimeSlots();
         await loadServicesStep1();
+        updateWizardUI(1);
     });
+
+    async function loadTenantConfig() {
+        const params = new URLSearchParams(window.location.search);
+        const tenantParam = params.get('tenant');
+        const url = tenantParam
+            ? `/api/public/tenant-config?tenant=${encodeURIComponent(tenantParam)}`
+            : '/api/public/tenant-config';
+
+        try {
+            const response = await fetch(url);
+            if (!response.ok) throw new Error('Tenant config unavailable');
+            const config = await response.json();
+            bookingState.tenantConfig = config;
+            applyTenantThemeAndLayout(config);
+        } catch (err) {
+            console.warn('Using fallback booking wizard configuration:', err);
+            bookingState.stepOrder = ['SERVICE', 'STAFF', 'DETAILS'];
+            renderDynamicStepper();
+        }
+    }
+
+    function applyTenantThemeAndLayout(config) {
+        if (!config) return;
+        const theme = config.theme || {};
+        const wizard = config.wizard || {};
+
+        // 1. Dynamic Visual Theme Injection
+        const root = document.documentElement;
+        if (theme.primaryColor) {
+            root.style.setProperty('--bs-primary-pink', theme.primaryColor);
+            root.style.setProperty('--bs-primary-pink-hover', darkenHex(theme.primaryColor, 12));
+            root.style.setProperty('--bs-soft-pink', hexToRgba(theme.primaryColor, 0.1));
+        }
+        if (theme.secondaryColor) {
+            root.style.setProperty('--bs-secondary-accent', theme.secondaryColor);
+        }
+        if (theme.fontFamily) {
+            root.style.setProperty('--tenant-font-family', theme.fontFamily);
+        }
+
+        const salonName = config.salonName || "Jenny's Nail Studio";
+        document.title = `Book an Appointment - ${salonName}`;
+        const brandEl = document.getElementById('salonBrandName');
+        if (brandEl) brandEl.textContent = salonName;
+        const thankYouEl = document.getElementById('confirmationThankYouText');
+        if (thankYouEl) {
+            thankYouEl.textContent = `Thank you for booking with ${salonName}. Here is your reservation summary:`;
+        }
+
+        const logoImg = document.getElementById('tenantLogoImg');
+        if (logoImg && theme.logoUrl) {
+            logoImg.src = theme.logoUrl;
+            logoImg.alt = `${salonName} Logo`;
+            logoImg.classList.remove('d-none');
+        }
+
+        const bannerBox = document.getElementById('tenantBannerBox');
+        const bannerImg = document.getElementById('tenantBannerImg');
+        if (bannerBox && bannerImg && theme.bannerImageUrl) {
+            bannerImg.src = theme.bannerImageUrl;
+            bannerImg.alt = `${salonName} Banner`;
+            bannerBox.classList.remove('d-none');
+        }
+
+        // Apply safe layout variant class
+        const mainContainer = document.getElementById('wizardMainContainer');
+        if (mainContainer && config.layoutVariant) {
+            mainContainer.classList.add(`layout-${config.layoutVariant}`);
+        }
+
+        // 2. Dynamic Wizard Layout Configuration
+        const allowedKeys = ['SERVICE', 'STAFF', 'STATION', 'DETAILS'];
+        const configuredOrder = Array.isArray(wizard.stepOrder) ? wizard.stepOrder : ['SERVICE', 'STAFF', 'DETAILS'];
+        const validOrder = configuredOrder.filter(step => {
+            if (!allowedKeys.includes(step)) return false;
+            if (step === 'STATION' && !wizard.enableStationSelection) return false;
+            return true;
+        });
+        bookingState.stepOrder = (validOrder.length >= 3) ? validOrder : ['SERVICE', 'STAFF', 'DETAILS'];
+
+        // Optional notes visibility
+        const notesWrapper = document.getElementById('appointmentNotesWrapper');
+        if (notesWrapper) {
+            notesWrapper.classList.toggle('d-none', wizard.showAppointmentNotes === false);
+        }
+
+        const bannerText = document.getElementById('selectedDesignBanner');
+        if (bannerText && !localStorage.getItem('selectedDesign')) {
+            bannerText.textContent = `Complete the ${bookingState.stepOrder.length} easy steps below to reserve your visit`;
+        }
+
+        renderDynamicStepper();
+        updateStepLabelsFromOrder();
+    }
+
+    function renderDynamicStepper() {
+        const stepper = document.getElementById('wizardStepper');
+        if (!stepper) return;
+        stepper.innerHTML = '';
+
+        bookingState.stepOrder.forEach((stepKey, idx) => {
+            const stepNum = idx + 1;
+            const meta = STEP_META[stepKey] || { label: stepKey };
+            const div = document.createElement('div');
+            div.className = `wizard-step${stepNum === 1 ? ' active' : ''}`;
+            div.id = `stepIndicator${stepNum}`;
+            div.innerHTML = `
+                <span class="step-circle" id="stepCircle${stepNum}">${stepNum}</span>
+                <span class="step-label">${stepNum}. ${meta.label}</span>
+            `;
+            stepper.appendChild(div);
+        });
+    }
+
+    function updateStepLabelsFromOrder() {
+        const getNextLabel = (key) => {
+            const idx = bookingState.stepOrder.indexOf(key);
+            if (idx === -1 || idx + 1 >= bookingState.stepOrder.length) return 'Next';
+            const nextKey = bookingState.stepOrder[idx + 1];
+            const meta = STEP_META[nextKey];
+            return `Next: ${meta ? meta.label : nextKey}`;
+        };
+
+        const step1Next = document.getElementById('step1NextLabel');
+        if (step1Next) step1Next.textContent = getNextLabel('SERVICE');
+        const floatingNext = document.getElementById('floatingNextLabel');
+        if (floatingNext) {
+            const nextKey = bookingState.stepOrder[bookingState.stepOrder.indexOf('SERVICE') + 1];
+            floatingNext.textContent = (STEP_META[nextKey] && STEP_META[nextKey].label) || 'Continue';
+        }
+        const step2Next = document.getElementById('step2NextLabel');
+        if (step2Next) step2Next.textContent = getNextLabel('STAFF');
+        const stationNext = document.getElementById('stepStationNextLabel');
+        if (stationNext) stationNext.textContent = getNextLabel('STATION');
+    }
+
+    function darkenHex(hex, percent) {
+        const clean = hex.replace('#', '');
+        if (!/^[0-9a-fA-F]{6}$/.test(clean)) return hex;
+        const num = parseInt(clean, 16);
+        const amt = Math.round(2.55 * percent);
+        const R = Math.max(0, (num >> 16) - amt);
+        const G = Math.max(0, ((num >> 8) & 0x00ff) - amt);
+        const B = Math.max(0, (num & 0x0000ff) - amt);
+        return `#${(0x1000000 + R * 0x10000 + G * 0x100 + B).toString(16).slice(1)}`;
+    }
+
+    function hexToRgba(hex, alpha) {
+        const clean = hex.replace('#', '');
+        if (!/^[0-9a-fA-F]{6}$/.test(clean)) return 'rgba(233, 30, 99, 0.1)';
+        const num = parseInt(clean, 16);
+        return `rgba(${(num >> 16) & 255}, ${(num >> 8) & 255}, ${num & 255}, ${alpha})`;
+    }
 
     function setupHeaderNav() {
         const authNav = document.getElementById('authNav');
@@ -752,7 +967,16 @@
             const selectedDesign = localStorage.getItem('selectedDesign');
             let matchedServiceToSelect = null;
 
-            serviceCategoryConfigs.forEach((cat) => {
+            const enabledList = (bookingState.tenantConfig && bookingState.tenantConfig.wizard && Array.isArray(bookingState.tenantConfig.wizard.enabledCategories))
+                ? bookingState.tenantConfig.wizard.enabledCategories.map(c => c.toLowerCase().trim())
+                : [];
+            const activeCategoryConfigs = enabledList.length > 0
+                ? serviceCategoryConfigs.filter(cat =>
+                    enabledList.includes(cat.id.toLowerCase()) || enabledList.includes(cat.title.toLowerCase())
+                )
+                : serviceCategoryConfigs;
+
+            activeCategoryConfigs.forEach((cat) => {
                 const catServices = categorized[cat.id] || [];
                 if (catServices.length === 0) return;
 
@@ -998,25 +1222,48 @@
         document.getElementById('step2NextBtn').disabled = false;
     }
 
-    // ==================== WIZARD STEP NAVIGATION ====================
+    // ==================== WIZARD STEP NAVIGATION (DYNAMIC STEP ORDER) ====================
+    function goNextStep() {
+        return goToStep(bookingState.currentStep + 1);
+    }
+
+    function goPrevStep() {
+        return goToStep(bookingState.currentStep - 1);
+    }
+
     async function goToStep(targetStep) {
         hideAlert();
+        if (targetStep < 1 || targetStep > bookingState.stepOrder.length) return;
 
-        if (targetStep === 2) {
+        const targetKey = bookingState.stepOrder[targetStep - 1];
+
+        if (targetKey === 'STAFF') {
             if (!bookingState.selectedService) {
-                showAlert('Please select a service in Step 1 before proceeding.');
+                showAlert('Please select a service before choosing a technician.');
                 return;
             }
             await loadStaffForService(bookingState.selectedService.id);
         }
 
-        if (targetStep === 3) {
+        if (targetKey === 'STATION') {
             if (!bookingState.selectedService) {
                 showAlert('Please select a service first.');
                 return;
             }
             if (!bookingState.selectedStaff) {
-                showAlert('Please select a technician in Step 2 before proceeding.');
+                showAlert('Please select a technician before choosing a station.');
+                return;
+            }
+            loadStationStep();
+        }
+
+        if (targetKey === 'DETAILS') {
+            if (!bookingState.selectedService) {
+                showAlert('Please select a service first.');
+                return;
+            }
+            if (!bookingState.selectedStaff) {
+                showAlert('Please select a technician before proceeding.');
                 return;
             }
             populateStep3Summary();
@@ -1026,32 +1273,79 @@
         updateWizardUI(targetStep);
     }
 
+    function loadStationStep() {
+        const stationGrid = document.getElementById('stationGrid');
+        if (!stationGrid) return;
+
+        const wizardCfg = (bookingState.tenantConfig && bookingState.tenantConfig.wizard) || {};
+        const stations = Array.isArray(wizardCfg.availableStations) && wizardCfg.availableStations.length > 0
+            ? wizardCfg.availableStations
+            : ['Main Floor Chair 1', 'Main Floor Chair 2', 'VIP Window Suite'];
+
+        if (!bookingState.selectedStation) {
+            bookingState.selectedStation = 'Any Available Station';
+        }
+
+        stationGrid.innerHTML = '';
+        const options = ['Any Available Station', ...stations];
+        options.forEach((stationName, idx) => {
+            const isSelected = bookingState.selectedStation === stationName;
+            const iconClass = idx === 0 ? 'bi-stars' : 'bi-door-open-fill';
+            const col = document.createElement('div');
+            col.className = 'col-md-6';
+            col.innerHTML = `
+                <div class="staff-card d-flex align-items-center justify-content-between ${isSelected ? 'selected' : ''}"
+                     onclick="selectStation(this, ${JSON.stringify(stationName).replace(/"/g, '&quot;')})">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="staff-avatar"><i class="bi ${iconClass}"></i></div>
+                        <div>
+                            <h6 class="fw-bold text-dark mb-0">${stationName}</h6>
+                            <small class="text-muted">${idx === 0 ? 'Fastest seating option' : 'Requested station / suite'}</small>
+                        </div>
+                    </div>
+                    <span class="check-indicator"><i class="bi bi-check-lg"></i></span>
+                </div>
+            `;
+            stationGrid.appendChild(col);
+        });
+    }
+
+    function selectStation(cardEl, stationName) {
+        hideAlert();
+        document.querySelectorAll('#stationGrid .staff-card').forEach(c => c.classList.remove('selected'));
+        if (cardEl) cardEl.classList.add('selected');
+        bookingState.selectedStation = stationName;
+    }
+
     function updateWizardUI(step) {
-        document.getElementById('step1Panel').classList.toggle('d-none', step !== 1);
-        document.getElementById('step2Panel').classList.toggle('d-none', step !== 2);
-        document.getElementById('step3Panel').classList.toggle('d-none', step !== 3);
+        const activeKey = bookingState.stepOrder[step - 1] || 'SERVICE';
+        Object.entries(STEP_META).forEach(([key, meta]) => {
+            const panel = document.getElementById(meta.panelId);
+            if (panel) panel.classList.toggle('d-none', key !== activeKey);
+        });
+
         document.getElementById('confirmationPanel').classList.add('d-none');
         document.getElementById('wizardStepper').classList.remove('d-none');
 
-        // Only show floating bar during step 1 if a service is actively chosen
+        // Only show floating bar during SERVICE step if a service is actively chosen
         const floatingBar = document.getElementById('floatingActionBar');
         if (floatingBar) {
-            if (step === 1 && bookingState.selectedService) {
+            if (activeKey === 'SERVICE' && bookingState.selectedService) {
                 floatingBar.classList.add('visible');
             } else {
                 floatingBar.classList.remove('visible');
             }
         }
 
-        // Scroll to wizard stepper on step change for a smooth transition
         const stepper = document.getElementById('wizardStepper');
         if (stepper) {
             stepper.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
 
-        for (let i = 1; i <= 3; i++) {
+        for (let i = 1; i <= bookingState.stepOrder.length; i++) {
             const indicator = document.getElementById(`stepIndicator${i}`);
             const circle = document.getElementById(`stepCircle${i}`);
+            if (!indicator || !circle) continue;
             indicator.classList.remove('active', 'completed');
 
             if (i < step) {
@@ -1076,6 +1370,14 @@
             : '—';
 
         document.getElementById('summaryStaffName').textContent = t ? t.name : '—';
+
+        const stationBox = document.getElementById('summaryStationBox');
+        const stationNameEl = document.getElementById('summaryStationName');
+        const hasStationStep = bookingState.stepOrder.includes('STATION');
+        if (stationBox && stationNameEl) {
+            stationBox.classList.toggle('d-none', !hasStationStep);
+            stationNameEl.textContent = bookingState.selectedStation || 'Any Available Station';
+        }
     }
 
     // ==================== STEP 3: SUBMIT BOOKING ====================
@@ -1110,6 +1412,9 @@
             customerPhone: customerPhone,
             customerEmail: customerEmail,
             notes: notes,
+            stationPreference: bookingState.stepOrder.includes('STATION')
+                ? (bookingState.selectedStation || 'Any Available Station')
+                : null,
             service: { id: bookingState.selectedService.id },
             nailTech: (bookingState.selectedStaff && bookingState.selectedStaff.id)
                 ? { id: bookingState.selectedStaff.id }
@@ -1154,9 +1459,10 @@
     });
 
     function showConfirmationScreen(payload, savedBooking) {
-        document.getElementById('step1Panel').classList.add('d-none');
-        document.getElementById('step2Panel').classList.add('d-none');
-        document.getElementById('step3Panel').classList.add('d-none');
+        Object.values(STEP_META).forEach(meta => {
+            const panel = document.getElementById(meta.panelId);
+            if (panel) panel.classList.add('d-none');
+        });
         document.getElementById('wizardStepper').classList.add('d-none');
 
         const confirmPanel = document.getElementById('confirmationPanel');
@@ -1180,6 +1486,11 @@
                 <span class="text-muted">Technician</span>
                 <span class="fw-semibold text-dark">${bookingState.selectedStaff.name}</span>
             </div>
+            ${payload.stationPreference ? `
+            <div class="d-flex justify-content-between border-bottom pb-2 mb-2">
+                <span class="text-muted">Station / Room</span>
+                <span class="fw-semibold text-dark">${payload.stationPreference}</span>
+            </div>` : ''}
             <div class="d-flex justify-content-between border-bottom pb-2 mb-2">
                 <span class="text-muted">Date & Time</span>
                 <span class="fw-semibold text-dark">${formattedDate}</span>
@@ -1202,6 +1513,7 @@
         bookingState.currentStep = 1;
         bookingState.selectedService = null;
         bookingState.selectedStaff = null;
+        bookingState.selectedStation = null;
 
         document.querySelectorAll('.service-select-row').forEach(c => c.classList.remove('selected'));
         document.getElementById('selectedServiceBadge').classList.add('d-none');

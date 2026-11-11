@@ -26,6 +26,9 @@ public class Appointment {
     @Column(length = 1000)
     private String notes;
 
+    @Column(length = 120)
+    private String stationPreference;
+
     @ManyToOne
     @JoinColumn(name = "service_id", nullable = false)
     private ServiceEntity service;
@@ -62,6 +65,9 @@ public class Appointment {
 
     public String getNotes() { return notes; }
     public void setNotes(String notes) { this.notes = notes; }
+
+    public String getStationPreference() { return stationPreference; }
+    public void setStationPreference(String stationPreference) { this.stationPreference = stationPreference; }
 
     public ServiceEntity getService() { return service; }
     public void setService(ServiceEntity service) { this.service = service; }

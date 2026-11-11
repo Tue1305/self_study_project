@@ -97,7 +97,8 @@ public class SecurityConfig {
                                 "/*.png",
                                 "/*.jpg",
                                 "/*.jpeg",
-                                "/login"
+                                "/login",
+                                "/api/public/**"
                         ).permitAll()
                         // Services rules (public GET, admin-only POST/PUT/DELETE)
                         .requestMatchers(HttpMethod.GET, "/api/services", "/api/services/**").permitAll()
@@ -116,6 +117,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.DELETE, "/api/showcase", "/api/showcase/**").hasAnyAuthority("ROLE_ADMIN", "ADMIN")
                         // Customers admin API rules
                         .requestMatchers("/api/customers", "/api/customers/**").hasAnyAuthority("ROLE_ADMIN", "ADMIN")
+                        .requestMatchers("/api/admin/**").hasAnyAuthority("ROLE_ADMIN", "ADMIN")
                         // Subscribers rules for connection
                         .requestMatchers(HttpMethod.GET, "/api/subscriptions/admin/**").hasAnyAuthority("ROLE_ADMIN", "ADMIN")
                         .requestMatchers("/api/auth/**").permitAll()

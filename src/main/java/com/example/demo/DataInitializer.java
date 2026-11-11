@@ -1,10 +1,12 @@
 package com.example.demo;
 
 import com.example.demo.entity.ShowcaseItem;
+import com.example.demo.entity.TenantConfig;
 import com.example.demo.entity.UserEntity;
 import com.example.demo.entity.ServiceEntity;
 import com.example.demo.repository.ServiceRepository;
 import com.example.demo.repository.ShowcaseRepository;
+import com.example.demo.repository.TenantConfigRepository;
 import com.example.demo.repository.UserRepository;
 import com.example.demo.service.CustomerService;
 import org.springframework.boot.CommandLineRunner;
@@ -20,17 +22,20 @@ public class DataInitializer implements CommandLineRunner {
     private final UserRepository userRepository;
     private final ServiceRepository serviceRepository;
     private final ShowcaseRepository showcaseRepository;
+    private final TenantConfigRepository tenantConfigRepository;
     private final PasswordEncoder passwordEncoder;
     private final CustomerService customerService;
 
     public DataInitializer(UserRepository userRepository,
                            ServiceRepository serviceRepository,
                            ShowcaseRepository showcaseRepository,
+                           TenantConfigRepository tenantConfigRepository,
                            PasswordEncoder passwordEncoder,
                            CustomerService customerService) {
         this.userRepository = userRepository;
         this.serviceRepository = serviceRepository;
         this.showcaseRepository = showcaseRepository;
+        this.tenantConfigRepository = tenantConfigRepository;
         this.passwordEncoder = passwordEncoder;
         this.customerService = customerService;
     }
@@ -58,6 +63,9 @@ public class DataInitializer implements CommandLineRunner {
 
         // Seed or update the 10 Staff Members with specific capabilities
         seedOrUpdateStaffMembers();
+
+        // Seed multi-tenant UI layout & theme configurations
+        seedTenantConfigs();
 
         // Seed full salon services menu into database if count < 10
         if (serviceRepository.count() < 10) {
@@ -245,5 +253,45 @@ public class DataInitializer implements CommandLineRunner {
             userRepository.save(tech);
         }
         System.out.println("✅ Configured all 10 salon technicians with customized service capabilities!");
+    }
+
+    private void seedTenantConfigs() {
+        if (tenantConfigRepository.count() > 0) {
+            return;
+        }
+
+        TenantConfig defaultConfig = new TenantConfig();
+        defaultConfig.setTenantKey("default");
+        defaultConfig.setSalonName("Jenny's Nail Studio");
+        defaultConfig.setPrimaryColor("#e83e8c");
+        defaultConfig.setSecondaryColor("#343a40");
+        defaultConfig.setFontFamily("'Poppins', sans-serif");
+        defaultConfig.setStepOrder("SERVICE,STAFF,STATION,DETAILS");
+        defaultConfig.setEnableStationSelection(false);
+        defaultConfig.setAvailableStations("Main Floor Chair 1,Main Floor Chair 2,VIP Window Suite,Quiet Spa Room");
+        defaultConfig.setEnabledCategories("");
+        defaultConfig.setShowAppointmentNotes(true);
+        defaultConfig.setShowStaffQualificationTags(false);
+        defaultConfig.setLayoutVariant("classic");
+        defaultConfig.setDefaultTenant(true);
+
+        TenantConfig luxeConfig = new TenantConfig();
+        luxeConfig.setTenantKey("luxe");
+        luxeConfig.setCustomDomain("luxe.jennysnailstudio.com");
+        luxeConfig.setSalonName("Luxe Nail & Spa Sanctuary");
+        luxeConfig.setPrimaryColor("#6f42c1");
+        luxeConfig.setSecondaryColor("#212529");
+        luxeConfig.setFontFamily("'Playfair Display', Georgia, serif");
+        luxeConfig.setStepOrder("SERVICE,STAFF,STATION,DETAILS");
+        luxeConfig.setEnableStationSelection(true);
+        luxeConfig.setAvailableStations("Private Zen Suite A,Private Zen Suite B,Window Lounge Station 1,Window Lounge Station 2");
+        luxeConfig.setEnabledCategories("Manicures,Pedicures,Mani / Pedi Combos,Nail Enhancement & Art,Facial Treatments");
+        luxeConfig.setShowAppointmentNotes(true);
+        luxeConfig.setShowStaffQualificationTags(false);
+        luxeConfig.setLayoutVariant("luxe");
+        luxeConfig.setDefaultTenant(false);
+
+        tenantConfigRepository.saveAll(List.of(defaultConfig, luxeConfig));
+        System.out.println("✅ Seeded default and sample Luxe multi-tenant configurations!");
     }
 }

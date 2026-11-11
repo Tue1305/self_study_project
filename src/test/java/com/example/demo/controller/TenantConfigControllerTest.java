@@ -129,4 +129,15 @@ class TenantConfigControllerTest {
                 .andExpect(jsonPath("$.wizard.stepOrder[2]").value("STATION"))
                 .andExpect(jsonPath("$.wizard.showStaffQualificationTags").value(false));
     }
+
+    @Test
+    void publicEndpointStrictModeReturnsNotFoundForUnknownSubdomain() throws Exception {
+        when(tenantConfigRepository.findByCustomDomainIgnoreCase("unknown.localhost")).thenReturn(Optional.empty());
+        when(tenantConfigRepository.findByTenantKeyIgnoreCase("unknown")).thenReturn(Optional.empty());
+
+        mockMvc.perform(get("/api/public/tenant-config")
+                        .param("domain", "unknown.localhost")
+                        .param("strict", "true"))
+                .andExpect(status().isNotFound());
+    }
 }

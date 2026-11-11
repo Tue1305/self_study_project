@@ -12,11 +12,14 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <style>
         :root {
-            --bs-primary-pink: #e91e63;
+            --primary-color: #e91e63;
+            --secondary-color: #343a40;
+            --font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+            --bs-primary-pink: var(--primary-color);
             --bs-primary-pink-hover: #d81b60;
-            --bs-secondary-accent: #343a40;
+            --bs-secondary-accent: var(--secondary-color);
             --bs-soft-pink: #fce4ec;
-            --tenant-font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+            --tenant-font-family: var(--font-family);
         }
         body {
             font-family: var(--tenant-font-family);
@@ -721,14 +724,17 @@
         // 1. Dynamic Visual Theme Injection
         const root = document.documentElement;
         if (theme.primaryColor) {
+            root.style.setProperty('--primary-color', theme.primaryColor);
             root.style.setProperty('--bs-primary-pink', theme.primaryColor);
             root.style.setProperty('--bs-primary-pink-hover', darkenHex(theme.primaryColor, 12));
             root.style.setProperty('--bs-soft-pink', hexToRgba(theme.primaryColor, 0.1));
         }
         if (theme.secondaryColor) {
+            root.style.setProperty('--secondary-color', theme.secondaryColor);
             root.style.setProperty('--bs-secondary-accent', theme.secondaryColor);
         }
         if (theme.fontFamily) {
+            root.style.setProperty('--font-family', theme.fontFamily);
             root.style.setProperty('--tenant-font-family', theme.fontFamily);
         }
 

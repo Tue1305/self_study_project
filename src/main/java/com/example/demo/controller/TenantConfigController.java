@@ -31,10 +31,15 @@ public class TenantConfigController {
     public ResponseEntity<TenantConfigDto> getPublicTenantConfig(
             @RequestHeader(value = "X-Tenant-ID", required = false) String tenantHeader,
             @RequestParam(value = "tenant", required = false) String tenantParam,
+            @RequestParam(value = "domain", required = false) String domainParam,
+            @RequestParam(value = "strict", defaultValue = "false") boolean strict,
             HttpServletRequest request
     ) {
-        TenantConfig config = resolveTenant(tenantHeader, tenantParam, request)
-                .orElseGet(this::buildFallbackDefaultConfig);
+        Optional<TenantConfig> resolved = resolveTenant(tenantHeader, tenantParam, domainParam, strict, request);
+        if (resolved.isEmpty() && strict) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Requested salon tenant was not found");
+        }
+        TenantConfig config = resolved.orElseGet(this::buildFallbackDefaultConfig);
         return ResponseEntity.ok(toDto(config, true));
     }
 
@@ -73,17 +78,21 @@ public class TenantConfigController {
     private Optional<TenantConfig> resolveTenant(
             String tenantHeader,
             String tenantParam,
+            String domainParam,
+            boolean strict,
             HttpServletRequest request
     ) {
         String explicitKey = firstNonBlank(tenantHeader, tenantParam);
         if (explicitKey != null) {
             Optional<TenantConfig> byKey = tenantConfigRepository.findByTenantKeyIgnoreCase(explicitKey.trim());
-            if (byKey.isPresent()) {
+            if (byKey.isPresent() || strict) {
                 return byKey;
             }
         }
 
-        String host = extractHost(request);
+        String host = (domainParam != null && !domainParam.isBlank())
+                ? cleanHostString(domainParam)
+                : extractHost(request);
         if (host != null && !host.isBlank()) {
             Optional<TenantConfig> byDomain = tenantConfigRepository.findByCustomDomainIgnoreCase(host);
             if (byDomain.isPresent()) {
@@ -92,7 +101,7 @@ public class TenantConfigController {
             String subdomain = extractSubdomain(host);
             if (subdomain != null) {
                 Optional<TenantConfig> bySubdomain = tenantConfigRepository.findByTenantKeyIgnoreCase(subdomain);
-                if (bySubdomain.isPresent()) {
+                if (bySubdomain.isPresent() || strict) {
                     return bySubdomain;
                 }
             }
@@ -269,14 +278,19 @@ public class TenantConfigController {
         String host = (forwardedHost != null && !forwardedHost.isBlank())
                 ? forwardedHost.split(",")[0].trim()
                 : request.getHeader("Host");
+        return cleanHostString(host);
+    }
+
+    private String cleanHostString(String host) {
         if (host == null) {
             return null;
         }
-        int colonIdx = host.indexOf(':');
+        String cleaned = host.trim();
+        int colonIdx = cleaned.indexOf(':');
         if (colonIdx > -1) {
-            host = host.substring(0, colonIdx);
+            cleaned = cleaned.substring(0, colonIdx);
         }
-        return host.trim().toLowerCase(Locale.ROOT);
+        return cleaned.trim().toLowerCase(Locale.ROOT);
     }
 
     private String extractSubdomain(String host) {

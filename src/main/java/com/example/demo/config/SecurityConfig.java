@@ -76,10 +76,8 @@ public class SecurityConfig {
                                 "/signup.html",
                                 "/forgot-password.html",
                                 "/profile.html",
-                                "/subscription-plans.html",
                                 "/admin-calendar.html",
                                 "/admin-dashboard.html",
-                                "/admin-subs.html",
                                 "/admin-customers.html",
                                 "/nail-techs.html",
                                 "/dashboard.html",
@@ -118,8 +116,6 @@ public class SecurityConfig {
                         // Customers admin API rules
                         .requestMatchers("/api/customers", "/api/customers/**").hasAnyAuthority("ROLE_ADMIN", "ADMIN")
                         .requestMatchers("/api/admin/**").hasAnyAuthority("ROLE_ADMIN", "ADMIN")
-                        // Subscribers rules for connection
-                        .requestMatchers(HttpMethod.GET, "/api/subscriptions/admin/**").hasAnyAuthority("ROLE_ADMIN", "ADMIN")
                         .requestMatchers("/api/auth/**").permitAll()
                         .anyRequest().authenticated()
                 )

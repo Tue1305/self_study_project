@@ -127,4 +127,4 @@
 * Registered a custom bash alias (alias deploy="...") in the VPS environment to reduce the full deployment pipeline execution down to a single keyword command (deploy).
 
 
-11/11/2026 Multi-booking demo [![Multi-Tenant Booking Demo Preview](https://youtu.be/Dk-5jHBNCJk)
+11/11/2026 Multi-booking demo [Multi-Tenant Booking Demo Preview](https://youtu.be/Dk-5jHBNCJk)

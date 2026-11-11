@@ -1,12 +1,18 @@
 import React, { useState } from 'react';
 import { useTenant } from '../context/TenantContext';
 
-export default function TenantHeader() {
-  const { tenant } = useTenant();
+export default function TenantHeader({ onOpenLogin, onResetWizard }) {
+  const { tenant, startBlankBooking } = useTenant();
   const [logoFailed, setLogoFailed] = useState(false);
   const [bannerFailed, setBannerFailed] = useState(false);
 
   const { salonName, theme } = tenant;
+
+  const handleGlobalBookNowClick = (e) => {
+    e.preventDefault();
+    startBlankBooking();
+    if (onResetWizard) onResetWizard();
+  };
 
   return (
     <>
@@ -38,23 +44,32 @@ export default function TenantHeader() {
             <a href="/services.html" className="nav-link fw-semibold text-dark">
               Services
             </a>
-            <a
-              href="/booking.html"
-              className="btn rounded-pill px-4 py-2 fw-bold text-white"
+            {/* Global Book Now button - initializes completely blank */}
+            <button
+              type="button"
+              onClick={handleGlobalBookNowClick}
+              className="btn rounded-pill px-4 py-2 fw-bold text-white shadow-sm"
               style={{ backgroundColor: 'var(--primary-color)' }}
             >
               Book Now
-            </a>
+            </button>
+            {onOpenLogin && (
+              <button
+                type="button"
+                onClick={onOpenLogin}
+                className="btn btn-outline-secondary btn-sm rounded-pill px-3 py-1"
+                title="Direct Tenant Login"
+              >
+                Sign In
+              </button>
+            )}
           </nav>
         </div>
       </header>
 
       {theme?.bannerImageUrl && !bannerFailed && (
         <div className="container mt-4">
-          <div
-            className="overflow-hidden rounded-4 shadow-sm"
-            style={{ maxHeight: 200 }}
-          >
+          <div className="overflow-hidden rounded-4 shadow-sm" style={{ maxHeight: 200 }}>
             <img
               src={theme.bannerImageUrl}
               alt={`${salonName} Banner`}

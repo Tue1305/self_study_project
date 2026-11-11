@@ -689,6 +689,15 @@
 
     // ==================== INITIALIZATION & TENANT CONFIG ====================
     window.addEventListener('DOMContentLoaded', async () => {
+        // Detect if user navigated from a global "Book Now" button (no query param)
+        const urlParams = new URLSearchParams(window.location.search);
+        const hasServiceParam = urlParams.has('serviceId') || urlParams.has('service_id') || urlParams.has('service');
+
+        if (!hasServiceParam) {
+            // General global booking click: initialize completely blank session
+            localStorage.removeItem('selectedDesign');
+        }
+
         setupHeaderNav();
         await loadTenantConfig();
         populateStoreTimeSlots();
@@ -966,20 +975,38 @@
             });
 
             grid.innerHTML = '';
+            const urlParams = new URLSearchParams(window.location.search);
+            const serviceIdParam = urlParams.get('serviceId') || urlParams.get('service_id') || urlParams.get('service');
             const selectedDesign = localStorage.getItem('selectedDesign');
             let matchedServiceToSelect = null;
+
+            // Check if pre-selected service was requested from service.html
+            if (serviceIdParam) {
+                matchedServiceToSelect = services.find(s =>
+                    String(s.id) === String(serviceIdParam) ||
+                    (s.name && s.name.toLowerCase() === serviceIdParam.toLowerCase())
+                );
+            } else if (selectedDesign) {
+                matchedServiceToSelect = services.find(s => s.name && s.name.toLowerCase().trim() === selectedDesign.toLowerCase().trim());
+            }
+
+            const isPreselectedLocked = Boolean(serviceIdParam && matchedServiceToSelect);
 
             const enabledList = (bookingState.tenantConfig && bookingState.tenantConfig.wizard && Array.isArray(bookingState.tenantConfig.wizard.enabledCategories))
                 ? bookingState.tenantConfig.wizard.enabledCategories.map(c => c.toLowerCase().trim())
                 : [];
-            const activeCategoryConfigs = enabledList.length > 0
+            const activeCategoryConfigs = enabledList.length > 0 && !isPreselectedLocked
                 ? serviceCategoryConfigs.filter(cat =>
                     enabledList.includes(cat.id.toLowerCase()) || enabledList.includes(cat.title.toLowerCase())
                 )
                 : serviceCategoryConfigs;
 
             activeCategoryConfigs.forEach((cat) => {
-                const catServices = categorized[cat.id] || [];
+                let catServices = categorized[cat.id] || [];
+                // If pre-selected from service.html, lock choice to only show that chosen service
+                if (isPreselectedLocked) {
+                    catServices = catServices.filter(s => s.id === matchedServiceToSelect.id);
+                }
                 if (catServices.length === 0) return;
 
                 const collapseId = `bookingCollapse_${cat.id}`;
@@ -989,10 +1016,6 @@
                 catServices.forEach(srv => {
                     const priceFormatted = Number(srv.price || 0).toFixed(2);
                     const duration = srv.durationMinutes || 45;
-
-                    if (selectedDesign && srv.name.toLowerCase().trim() === selectedDesign.toLowerCase().trim()) {
-                        matchedServiceToSelect = srv;
-                    }
 
                     rowsHtml += `
                         <div class="service-select-row d-flex justify-content-between align-items-center"
@@ -1012,11 +1035,11 @@
                 const col = document.createElement('div');
                 col.className = 'col-12';
                 col.innerHTML = `
-                    <div class="category-card shadow-sm" id="${cardId}">
+                    <div class="category-card shadow-sm ${isPreselectedLocked ? 'is-open' : ''}" id="${cardId}">
                         <div class="category-card-header d-flex justify-content-between align-items-center"
                              data-bs-toggle="collapse"
                              data-bs-target="#${collapseId}"
-                             aria-expanded="false"
+                             aria-expanded="${isPreselectedLocked ? 'true' : 'false'}"
                              onclick="toggleBookingCategoryCard('${cat.id}')">
                             <div class="d-flex align-items-center gap-3">
                                 <div class="category-icon">
@@ -1033,7 +1056,7 @@
                             </div>
                             <i class="bi bi-chevron-down chevron-icon ms-2"></i>
                         </div>
-                        <div class="collapse" id="${collapseId}">
+                        <div class="collapse ${isPreselectedLocked ? 'show' : ''}" id="${collapseId}">
                             <div class="border-top">
                                 ${rowsHtml}
                             </div>

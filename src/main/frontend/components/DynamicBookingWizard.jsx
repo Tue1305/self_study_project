@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTenant } from '../context/TenantContext';
 
 const STEP_METADATA = {
@@ -39,9 +39,6 @@ const SERVICE_CATEGORIES = [
   { id: 'gift-packages', title: 'Gift Packages', keywords: ['rejuvenation', 'executive', 'package'] },
 ];
 
-/**
- * Generates 15-minute store time slots between 10:00 AM and 7:00 PM.
- */
 function buildStoreTimeSlots() {
   const slots = [];
   for (let hour = 10; hour <= 19; hour++) {
@@ -57,8 +54,8 @@ function buildStoreTimeSlots() {
   return slots;
 }
 
-export default function DynamicBookingWizard() {
-  const { tenant } = useTenant();
+export default function DynamicBookingWizard({ onRegisterResetHandler }) {
+  const { tenant, preselectedServiceId, startBlankBooking } = useTenant();
   const { wizard, layoutVariant, salonName } = tenant;
 
   const activeSteps = useMemo(() => {
@@ -74,7 +71,9 @@ export default function DynamicBookingWizard() {
   const [staffList, setStaffList] = useState([]);
   const [loadingStaff, setLoadingStaff] = useState(false);
 
+  // Wizard state: initialized blank by default
   const [selectedService, setSelectedService] = useState(null);
+  const [isPreselectedLocked, setIsPreselectedLocked] = useState(false);
   const [selectedStaff, setSelectedStaff] = useState(null);
   const [selectedStation, setSelectedStation] = useState('Any Available Station');
 
@@ -94,15 +93,57 @@ export default function DynamicBookingWizard() {
   const timeSlots = useMemo(() => buildStoreTimeSlots(), []);
   const currentStepKey = activeSteps[currentStepIdx] || 'SERVICE';
 
-  // Fetch all salon services on mount
+  // Complete reset to clean/blank wizard session
+  const resetToBlankWizard = useCallback(() => {
+    setSelectedService(null);
+    setIsPreselectedLocked(false);
+    setSelectedStaff(null);
+    setSelectedStation('Any Available Station');
+    setCustomerForm({
+      customerName: '',
+      customerPhone: '',
+      customerEmail: '',
+      appointmentDate: new Date().toISOString().split('T')[0],
+      appointmentTime: '',
+      notes: '',
+    });
+    setAlertMessage(null);
+    setConfirmedBooking(null);
+    setCurrentStepIdx(0);
+    startBlankBooking();
+  }, [startBlankBooking]);
+
+  useEffect(() => {
+    if (onRegisterResetHandler) {
+      onRegisterResetHandler(resetToBlankWizard);
+    }
+  }, [onRegisterResetHandler, resetToBlankWizard]);
+
+  // Fetch all services on mount
   useEffect(() => {
     fetch('/api/services')
       .then((res) => (res.ok ? res.json() : []))
-      .then((data) => setServices(Array.isArray(data) ? data : []))
-      .catch(() => setAlertMessage('Unable to load salon services.'));
-  }, []);
+      .then((data) => {
+        const list = Array.isArray(data) ? data : [];
+        setServices(list);
 
-  // Dynamically fetch qualified staff when entering STAFF step (or when selectedService changes)
+        // Preselection handling: if arrived from service.html?serviceId=XYZ
+        if (preselectedServiceId) {
+          const matched = list.find(
+            (s) =>
+              String(s.id) === String(preselectedServiceId) ||
+              (s.name && s.name.toLowerCase() === preselectedServiceId.toLowerCase())
+          );
+          if (matched) {
+            setSelectedService(matched);
+            setIsPreselectedLocked(true);
+          }
+        }
+      })
+      .catch(() => setAlertMessage('Unable to load salon services.'));
+  }, [preselectedServiceId]);
+
+  // Dynamically fetch qualified staff when entering STAFF step
   useEffect(() => {
     if (currentStepKey !== 'STAFF') return;
     setLoadingStaff(true);
@@ -114,7 +155,6 @@ export default function DynamicBookingWizard() {
       .then((data) => {
         const list = Array.isArray(data) ? data : [];
         setStaffList(list);
-        // Clear previously selected technician if no longer qualified for a newly picked service
         if (
           selectedStaff &&
           !selectedStaff.isAnyoneAvailable &&
@@ -127,11 +167,15 @@ export default function DynamicBookingWizard() {
       .finally(() => setLoadingStaff(false));
   }, [currentStepKey, selectedService]);
 
-  // Filter categories according to tenant's enabledCategories configuration
+  // Categorize services, filtering down if locked to pre-selected service
   const categorizedServices = useMemo(() => {
+    const sourceServices = isPreselectedLocked && selectedService
+      ? [selectedService]
+      : services;
+
     const enabledLower = (wizard?.enabledCategories || []).map((c) => c.toLowerCase().trim());
     const visibleCategories =
-      enabledLower.length > 0
+      enabledLower.length > 0 && !isPreselectedLocked
         ? SERVICE_CATEGORIES.filter(
             (cat) =>
               enabledLower.includes(cat.id.toLowerCase()) ||
@@ -141,14 +185,14 @@ export default function DynamicBookingWizard() {
 
     return visibleCategories
       .map((cat) => {
-        const items = services.filter((srv) => {
+        const items = sourceServices.filter((srv) => {
           const nameLower = (srv.name || '').toLowerCase();
           return cat.keywords.some((kw) => nameLower.includes(kw));
         });
         return { ...cat, items };
       })
       .filter((cat) => cat.items.length > 0);
-  }, [services, wizard?.enabledCategories]);
+  }, [services, selectedService, isPreselectedLocked, wizard?.enabledCategories]);
 
   const validateBeforeNext = (stepKey) => {
     if (stepKey === 'SERVICE' && !selectedService) {
@@ -273,14 +317,9 @@ export default function DynamicBookingWizard() {
             type="button"
             className="btn text-white fw-bold px-4 py-2 rounded-pill"
             style={{ backgroundColor: 'var(--primary-color)' }}
-            onClick={() => {
-              setConfirmedBooking(null);
-              setSelectedService(null);
-              setSelectedStaff(null);
-              setCurrentStepIdx(0);
-            }}
+            onClick={resetToBlankWizard}
           >
-            Book Another Appointment
+            Start New Booking
           </button>
         </div>
       </div>
@@ -297,18 +336,50 @@ export default function DynamicBookingWizard() {
           <div
             className="card shadow-sm border-0 rounded-4"
             style={{
-              borderTop: layoutVariant === 'luxe' ? '5px solid var(--primary-color)' : undefined,
+              borderTop: layoutVariant === 'blue-sky' || layoutVariant === 'luxe'
+                ? '5px solid var(--primary-color)'
+                : undefined,
             }}
           >
             <div className="card-body p-4 p-md-5">
-              <h2 className="text-center fw-bold mb-1" style={{ color: 'var(--primary-color)' }}>
-                Book Your Appointment
-              </h2>
-              <p className="text-center text-muted mb-4">
+              <div className="d-flex justify-content-between align-items-center mb-2">
+                <h2 className="fw-bold mb-0" style={{ color: 'var(--primary-color)' }}>
+                  Book Your Appointment
+                </h2>
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary btn-sm rounded-pill px-3"
+                  onClick={resetToBlankWizard}
+                >
+                  Clear Selection
+                </button>
+              </div>
+
+              <p className="text-muted mb-4">
                 Complete the {activeSteps.length} steps below to reserve your visit at {salonName}
               </p>
 
-              {/* Dynamic Multi-Step Progress Bar */}
+              {/* Locked pre-selection banner if arrived from service.html */}
+              {isPreselectedLocked && selectedService && (
+                <div className="alert alert-info d-flex justify-content-between align-items-center rounded-3 mb-4">
+                  <div>
+                    <i className="bi bi-lock-fill me-2" />
+                    Booking pre-selected service: <strong>{selectedService.name}</strong> (${Number(selectedService.price).toFixed(2)})
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline-primary"
+                    onClick={() => {
+                      setIsPreselectedLocked(false);
+                      startBlankBooking();
+                    }}
+                  >
+                    Change Service
+                  </button>
+                </div>
+              )}
+
+              {/* Dynamic Stepper */}
               <div className="d-flex justify-content-between align-items-center mb-4">
                 {activeSteps.map((stepKey, idx) => {
                   const isCompleted = idx < currentStepIdx;
@@ -356,21 +427,27 @@ export default function DynamicBookingWizard() {
 
                   <div className="d-flex flex-column gap-3 mb-4">
                     {categorizedServices.map((cat) => {
-                      const isOpen = openCategoryId === cat.id;
+                      const isOpen = isPreselectedLocked || openCategoryId === cat.id;
                       return (
                         <div key={cat.id} className="card border rounded-4 shadow-sm">
                           <div
                             className="card-header bg-white border-0 p-3 d-flex justify-content-between align-items-center"
-                            style={{ cursor: 'pointer' }}
-                            onClick={() => setOpenCategoryId(isOpen ? null : cat.id)}
+                            style={{ cursor: isPreselectedLocked ? 'default' : 'pointer' }}
+                            onClick={() => {
+                              if (!isPreselectedLocked) {
+                                setOpenCategoryId(openCategoryId === cat.id ? null : cat.id);
+                              }
+                            }}
                           >
                             <div>
                               <h6 className="fw-bold mb-0">{cat.title}</h6>
                               <small className="text-muted">{cat.items.length} services</small>
                             </div>
-                            <span className="fw-bold" style={{ color: 'var(--primary-color)' }}>
-                              {isOpen ? '▲' : '▼'}
-                            </span>
+                            {!isPreselectedLocked && (
+                              <span className="fw-bold" style={{ color: 'var(--primary-color)' }}>
+                                {isOpen ? '▲' : '▼'}
+                              </span>
+                            )}
                           </div>
 
                           {isOpen && (
@@ -391,7 +468,9 @@ export default function DynamicBookingWizard() {
                                           ? '4px solid var(--primary-color)'
                                           : 'none',
                                       }}
-                                      onClick={() => setSelectedService(srv)}
+                                      onClick={() => {
+                                        setSelectedService(srv);
+                                      }}
                                     >
                                       <div>
                                         <div className="fw-bold text-dark">{srv.name}</div>
@@ -405,7 +484,7 @@ export default function DynamicBookingWizard() {
                                           className="badge rounded-pill"
                                           style={{ backgroundColor: 'var(--primary-color)' }}
                                         >
-                                          Selected
+                                          {isPreselectedLocked ? 'Pre-Selected' : 'Selected'}
                                         </span>
                                       )}
                                     </button>
@@ -419,7 +498,6 @@ export default function DynamicBookingWizard() {
                     })}
                   </div>
 
-                  {/* Floating Dynamic Next Button when a service is chosen */}
                   {selectedService && (
                     <div
                       className="position-fixed bottom-0 start-50 translate-middle-x mb-4 px-4 py-3 bg-white rounded-pill shadow-lg d-flex align-items-center gap-3"
@@ -445,7 +523,7 @@ export default function DynamicBookingWizard() {
                 </section>
               )}
 
-              {/* ==================== STEP: STAFF (NAMES ONLY — NO TAGS) ==================== */}
+              {/* ==================== STEP: STAFF ==================== */}
               {currentStepKey === 'STAFF' && (
                 <section>
                   <h5 className="fw-bold mb-1">
@@ -484,7 +562,6 @@ export default function DynamicBookingWizard() {
                         </div>
                       </div>
 
-                      {/* Security Constraint: Render ONLY technician names; never render specialty/qualification badges */}
                       {staffList.map((tech) => {
                         const displayName = tech.name || tech.username || 'Nail Technician';
                         const isSelected = selectedStaff?.id === tech.id;
@@ -541,7 +618,7 @@ export default function DynamicBookingWizard() {
                 </section>
               )}
 
-              {/* ==================== OPTIONAL STEP: STATION / ROOM ==================== */}
+              {/* ==================== OPTIONAL STEP: STATION ==================== */}
               {currentStepKey === 'STATION' && wizard?.enableStationSelection && (
                 <section>
                   <h5 className="fw-bold mb-1">

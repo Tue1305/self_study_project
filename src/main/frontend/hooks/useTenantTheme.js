@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 
 function darkenHex(hex, percent = 12) {
-  if (!hex) return '#d81b60';
+  if (!hex) return '#0077b6';
   const clean = hex.replace('#', '');
   if (!/^[0-9a-fA-F]{6}$/.test(clean)) return hex;
   const num = parseInt(clean, 16);
@@ -13,9 +13,9 @@ function darkenHex(hex, percent = 12) {
 }
 
 function hexToRgba(hex, alpha = 0.1) {
-  if (!hex) return 'rgba(232, 62, 140, 0.1)';
+  if (!hex) return 'rgba(0, 180, 216, 0.1)';
   const clean = hex.replace('#', '');
-  if (!/^[0-9a-fA-F]{6}$/.test(clean)) return 'rgba(232, 62, 140, 0.1)';
+  if (!/^[0-9a-fA-F]{6}$/.test(clean)) return 'rgba(0, 180, 216, 0.1)';
   const num = parseInt(clean, 16);
   return `rgba(${(num >> 16) & 255}, ${(num >> 8) & 255}, ${num & 255}, ${alpha})`;
 }

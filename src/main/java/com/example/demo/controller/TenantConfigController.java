@@ -19,7 +19,7 @@ public class TenantConfigController {
     private static final Set<String> ALLOWED_STEPS = Set.of("SERVICE", "STAFF", "STATION", "DETAILS");
     private static final List<String> REQUIRED_CORE_STEPS = List.of("SERVICE", "STAFF", "DETAILS");
     private static final List<String> DEFAULT_STEP_ORDER = List.of("SERVICE", "STAFF", "STATION", "DETAILS");
-    private static final Set<String> ALLOWED_LAYOUTS = Set.of("classic", "compact", "split", "luxe");
+    private static final Set<String> ALLOWED_LAYOUTS = Set.of("classic", "compact", "split", "luxe", "blue-sky");
 
     private final TenantConfigRepository tenantConfigRepository;
 

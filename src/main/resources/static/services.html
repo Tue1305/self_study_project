@@ -979,14 +979,17 @@
     async function bookServiceDirectly(serviceName, priceNum, durationMins, description) {
         localStorage.setItem('selectedDesign', serviceName);
 
-        const existing = backendServices.find(s => s.name.toLowerCase() === serviceName.toLowerCase());
-        if (!existing) {
+        let targetServiceId = null;
+        let existing = backendServices.find(s => s.name.toLowerCase() === serviceName.toLowerCase());
+        if (existing) {
+            targetServiceId = existing.id;
+        } else {
             try {
                 const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
                 const headers = { 'Content-Type': 'application/json' };
                 if (token) headers['Authorization'] = 'Bearer ' + token;
 
-                await fetch('/api/services', {
+                const createRes = await fetch('/api/services', {
                     method: 'POST',
                     headers: headers,
                     body: JSON.stringify({
@@ -996,12 +999,17 @@
                         description: description
                     })
                 });
+                if (createRes.ok) {
+                    const created = await createRes.json();
+                    targetServiceId = created.id;
+                }
             } catch (err) {
                 console.warn('Could not auto-sync service to backend:', err);
             }
         }
 
-        window.location.href = './booking.html';
+        const query = targetServiceId ? `?serviceId=${encodeURIComponent(targetServiceId)}` : `?service=${encodeURIComponent(serviceName)}`;
+        window.location.href = `./booking.html${query}`;
     }
 
     function openAddServiceModal() {

@@ -279,8 +279,8 @@ public class DataInitializer implements CommandLineRunner {
         luxeConfig.setTenantKey("luxe");
         luxeConfig.setCustomDomain("luxe.jennysnailstudio.com");
         luxeConfig.setSalonName("Luxe Nail & Spa Sanctuary");
-        luxeConfig.setPrimaryColor("#6f42c1");
-        luxeConfig.setSecondaryColor("#212529");
+        luxeConfig.setPrimaryColor("#00b4d8");
+        luxeConfig.setSecondaryColor("#03045e");
         luxeConfig.setFontFamily("'Playfair Display', Georgia, serif");
         luxeConfig.setStepOrder("SERVICE,STAFF,STATION,DETAILS");
         luxeConfig.setEnableStationSelection(true);
@@ -288,7 +288,7 @@ public class DataInitializer implements CommandLineRunner {
         luxeConfig.setEnabledCategories("Manicures,Pedicures,Mani / Pedi Combos,Nail Enhancement & Art,Facial Treatments");
         luxeConfig.setShowAppointmentNotes(true);
         luxeConfig.setShowStaffQualificationTags(false);
-        luxeConfig.setLayoutVariant("luxe");
+        luxeConfig.setLayoutVariant("blue-sky");
         luxeConfig.setDefaultTenant(false);
 
         tenantConfigRepository.saveAll(List.of(defaultConfig, luxeConfig));

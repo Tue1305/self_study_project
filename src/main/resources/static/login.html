@@ -132,6 +132,20 @@
                     localStorage.setItem('userRole', role);
                 }
 
+                // Check for Luxe account login to redirect to tenant subdomain / Blue Sky layout
+                const isLuxeAccount = username.toLowerCase().includes('luxe');
+                if (isLuxeAccount) {
+                    const host = window.location.hostname;
+                    const port = window.location.port ? `:${window.location.port}` : '';
+                    if (host === 'localhost' || host === '127.0.0.1') {
+                        window.location.assign(`${window.location.protocol}//luxe.localhost${port}/booking.html?tenant=luxe`);
+                        return;
+                    } else {
+                        window.location.assign('./booking.html?tenant=luxe');
+                        return;
+                    }
+                }
+
                 // Route based on role
                 if (role === 'ROLE_ADMIN' || role === 'ADMIN') {
                     window.location.assign('./admin-dashboard.html');

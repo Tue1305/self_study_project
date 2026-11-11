@@ -4,7 +4,8 @@ import com.example.demo.entity.ServiceEntity;
 import com.example.demo.entity.UserEntity;
 import com.example.demo.repository.ServiceRepository;
 import com.example.demo.repository.UserRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.example.demo.service.TenantContextResolver;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -22,70 +24,68 @@ import java.util.stream.Collectors;
 @CrossOrigin(origins = "*")
 public class NailTechController {
 
-    @Autowired
-    private UserRepository userRepository;
+    private final UserRepository userRepository;
+    private final ServiceRepository serviceRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final TenantContextResolver tenantContextResolver;
 
-    @Autowired
-    private ServiceRepository serviceRepository;
+    public NailTechController(
+            UserRepository userRepository,
+            ServiceRepository serviceRepository,
+            PasswordEncoder passwordEncoder,
+            TenantContextResolver tenantContextResolver
+    ) {
+        this.userRepository = userRepository;
+        this.serviceRepository = serviceRepository;
+        this.passwordEncoder = passwordEncoder;
+        this.tenantContextResolver = tenantContextResolver;
+    }
 
-    @Autowired
-    private PasswordEncoder passwordEncoder;
-
-    // Public or authenticated so booking page & admin can fetch the list of nail techs
-    // Supports optional ?serviceId={id} filtering for the multi-step booking wizard
+    // Supports optional ?serviceId={id} filtering scoped strictly to the active tenant
     @GetMapping
-    public List<UserEntity> getAllNailTechs(@RequestParam(required = false) Long serviceId) {
-        List<UserEntity> allTechs = userRepository.findAll()
-                .stream()
-                .filter(u -> "ROLE_NAIL_TECH".equals(u.getRole()))
-                .toList();
+    public List<UserEntity> getAllNailTechs(
+            @RequestParam(required = false) Long serviceId,
+            HttpServletRequest request
+    ) {
+        String tenantId = tenantContextResolver.resolveTenantId(request);
+        List<UserEntity> tenantTechs = userRepository.findAllByTenantIdAndRole(tenantId, "ROLE_NAIL_TECH");
 
         if (serviceId == null) {
-            return allTechs;
+            return tenantTechs;
         }
 
-        ServiceEntity service = serviceRepository.findById(serviceId).orElse(null);
+        ServiceEntity service = serviceRepository.findByTenantIdAndId(tenantId, serviceId).orElse(null);
         if (service == null || service.getName() == null) {
-            return allTechs;
+            return tenantTechs;
         }
 
         String targetCategory = categorizeService(service.getName());
 
-        List<UserEntity> qualifiedTechs = allTechs.stream()
+        List<UserEntity> qualifiedTechs = tenantTechs.stream()
                 .filter(tech -> isTechQualifiedForCategory(tech, targetCategory))
                 .toList();
 
-        // Fallback: if no specific specialty match, return all available nail technicians
-        return qualifiedTechs.isEmpty() ? allTechs : qualifiedTechs;
+        return qualifiedTechs.isEmpty() ? tenantTechs : qualifiedTechs;
     }
 
-    /**
-     * Determines the operational category of a service based on its name.
-     */
     private String categorizeService(String serviceName) {
         String lower = serviceName.toLowerCase().trim();
 
-        // 1. Pedicures (Universal - all staff qualified)
         if (lower.contains("pedicure") || lower.contains("combo")) {
             return "PEDICURE";
         }
-        // 2. Kid Services (Universal - all staff qualified)
         if (lower.contains("kid") || lower.contains("kids")) {
             return "KID_SERVICES";
         }
-        // 3. Body Massage
         if (lower.contains("massage") || lower.contains("hot stone")) {
             return "BODY_MASSAGE";
         }
-        // 4. Waxing
         if (lower.contains("wax") || lower.contains("waxing")) {
             return "WAXING";
         }
-        // 5. Facial Treatments
         if (lower.contains("facial") || lower.contains("babor") || lower.contains("collagen")) {
             return "FACIAL";
         }
-        // 6. Nail Enhancement & Art (Strict: only Staff with NAIL_ART)
         if (lower.contains("bio sculpture") || lower.contains("gel powder") || lower.contains("dipping powder")
                 || lower.contains("nail art") || lower.contains("french tip") || lower.contains("ombre")
                 || lower.contains("chrome") || lower.contains("take off") || lower.contains("extension")
@@ -93,26 +93,20 @@ public class NailTechController {
                 || lower.contains("nail cut") || lower.contains("nail repair") || lower.contains("shellac")) {
             return "NAIL_ART";
         }
-        // 7. Manicures
         if (lower.contains("manicure")) {
             return "MANICURE";
         }
-        // 8. Specialty / Tinting / Packages
         if (lower.contains("tint") || lower.contains("tinting")) {
-            return "FACIAL"; // Grouped under aesthetic/facial specialists
+            return "FACIAL";
         }
         if (lower.contains("rejuvenation") || lower.contains("executive") || lower.contains("package")) {
-            return "ALL"; // Package spans multiple services, full capability staff
+            return "ALL";
         }
 
         return "MANICURE";
     }
 
-    /**
-     * Verifies if a technician is qualified for the given category according to store capability rules.
-     */
     private boolean isTechQualifiedForCategory(UserEntity tech, String category) {
-        // Universal Rule: EVERY staff member can perform Pedicures and Kid Services
         if ("PEDICURE".equals(category) || "KID_SERVICES".equals(category)) {
             return true;
         }
@@ -127,7 +121,6 @@ public class NailTechController {
                 .map(String::toUpperCase)
                 .collect(Collectors.toSet());
 
-        // Universal staff capability tag
         if (capabilityTags.contains("ALL") || capabilityTags.contains("FULL EVERYTHING") || capabilityTags.contains("GENERAL")) {
             return true;
         }
@@ -137,22 +130,22 @@ public class NailTechController {
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ADMIN')")
     @PostMapping
-    public ResponseEntity<?> createNailTech(@RequestBody UserEntity tech) {
+    public ResponseEntity<?> createNailTech(@RequestBody UserEntity tech, HttpServletRequest request) {
         String identifier = tech.getEmail() != null ? tech.getEmail() : tech.getUsername();
 
         if (identifier == null || userRepository.existsByUsername(identifier)) {
             return ResponseEntity.badRequest().body(Map.of("message", "Email or username is already taken!"));
         }
 
-        // Assign default username/password if created from admin panel
         if (tech.getUsername() == null && tech.getEmail() != null) {
             tech.setUsername(tech.getEmail());
         }
         if (tech.getPassword() == null || tech.getPassword().isEmpty()) {
-            tech.setPassword(passwordEncoder.encode("defaultPassword123")); // Default secure pass
+            tech.setPassword(passwordEncoder.encode("defaultPassword123"));
         }
 
-        // Explicitly set the role to ROLE_NAIL_TECH
+        String tenantId = tenantContextResolver.resolveTenantId(request);
+        tech.setTenantId(tenantId);
         tech.setRole("ROLE_NAIL_TECH");
 
         UserEntity savedTech = userRepository.save(tech);
@@ -161,8 +154,13 @@ public class NailTechController {
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ADMIN')")
     @PutMapping("/{id}")
-    public ResponseEntity<?> updateNailTech(@PathVariable Long id, @RequestBody UserEntity updatedTech) {
-        return userRepository.findById(id)
+    public ResponseEntity<?> updateNailTech(
+            @PathVariable Long id,
+            @RequestBody UserEntity updatedTech,
+            HttpServletRequest request
+    ) {
+        String tenantId = tenantContextResolver.resolveTenantId(request);
+        return userRepository.findByTenantIdAndId(tenantId, id)
                 .map(tech -> {
                     tech.setName(updatedTech.getName());
                     tech.setEmail(updatedTech.getEmail());
@@ -179,12 +177,14 @@ public class NailTechController {
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ADMIN')")
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> deleteNailTech(@PathVariable Long id) {
-        if (!userRepository.existsById(id)) {
+    public ResponseEntity<?> deleteNailTech(@PathVariable Long id, HttpServletRequest request) {
+        String tenantId = tenantContextResolver.resolveTenantId(request);
+        Optional<UserEntity> existing = userRepository.findByTenantIdAndId(tenantId, id);
+        if (existing.isEmpty()) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(Map.of("message", "Nail technician not found"));
         }
-        userRepository.deleteById(id);
+        userRepository.delete(existing.get());
         return ResponseEntity.ok(Map.of("message", "Nail technician deleted successfully"));
     }
 }

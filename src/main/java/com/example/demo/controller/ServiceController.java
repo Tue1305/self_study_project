@@ -2,7 +2,8 @@ package com.example.demo.controller;
 
 import com.example.demo.entity.ServiceEntity;
 import com.example.demo.repository.ServiceRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.example.demo.service.TenantContextResolver;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -17,30 +18,43 @@ import java.util.Optional;
 @CrossOrigin(origins = "*")
 public class ServiceController {
 
-    @Autowired
-    private ServiceRepository serviceRepository;
+    private final ServiceRepository serviceRepository;
+    private final TenantContextResolver tenantContextResolver;
+
+    public ServiceController(ServiceRepository serviceRepository, TenantContextResolver tenantContextResolver) {
+        this.serviceRepository = serviceRepository;
+        this.tenantContextResolver = tenantContextResolver;
+    }
 
     @GetMapping
-    public List<ServiceEntity> getAllServices() {
-        return serviceRepository.findAll();
+    public List<ServiceEntity> getAllServices(HttpServletRequest request) {
+        String tenantId = tenantContextResolver.resolveTenantId(request);
+        return serviceRepository.findAllByTenantId(tenantId);
     }
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ADMIN')")
     @PostMapping
-    public ResponseEntity<?> createService(@RequestBody ServiceEntity service) {
+    public ResponseEntity<?> createService(@RequestBody ServiceEntity service, HttpServletRequest request) {
         if (service.getName() == null || service.getName().isBlank() || service.getPrice() == null) {
             return ResponseEntity.badRequest().body(Map.of("message", "Service name and price are required."));
         }
         if (service.getDurationMinutes() == null) {
             service.setDurationMinutes(60);
         }
+        String tenantId = tenantContextResolver.resolveTenantId(request);
+        service.setTenantId(tenantId);
         return ResponseEntity.ok(serviceRepository.save(service));
     }
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ADMIN')")
     @PutMapping("/{id}")
-    public ResponseEntity<?> updateService(@PathVariable Long id, @RequestBody ServiceEntity updated) {
-        Optional<ServiceEntity> optional = serviceRepository.findById(id);
+    public ResponseEntity<?> updateService(
+            @PathVariable Long id,
+            @RequestBody ServiceEntity updated,
+            HttpServletRequest request
+    ) {
+        String tenantId = tenantContextResolver.resolveTenantId(request);
+        Optional<ServiceEntity> optional = serviceRepository.findByTenantIdAndId(tenantId, id);
         if (optional.isEmpty()) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(Map.of("message", "Service not found."));
@@ -62,12 +76,14 @@ public class ServiceController {
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ADMIN')")
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> deleteService(@PathVariable Long id) {
-        if (!serviceRepository.existsById(id)) {
+    public ResponseEntity<?> deleteService(@PathVariable Long id, HttpServletRequest request) {
+        String tenantId = tenantContextResolver.resolveTenantId(request);
+        Optional<ServiceEntity> existing = serviceRepository.findByTenantIdAndId(tenantId, id);
+        if (existing.isEmpty()) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(Map.of("message", "Service not found."));
         }
-        serviceRepository.deleteById(id);
+        serviceRepository.delete(existing.get());
         return ResponseEntity.ok(Map.of("message", "Service deleted successfully."));
     }
 }

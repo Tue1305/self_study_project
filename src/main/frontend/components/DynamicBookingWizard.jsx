@@ -119,9 +119,11 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
     }
   }, [onRegisterResetHandler, resetToBlankWizard]);
 
-  // Fetch all services on mount
+  // Fetch all services scoped to active tenant
   useEffect(() => {
-    fetch('/api/services')
+    fetch('/api/services', {
+      headers: { 'X-Tenant-ID': tenant.tenantKey },
+    })
       .then((res) => (res.ok ? res.json() : []))
       .then((data) => {
         const list = Array.isArray(data) ? data : [];
@@ -141,16 +143,18 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
         }
       })
       .catch(() => setAlertMessage('Unable to load salon services.'));
-  }, [preselectedServiceId]);
+  }, [preselectedServiceId, tenant.tenantKey]);
 
-  // Dynamically fetch qualified staff when entering STAFF step
+  // Dynamically fetch qualified staff scoped to active tenant
   useEffect(() => {
     if (currentStepKey !== 'STAFF') return;
     setLoadingStaff(true);
     const query = selectedService?.id
       ? `?serviceId=${encodeURIComponent(selectedService.id)}`
       : '';
-    fetch(`/api/nail-techs${query}`)
+    fetch(`/api/nail-techs${query}`, {
+      headers: { 'X-Tenant-ID': tenant.tenantKey },
+    })
       .then((res) => (res.ok ? res.json() : []))
       .then((data) => {
         const list = Array.isArray(data) ? data : [];

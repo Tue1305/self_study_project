@@ -4,12 +4,15 @@ import jakarta.persistence.*;
 import java.math.BigDecimal;
 
 @Entity
-@Table(name = "services")
+@Table(name = "services", indexes = @Index(name = "idx_services_tenant_id", columnList = "tenant_id"))
 public class ServiceEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(name = "tenant_id", nullable = false, length = 64)
+    private String tenantId = "default";
 
     @Column(nullable = false)
     private String name;
@@ -26,6 +29,11 @@ public class ServiceEntity {
     public ServiceEntity() {}
 
     public ServiceEntity(String name, String description, BigDecimal price, Integer durationMinutes) {
+        this("default", name, description, price, durationMinutes);
+    }
+
+    public ServiceEntity(String tenantId, String name, String description, BigDecimal price, Integer durationMinutes) {
+        this.tenantId = (tenantId == null || tenantId.isBlank()) ? "default" : tenantId.trim().toLowerCase();
         this.name = name;
         this.description = description;
         this.price = price;
@@ -35,6 +43,9 @@ public class ServiceEntity {
     // Getters and Setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
+
+    public String getTenantId() { return tenantId; }
+    public void setTenantId(String tenantId) { this.tenantId = (tenantId == null || tenantId.isBlank()) ? "default" : tenantId.trim().toLowerCase(); }
 
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }

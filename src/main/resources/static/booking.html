@@ -941,11 +941,22 @@
         }
     }
 
+    function getActiveTenantHeaders(extraHeaders = {}) {
+        const headers = { ...extraHeaders };
+        const tKey = bookingState.tenantConfig && bookingState.tenantConfig.tenantKey;
+        if (tKey) {
+            headers['X-Tenant-ID'] = tKey;
+        }
+        return headers;
+    }
+
     // ==================== STEP 1: LOAD & SELECT SERVICE (CATEGORIES) ====================
     async function loadServicesStep1() {
         const grid = document.getElementById('categoriesGrid');
         try {
-            const response = await fetch('/api/services');
+            const response = await fetch('/api/services', {
+                headers: getActiveTenantHeaders()
+            });
             if (!response.ok) throw new Error('Failed to load services');
             const services = await response.json();
             bookingState.servicesList = services;
@@ -1153,7 +1164,9 @@
         `;
 
         try {
-            const response = await fetch(`/api/nail-techs?serviceId=${encodeURIComponent(serviceId)}`);
+            const response = await fetch(`/api/nail-techs?serviceId=${encodeURIComponent(serviceId)}`, {
+                headers: getActiveTenantHeaders()
+            });
             const techs = response.ok ? await response.json() : [];
             bookingState.staffList = techs;
 
@@ -1447,7 +1460,7 @@
             appointmentTime: `${selectedDate}T${selectedTime}`
         };
 
-        const headers = { 'Content-Type': 'application/json' };
+        const headers = getActiveTenantHeaders({ 'Content-Type': 'application/json' });
         if (token) {
             headers['Authorization'] = 'Bearer ' + token;
         }

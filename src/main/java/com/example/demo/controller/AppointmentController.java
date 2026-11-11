@@ -2,34 +2,55 @@ package com.example.demo.controller;
 
 import com.example.demo.entity.Appointment;
 import com.example.demo.entity.Customer;
+import com.example.demo.entity.ServiceEntity;
+import com.example.demo.entity.UserEntity;
 import com.example.demo.repository.AppointmentRepository;
 import com.example.demo.repository.CustomerRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.example.demo.repository.ServiceRepository;
+import com.example.demo.repository.UserRepository;
+import com.example.demo.service.TenantContextResolver;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @RestController
 @RequestMapping({"/api/appointments", "/api/bookings"})
 @CrossOrigin(origins = "*")
 public class AppointmentController {
 
-    @Autowired
-    private AppointmentRepository appointmentRepository;
+    private final AppointmentRepository appointmentRepository;
+    private final CustomerRepository customerRepository;
+    private final ServiceRepository serviceRepository;
+    private final UserRepository userRepository;
+    private final TenantContextResolver tenantContextResolver;
 
-    @Autowired
-    private CustomerRepository customerRepository;
+    public AppointmentController(
+            AppointmentRepository appointmentRepository,
+            CustomerRepository customerRepository,
+            ServiceRepository serviceRepository,
+            UserRepository userRepository,
+            TenantContextResolver tenantContextResolver
+    ) {
+        this.appointmentRepository = appointmentRepository;
+        this.customerRepository = customerRepository;
+        this.serviceRepository = serviceRepository;
+        this.userRepository = userRepository;
+        this.tenantContextResolver = tenantContextResolver;
+    }
 
     @GetMapping
-    public List<Appointment> getAllAppointments() {
-        return appointmentRepository.findAll();
+    public List<Appointment> getAllAppointments(HttpServletRequest request) {
+        String tenantId = tenantContextResolver.resolveTenantId(request);
+        return appointmentRepository.findAllByTenantId(tenantId);
     }
 
     @PostMapping
-    public ResponseEntity<?> bookAppointment(@RequestBody Appointment appointment) {
+    public ResponseEntity<?> bookAppointment(@RequestBody Appointment appointment, HttpServletRequest request) {
         if (appointment.getCustomerName() == null || appointment.getCustomerName().isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("message", "Customer name is required."));
         }
@@ -46,19 +67,39 @@ public class AppointmentController {
             return ResponseEntity.badRequest().body(Map.of("message", "Please select an appointment date and time."));
         }
 
+        String tenantId = tenantContextResolver.resolveTenantId(request);
+
+        // Enforce that the booked service belongs to the active tenant
+        Optional<ServiceEntity> tenantService = serviceRepository.findByTenantIdAndId(
+                tenantId,
+                appointment.getService().getId()
+        );
+        if (tenantService.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Selected service does not belong to this salon."));
+        }
+        appointment.setService(tenantService.get());
+        appointment.setTenantId(tenantId);
+
         // If "Anyone Available" was chosen (no nail tech ID), set nailTech to null
         if (appointment.getNailTech() != null && appointment.getNailTech().getId() == null) {
             appointment.setNailTech(null);
         }
 
-        // Check for scheduling conflicts with the selected technician at the same time slot
+        // Enforce technician belongs to tenant & check conflicts ONLY inside current tenant scope
         if (appointment.getNailTech() != null && appointment.getNailTech().getId() != null) {
             Long techId = appointment.getNailTech().getId();
-            boolean hasConflict = appointmentRepository.findAll().stream()
-                    .anyMatch(existing -> existing.getStatus() != Appointment.AppointmentStatus.CANCELLED
-                            && existing.getNailTech() != null
-                            && techId.equals(existing.getNailTech().getId())
-                            && appointment.getAppointmentTime().equals(existing.getAppointmentTime()));
+            Optional<UserEntity> tenantTech = userRepository.findByTenantIdAndId(tenantId, techId);
+            if (tenantTech.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Selected technician does not belong to this salon."));
+            }
+            appointment.setNailTech(tenantTech.get());
+
+            boolean hasConflict = appointmentRepository.existsByTenantIdAndNailTechIdAndAppointmentTimeAndStatusNot(
+                    tenantId,
+                    techId,
+                    appointment.getAppointmentTime(),
+                    Appointment.AppointmentStatus.CANCELLED
+            );
             if (hasConflict) {
                 return ResponseEntity.status(HttpStatus.CONFLICT)
                         .body(Map.of("message", "This technician is already booked at the selected time slot. Please choose another time or technician."));
@@ -75,7 +116,6 @@ public class AppointmentController {
                 customer.setPhone(appointment.getCustomerPhone().trim());
                 customerRepository.save(customer);
             } catch (Exception ignored) {
-                // Keep booking resilient even if customer sync encounters a constraint issue
             }
         }
 
@@ -86,12 +126,13 @@ public class AppointmentController {
     @PatchMapping("/{id}/status")
     public ResponseEntity<?> updateAppointmentStatus(
             @PathVariable Long id,
-            @RequestParam String status) {
-
-        return appointmentRepository.findById(id)
+            @RequestParam String status,
+            HttpServletRequest request
+    ) {
+        String tenantId = tenantContextResolver.resolveTenantId(request);
+        return appointmentRepository.findByTenantIdAndId(tenantId, id)
                 .map(appointment -> {
                     try {
-                        // Updates the status (CONFIRMED or CANCELLED)
                         appointment.setStatus(Appointment.AppointmentStatus.valueOf(status.toUpperCase()));
                         appointmentRepository.save(appointment);
                         return ResponseEntity.ok(Map.of("message", "Appointment status updated successfully"));

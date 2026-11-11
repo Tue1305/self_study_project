@@ -1,9 +1,11 @@
 package com.example.demo;
 
+import com.example.demo.entity.Appointment;
 import com.example.demo.entity.ShowcaseItem;
 import com.example.demo.entity.TenantConfig;
 import com.example.demo.entity.UserEntity;
 import com.example.demo.entity.ServiceEntity;
+import com.example.demo.repository.AppointmentRepository;
 import com.example.demo.repository.ServiceRepository;
 import com.example.demo.repository.ShowcaseRepository;
 import com.example.demo.repository.TenantConfigRepository;
@@ -14,6 +16,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Component
@@ -23,6 +27,7 @@ public class DataInitializer implements CommandLineRunner {
     private final ServiceRepository serviceRepository;
     private final ShowcaseRepository showcaseRepository;
     private final TenantConfigRepository tenantConfigRepository;
+    private final AppointmentRepository appointmentRepository;
     private final PasswordEncoder passwordEncoder;
     private final CustomerService customerService;
 
@@ -30,12 +35,14 @@ public class DataInitializer implements CommandLineRunner {
                            ServiceRepository serviceRepository,
                            ShowcaseRepository showcaseRepository,
                            TenantConfigRepository tenantConfigRepository,
+                           AppointmentRepository appointmentRepository,
                            PasswordEncoder passwordEncoder,
                            CustomerService customerService) {
         this.userRepository = userRepository;
         this.serviceRepository = serviceRepository;
         this.showcaseRepository = showcaseRepository;
         this.tenantConfigRepository = tenantConfigRepository;
+        this.appointmentRepository = appointmentRepository;
         this.passwordEncoder = passwordEncoder;
         this.customerService = customerService;
     }
@@ -67,8 +74,8 @@ public class DataInitializer implements CommandLineRunner {
         // Seed multi-tenant UI layout & theme configurations
         seedTenantConfigs();
 
-        // Seed full salon services menu into database if count < 10
-        if (serviceRepository.count() < 10) {
+        // Seed full salon services menu for "default" tenant if count < 10
+        if (serviceRepository.countByTenantId("default") < 10) {
             List<ServiceEntity> menuServices = List.of(
                     // Manicures
                     new ServiceEntity("Express Manicure", "Warm hand soak, nail trim, shape, buff, cuticle clean, polish application.", new BigDecimal("23.00"), 25),
@@ -173,8 +180,24 @@ public class DataInitializer implements CommandLineRunner {
             );
 
             serviceRepository.saveAll(menuServices);
-            System.out.println("✅ Full salon services menu seeded into database!");
+            System.out.println("✅ Full salon services menu seeded for tenant 'default'!");
         }
+
+        // Seed distinct salon services menu for "luxe" tenant
+        if (serviceRepository.countByTenantId("luxe") == 0) {
+            List<ServiceEntity> luxeServices = List.of(
+                    new ServiceEntity("luxe", "Luxe Signature Gel Manicure", "Organic cuticle ritual, warm towel wrap, and high-gloss Luxe gel polish.", new BigDecimal("48.00"), 40),
+                    new ServiceEntity("luxe", "Royal Lavender Spa Pedicure", "Mineral bath soak, volcanic stone scrub, paraffin mask, and lavender foot massage.", new BigDecimal("72.00"), 55),
+                    new ServiceEntity("luxe", "Zen Custom Nail Art & Chrome", "Custom hand-painted nail artistry with pearl chrome and encapsulated foil accents.", new BigDecimal("95.00"), 75),
+                    new ServiceEntity("luxe", "24K Gold Collagen Facial", "Luxury rejuvenating facial infused with 24K gold peptides and deep hydration serum.", new BigDecimal("145.00"), 60),
+                    new ServiceEntity("luxe", "Hydro-Silk Body Massage", "Full-body 60-minute aromatherapy massage using warm botanical oils.", new BigDecimal("110.00"), 60)
+            );
+            serviceRepository.saveAll(luxeServices);
+            System.out.println("✅ Seeded custom service menu for tenant 'luxe'!");
+        }
+
+        // Seed isolated sample appointments per tenant
+        seedSampleTenantAppointments();
 
         if (showcaseRepository.count() == 0) {
             showcaseRepository.saveAll(List.of(
@@ -242,6 +265,7 @@ public class DataInitializer implements CommandLineRunner {
 
         for (StaffConfig config : staffConfigs) {
             UserEntity tech = userRepository.findByUsername(config.username()).orElseGet(UserEntity::new);
+            tech.setTenantId("default");
             tech.setUsername(config.username());
             tech.setName(config.name());
             tech.setEmail(config.email());
@@ -252,7 +276,66 @@ public class DataInitializer implements CommandLineRunner {
             }
             userRepository.save(tech);
         }
-        System.out.println("✅ Configured all 10 salon technicians with customized service capabilities!");
+
+        // Seed dedicated technicians for "luxe" tenant
+        List<StaffConfig> luxeStaff = List.of(
+                new StaffConfig("sophia@luxenailspa.com", "Sophia Laurent", "sophia@luxenailspa.com", "ALL, NAIL_ART"),
+                new StaffConfig("chloe@luxenailspa.com", "Chloe Vance", "chloe@luxenailspa.com", "MANICURE, FACIAL"),
+                new StaffConfig("marcus@luxenailspa.com", "Marcus Reed", "marcus@luxenailspa.com", "BODY_MASSAGE, MANICURE")
+        );
+        for (StaffConfig config : luxeStaff) {
+            UserEntity tech = userRepository.findByUsername(config.username()).orElseGet(UserEntity::new);
+            tech.setTenantId("luxe");
+            tech.setUsername(config.username());
+            tech.setName(config.name());
+            tech.setEmail(config.email());
+            tech.setSpecialty(config.specialty());
+            tech.setRole("ROLE_NAIL_TECH");
+            if (tech.getPassword() == null || tech.getPassword().isEmpty()) {
+                tech.setPassword(passwordEncoder.encode("defaultPassword123"));
+            }
+            userRepository.save(tech);
+        }
+        System.out.println("✅ Configured tenant-isolated salon technicians for 'default' and 'luxe'!");
+    }
+
+    private void seedSampleTenantAppointments() {
+        LocalDateTime tomorrowAtTwo = LocalDate.now().plusDays(1).atTime(14, 0);
+
+        if (appointmentRepository.findAllByTenantId("default").isEmpty()) {
+            List<ServiceEntity> defaultServices = serviceRepository.findAllByTenantId("default");
+            List<UserEntity> defaultTechs = userRepository.findAllByTenantIdAndRole("default", "ROLE_NAIL_TECH");
+            if (!defaultServices.isEmpty() && !defaultTechs.isEmpty()) {
+                Appointment appt = new Appointment();
+                appt.setTenantId("default");
+                appt.setCustomerName("Alice Morgan");
+                appt.setCustomerPhone("(555) 210-1001");
+                appt.setCustomerEmail("alice@example.com");
+                appt.setAppointmentTime(tomorrowAtTwo);
+                appt.setService(defaultServices.get(0));
+                appt.setNailTech(defaultTechs.get(0));
+                appt.setNotes("Initial seeded booking for Jenny's Nail Studio");
+                appointmentRepository.save(appt);
+            }
+        }
+
+        if (appointmentRepository.findAllByTenantId("luxe").isEmpty()) {
+            List<ServiceEntity> luxeServices = serviceRepository.findAllByTenantId("luxe");
+            List<UserEntity> luxeTechs = userRepository.findAllByTenantIdAndRole("luxe", "ROLE_NAIL_TECH");
+            if (!luxeServices.isEmpty() && !luxeTechs.isEmpty()) {
+                Appointment appt = new Appointment();
+                appt.setTenantId("luxe");
+                appt.setCustomerName("Victoria Sterling");
+                appt.setCustomerPhone("(555) 980-2002");
+                appt.setCustomerEmail("victoria@example.com");
+                appt.setAppointmentTime(tomorrowAtTwo);
+                appt.setStationPreference("Private Zen Suite A");
+                appt.setService(luxeServices.get(0));
+                appt.setNailTech(luxeTechs.get(0));
+                appt.setNotes("Initial seeded booking for Luxe Nail & Spa");
+                appointmentRepository.save(appt);
+            }
+        }
     }
 
     private void seedTenantConfigs() {

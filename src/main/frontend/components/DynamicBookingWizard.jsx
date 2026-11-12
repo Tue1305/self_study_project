@@ -107,6 +107,17 @@ function isTechQualifiedForBackendCategory(tech, category) {
 }
 
 
+function getStaffPronouns(tech) {
+  if (!tech) return 'she/her';
+  const raw = (tech.name || tech.username || '').trim().toLowerCase();
+  const first = raw.split(/[\s@._]/)[0];
+  const maleNames = ['tony', 'michael', 'david', 'john', 'alex', 'kevin', 'brian', 'james', 'robert', 'daniel', 'chris', 'ryan'];
+  if (maleNames.includes(first)) {
+    return 'he/him';
+  }
+  return 'she/her';
+}
+
 function createEmptyGuest(guestNumber) {
   return {
     guestNumber,
@@ -178,7 +189,6 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
   const [alertMessage, setAlertMessage] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [confirmedBooking, setConfirmedBooking] = useState(null);
-  const [crossServicePrompt, setCrossServicePrompt] = useState(null);
 
   const currentStepKey = activeSteps[currentStepIdx] || 'SERVICE';
 
@@ -525,93 +535,18 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
     const catGroup = currentGuestCategoryGroups.find((g) => g.catId === catId);
     if (!catGroup) return;
 
-    if (!tech) {
-      // Anyone Available for this category
-      setGuests((prev) =>
-        prev.map((g, idx) => {
-          if (idx !== staffGuestIndex) return g;
-          const assignments = { ...(g.serviceStaffAssignments || {}) };
-          catGroup.services.forEach((s) => {
-            assignments[s.id] = null;
-          });
-          const updated = updateMultiServiceStaffStatus(g, assignments);
-          if (idx === 0 && updated.selectedStaff) {
-            setSelectedStaff(updated.selectedStaff);
-          }
-          return updated;
-        })
-      );
-      return;
-    }
-
-    // Specific tech chosen
-    const otherGroups = currentGuestCategoryGroups.filter((g) => g.catId !== catId);
-    const otherQualified = otherGroups.filter((g) =>
-      isTechQualifiedForBackendCategory(tech, g.backendCat)
-    );
-
-    if (otherQualified.length > 0) {
-      // Prompt customer: "Do you want [Staff Name] to do both services for you? (Yes / No)"
-      setCrossServicePrompt({
-        tech,
-        catId,
-        group: catGroup,
-        otherQualifiedGroups: otherQualified,
-      });
-    } else {
-      // Tech can only perform this category
-      setGuests((prev) =>
-        prev.map((g, idx) => {
-          if (idx !== staffGuestIndex) return g;
-          const assignments = { ...(g.serviceStaffAssignments || {}) };
-          catGroup.services.forEach((s) => {
-            assignments[s.id] = tech.id;
-          });
-          const updated = updateMultiServiceStaffStatus(g, assignments);
-          if (idx === 0 && updated.selectedStaff) {
-            setSelectedStaff(updated.selectedStaff);
-          }
-          return updated;
-        })
-      );
-    }
-  };
-
-  const handleCrossServiceResponse = (applyToAll) => {
-    if (!crossServicePrompt) return;
-    const { tech, group, otherQualifiedGroups } = crossServicePrompt;
-    setCrossServicePrompt(null);
-
     setGuests((prev) =>
       prev.map((g, idx) => {
         if (idx !== staffGuestIndex) return g;
         const assignments = { ...(g.serviceStaffAssignments || {}) };
-
-        if (applyToAll) {
-          [group, ...otherQualifiedGroups].forEach((grp) => {
-            grp.services.forEach((s) => {
-              assignments[s.id] = tech.id;
-            });
-          });
-          const updated = updateMultiServiceStaffStatus(
-            g,
-            assignments,
-            `${tech.name || tech.username} (All Services)`
-          );
-          if (idx === 0 && updated.selectedStaff) {
-            setSelectedStaff(updated.selectedStaff);
-          }
-          return updated;
-        } else {
-          group.services.forEach((s) => {
-            assignments[s.id] = tech.id;
-          });
-          const updated = updateMultiServiceStaffStatus(g, assignments);
-          if (idx === 0 && updated.selectedStaff) {
-            setSelectedStaff(updated.selectedStaff);
-          }
-          return updated;
+        catGroup.services.forEach((s) => {
+          assignments[s.id] = tech ? tech.id : null;
+        });
+        const updated = updateMultiServiceStaffStatus(g, assignments);
+        if (idx === 0 && updated.selectedStaff) {
+          setSelectedStaff(updated.selectedStaff);
         }
+        return updated;
       })
     );
   };
@@ -1340,7 +1275,7 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
                                   </div>
                                   <div>
                                     <h6 className="fw-bold text-dark mb-0">{tech.name || tech.username}</h6>
-                                    <small className="text-muted">Salon Specialist</small>
+                                    <small className="text-muted">{getStaffPronouns(tech)}</small>
                                   </div>
                                 </div>
                                 {isSelected && (
@@ -1439,7 +1374,7 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
                                         </div>
                                         <div>
                                           <h6 className="fw-bold text-dark mb-0">{tech.name || tech.username}</h6>
-                                          <small className="text-muted">Qualified Specialist</small>
+                                          <small className="text-muted">{getStaffPronouns(tech)}</small>
                                         </div>
                                       </div>
                                       {isAssigned && (
@@ -1766,62 +1701,6 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
           </div>
         </div>
       </div>
-
-      {/* Cross-Service Staff Assignment Prompt Modal */}
-      {crossServicePrompt && (
-        <div
-          className="modal show d-block"
-          tabIndex="-1"
-          style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1060 }}
-        >
-          <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content border-0 shadow rounded-4">
-              <div className="modal-body p-4 text-center">
-                <div className="mb-3">
-                  <span
-                    className="d-inline-flex align-items-center justify-content-center rounded-circle text-white"
-                    style={{
-                      width: 56,
-                      height: 56,
-                      fontSize: '1.8rem',
-                      backgroundColor: 'var(--primary-color)',
-                    }}
-                  >
-                    ✓
-                  </span>
-                </div>
-                <h5 className="fw-bold mb-2">Assign Technician</h5>
-                <p className="text-secondary mb-4 fs-6">
-                  Do you want{' '}
-                  <strong>
-                    {crossServicePrompt.tech.name || crossServicePrompt.tech.username}
-                  </strong>{' '}
-                  to do{' '}
-                  {currentGuestCategoryGroups.length <= 2 ? 'both services' : 'all your services'}{' '}
-                  for you?
-                </p>
-                <div className="d-flex justify-content-center gap-3">
-                  <button
-                    type="button"
-                    className="btn btn-outline-secondary px-4 py-2 rounded-3 fw-semibold"
-                    onClick={() => handleCrossServiceResponse(false)}
-                  >
-                    No
-                  </button>
-                  <button
-                    type="button"
-                    className="btn text-white px-4 py-2 rounded-3 fw-bold"
-                    style={{ backgroundColor: 'var(--primary-color)' }}
-                    onClick={() => handleCrossServiceResponse(true)}
-                  >
-                    Yes
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </main>
   );
 }

@@ -649,33 +649,6 @@
     </div>
 </main>
 
-<!-- Cross-Service Staff Assignment Prompt Modal -->
-<div class="modal fade" id="crossServicePromptModal" tabindex="-1" aria-labelledby="crossServiceModalLabel" aria-hidden="true" data-bs-backdrop="static">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow rounded-4">
-            <div class="modal-body p-4 text-center">
-                <div class="mb-3">
-                    <span class="d-inline-flex align-items-center justify-content-center rounded-circle" style="width: 56px; height: 56px; font-size: 1.8rem; background-color: var(--bs-soft-pink); color: var(--bs-primary-pink);">
-                        <i class="bi bi-person-check-fill"></i>
-                    </span>
-                </div>
-                <h5 class="fw-bold mb-2">Assign Technician</h5>
-                <p class="text-secondary mb-4 fs-6" id="crossServicePromptMessage">
-                    Do you want this technician to do both services for you?
-                </p>
-                <div class="d-flex justify-content-center gap-3">
-                    <button type="button" class="btn btn-outline-secondary px-4 py-2 rounded-3 fw-semibold" id="crossServicePromptNoBtn">
-                        No
-                    </button>
-                    <button type="button" class="btn btn-pink px-4 py-2 rounded-3 fw-bold" id="crossServicePromptYesBtn">
-                        Yes
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
 <!-- Footer with Store Hours -->
 <footer class="bg-white border-top py-4 mt-auto">
     <div class="container text-center">
@@ -1590,6 +1563,17 @@
         }
     }
 
+    function getStaffPronouns(tech) {
+        if (!tech) return 'she/her';
+        const raw = (tech.name || tech.username || '').trim().toLowerCase();
+        const first = raw.split(/[\s@._]/)[0];
+        const maleNames = ['tony', 'michael', 'david', 'john', 'alex', 'kevin', 'brian', 'james', 'robert', 'daniel', 'chris', 'ryan'];
+        if (maleNames.includes(first)) {
+            return 'he/him';
+        }
+        return 'she/her';
+    }
+
     function isTechQualifiedForBackend(tech, backendCat) {
         if (backendCat === 'PEDICURE' || backendCat === 'KID_SERVICES') {
             return true;
@@ -1722,7 +1706,7 @@
                             <div class="staff-avatar"><i class="bi bi-person-fill"></i></div>
                             <div>
                                 <h5 class="fw-bold text-dark mb-0">${tech.name || tech.username}</h5>
-                                <small class="text-muted">Salon Specialist</small>
+                                <small class="text-muted">${getStaffPronouns(tech)}</small>
                             </div>
                         </div>
                         <span class="check-indicator"><i class="bi bi-check-lg"></i></span>
@@ -1790,7 +1774,7 @@
                                     <div class="staff-avatar"><i class="bi bi-person-fill"></i></div>
                                     <div>
                                         <h5 class="fw-bold text-dark mb-0">${tech.name || tech.username}</h5>
-                                        <small class="text-muted">Qualified Specialist</small>
+                                        <small class="text-muted">${getStaffPronouns(tech)}</small>
                                     </div>
                                 </div>
                                 <span class="check-indicator"><i class="bi bi-check-lg"></i></span>
@@ -1894,22 +1878,12 @@
             return;
         }
 
-        // Specific staff member chosen
+        // Specific staff member chosen - directly assign to this category without prompting
         const tech = bookingState.staffList.find(t => t.id === identifier);
         if (!tech) return;
 
-        // Check if tech is qualified for OTHER categories selected by this guest
-        const otherGroups = Object.values(groups).filter(g => g.catId !== catId);
-        const otherQualifiedGroups = otherGroups.filter(g => isTechQualifiedForBackend(tech, g.backendCat));
-
-        if (otherQualifiedGroups.length > 0) {
-            // Prompt customer: "Do you want [Staff Name] to do both services for you? (Yes / No)"
-            showCrossServicePrompt(tech, catId, grp, otherQualifiedGroups, groups);
-        } else {
-            // Tech only qualified for this category
-            assignTechToCategory(currentGuest, grp, tech.id);
-            checkMultiServiceStaffCompletion(currentGuest, groups);
-        }
+        assignTechToCategory(currentGuest, grp, tech.id);
+        checkMultiServiceStaffCompletion(currentGuest, groups);
     }
 
     function assignTechToCategory(currentGuest, grp, techId) {
@@ -1919,54 +1893,6 @@
         document.querySelectorAll(`#catStaffGrid-${grp.catId} .staff-card`).forEach(c => c.classList.remove('selected'));
         const card = document.getElementById(`catCard-${grp.catId}-${techId}`);
         if (card) card.classList.add('selected');
-    }
-
-    function showCrossServicePrompt(tech, catId, grp, otherQualifiedGroups, allGroups) {
-        const currentGuest = bookingState.guests[bookingState.staffGuestIndex] || bookingState.guests[0];
-        const techName = tech.name || tech.username;
-        const msgEl = document.getElementById('crossServicePromptMessage');
-        const modalEl = document.getElementById('crossServicePromptModal');
-        const yesBtn = document.getElementById('crossServicePromptYesBtn');
-        const noBtn = document.getElementById('crossServicePromptNoBtn');
-
-        const totalSelectedCats = Object.keys(allGroups).length;
-        if (msgEl) {
-            msgEl.innerHTML = totalSelectedCats <= 2
-                ? `Do you want <strong>${techName}</strong> to do both services for you?`
-                : `Do you want <strong>${techName}</strong> to do all your services?`;
-        }
-
-        let modalInstance = null;
-        if (window.bootstrap && bootstrap.Modal) {
-            modalInstance = bootstrap.Modal.getOrCreateInstance(modalEl);
-            modalInstance.show();
-        } else {
-            modalEl.classList.add('show', 'd-block');
-        }
-
-        const closeModal = () => {
-            if (modalInstance) {
-                modalInstance.hide();
-            } else {
-                modalEl.classList.remove('show', 'd-block');
-            }
-        };
-
-        yesBtn.onclick = function() {
-            closeModal();
-            // Assign tech across this category AND all other qualified categories
-            [grp, ...otherQualifiedGroups].forEach(g => {
-                assignTechToCategory(currentGuest, g, tech.id);
-            });
-            checkMultiServiceStaffCompletion(currentGuest, allGroups, `${techName} (All Services)`);
-        };
-
-        noBtn.onclick = function() {
-            closeModal();
-            // Assign tech ONLY to the clicked category
-            assignTechToCategory(currentGuest, grp, tech.id);
-            checkMultiServiceStaffCompletion(currentGuest, allGroups);
-        };
     }
 
     function checkMultiServiceStaffCompletion(currentGuest, groups, overrideName) {

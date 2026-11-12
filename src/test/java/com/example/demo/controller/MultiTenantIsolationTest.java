@@ -184,4 +184,62 @@ class MultiTenantIsolationTest {
                         .content(body))
                 .andExpect(status().isBadRequest());
     }
+
+    @Test
+    void multiGuestMultiServiceBookingCalculatesSubtotalsAndGrandTotalWithinTenant() throws Exception {
+        ServiceEntity gelMani = new ServiceEntity("luxe", "Luxe Signature Gel Manicure", "Gel", new BigDecimal("48.00"), 40);
+        gelMani.setId(101L);
+        ServiceEntity spaPedi = new ServiceEntity("luxe", "Royal Lavender Spa Pedicure", "Pedi", new BigDecimal("72.00"), 55);
+        spaPedi.setId(102L);
+
+        when(serviceRepository.findByTenantIdAndId("luxe", 101L)).thenReturn(Optional.of(gelMani));
+        when(serviceRepository.findByTenantIdAndId("luxe", 102L)).thenReturn(Optional.of(spaPedi));
+        when(appointmentRepository.save(any(Appointment.class))).thenAnswer(inv -> {
+            Appointment a = inv.getArgument(0);
+            if (a.getId() == null) a.setId(500L);
+            return a;
+        });
+
+        String payload = """
+                {
+                  "appointmentTime": "2026-11-25T15:00:00",
+                  "stationPreference": "Private Suite A",
+                  "guests": [
+                    {
+                      "guestNumber": 1,
+                      "customerName": "Alice GuestOne",
+                      "customerEmail": "alice@example.com",
+                      "customerPhone": "555-0101",
+                      "notes": "Almond shape",
+                      "serviceIds": [101, 102]
+                    },
+                    {
+                      "guestNumber": 2,
+                      "customerName": "Bella GuestTwo",
+                      "customerEmail": "bella@example.com",
+                      "customerPhone": "555-0102",
+                      "notes": "Extra massage",
+                      "serviceIds": [102]
+                    }
+                  ]
+                }
+                """;
+
+        appointmentMockMvc.perform(post("/api/bookings")
+                        .header("X-Tenant-ID", "luxe")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tenantId").value("luxe"))
+                .andExpect(jsonPath("$.guests.length()").value(2))
+                .andExpect(jsonPath("$.guests[0].customerName").value("Alice GuestOne"))
+                .andExpect(jsonPath("$.guests[0].subtotal").value(120.00))
+                .andExpect(jsonPath("$.guests[0].durationMinutes").value(95))
+                .andExpect(jsonPath("$.guests[1].customerName").value("Bella GuestTwo"))
+                .andExpect(jsonPath("$.guests[1].subtotal").value(72.00))
+                .andExpect(jsonPath("$.guests[1].durationMinutes").value(55))
+                .andExpect(jsonPath("$.grandTotal").value(192.00))
+                .andExpect(jsonPath("$.totalDurationMinutes").value(150))
+                .andExpect(jsonPath("$.appointments.length()").value(3));
+    }
 }

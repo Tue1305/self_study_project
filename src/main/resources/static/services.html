@@ -967,7 +967,11 @@
 
     async function fetchBackendServices() {
         try {
-            const res = await fetch('/api/services');
+            const urlParams = new URLSearchParams(window.location.search);
+            const tenantParam = urlParams.get('tenant');
+            const headers = {};
+            if (tenantParam) headers['X-Tenant-ID'] = tenantParam;
+            const res = await fetch('/api/services', { headers });
             if (res.ok) {
                 backendServices = await res.json();
             }
@@ -978,6 +982,8 @@
 
     async function bookServiceDirectly(serviceName, priceNum, durationMins, description) {
         localStorage.setItem('selectedDesign', serviceName);
+        const urlParams = new URLSearchParams(window.location.search);
+        const tenantParam = urlParams.get('tenant');
 
         let targetServiceId = null;
         let existing = backendServices.find(s => s.name.toLowerCase() === serviceName.toLowerCase());
@@ -988,6 +994,7 @@
                 const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
                 const headers = { 'Content-Type': 'application/json' };
                 if (token) headers['Authorization'] = 'Bearer ' + token;
+                if (tenantParam) headers['X-Tenant-ID'] = tenantParam;
 
                 const createRes = await fetch('/api/services', {
                     method: 'POST',
@@ -1008,8 +1015,16 @@
             }
         }
 
-        const query = targetServiceId ? `?serviceId=${encodeURIComponent(targetServiceId)}` : `?service=${encodeURIComponent(serviceName)}`;
-        window.location.href = `./booking.html${query}`;
+        const outParams = new URLSearchParams();
+        if (targetServiceId) {
+            outParams.set('serviceId', targetServiceId);
+        } else {
+            outParams.set('service', serviceName);
+        }
+        if (tenantParam) {
+            outParams.set('tenant', tenantParam);
+        }
+        window.location.href = `./booking.html?${outParams.toString()}`;
     }
 
     function openAddServiceModal() {

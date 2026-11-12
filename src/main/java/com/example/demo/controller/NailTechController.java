@@ -41,29 +41,47 @@ public class NailTechController {
         this.tenantContextResolver = tenantContextResolver;
     }
 
-    // Supports optional ?serviceId={id} filtering scoped strictly to the active tenant
+    // Supports optional ?serviceId={id} or ?serviceIds={id1,id2} filtering scoped strictly to the active tenant
     @GetMapping
     public List<UserEntity> getAllNailTechs(
             @RequestParam(required = false) Long serviceId,
+            @RequestParam(required = false) List<Long> serviceIds,
             HttpServletRequest request
     ) {
         String tenantId = tenantContextResolver.resolveTenantId(request);
         List<UserEntity> tenantTechs = userRepository.findAllByTenantIdAndRole(tenantId, "ROLE_NAIL_TECH");
 
-        if (serviceId == null) {
+        List<Long> targetIds = new java.util.ArrayList<>();
+        if (serviceIds != null && !serviceIds.isEmpty()) {
+            targetIds.addAll(serviceIds);
+        }
+        if (serviceId != null && !targetIds.contains(serviceId)) {
+            targetIds.add(serviceId);
+        }
+
+        if (targetIds.isEmpty()) {
             return tenantTechs;
         }
 
-        ServiceEntity service = serviceRepository.findByTenantIdAndId(tenantId, serviceId).orElse(null);
-        if (service == null || service.getName() == null) {
+        Set<String> targetCategories = targetIds.stream()
+                .map(id -> serviceRepository.findByTenantIdAndId(tenantId, id).orElse(null))
+                .filter(s -> s != null && s.getName() != null)
+                .map(s -> categorizeService(s.getName()))
+                .collect(Collectors.toSet());
+
+        if (targetCategories.isEmpty()) {
             return tenantTechs;
         }
-
-        String targetCategory = categorizeService(service.getName());
 
         List<UserEntity> qualifiedTechs = tenantTechs.stream()
-                .filter(tech -> isTechQualifiedForCategory(tech, targetCategory))
+                .filter(tech -> targetCategories.stream().allMatch(cat -> isTechQualifiedForCategory(tech, cat)))
                 .toList();
+
+        if (qualifiedTechs.isEmpty()) {
+            qualifiedTechs = tenantTechs.stream()
+                    .filter(tech -> targetCategories.stream().anyMatch(cat -> isTechQualifiedForCategory(tech, cat)))
+                    .toList();
+        }
 
         return qualifiedTechs.isEmpty() ? tenantTechs : qualifiedTechs;
     }

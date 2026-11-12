@@ -366,13 +366,66 @@
                         <span id="wizardAlertText"></span>
                     </div>
 
-                    <!-- ==================== STEP 1: SELECT SERVICE (CATEGORY DROPDOWNS) ==================== -->
+                    <!-- ==================== STEP 1: SELECT SERVICE (MULTI-SELECT + SOLO/GROUP PROMPT) ==================== -->
                     <section id="step1Panel">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h5 class="fw-bold mb-0"><i class="bi bi-stars text-pink me-2"></i>Step 1: Choose a Service Category</h5>
-                            <span class="badge bg-danger-subtle text-pink border border-danger-subtle rounded-pill px-3 py-2 d-none" id="selectedServiceBadge">
-                                Selected: <strong id="selectedServiceNameDisplay">—</strong>
-                            </span>
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                            <div>
+                                <h5 class="fw-bold mb-0"><i class="bi bi-stars text-pink me-2"></i><span id="step1HeaderTitle">Step 1: Choose Services for Guest 1</span></h5>
+                                <small class="text-muted">Select one or more services from the full menu below</small>
+                            </div>
+                            <div class="d-flex align-items-center gap-2 d-none" id="guestSwitcherControls">
+                                <button type="button" class="btn btn-sm rounded-pill px-3 btn-pink fw-bold" id="switchGuest1Btn" onclick="switchActiveGuest(0)">
+                                    Guest 1 (<span id="guest1BadgeCount">0</span>)
+                                </button>
+                                <button type="button" class="btn btn-sm rounded-pill px-3 btn-outline-secondary" id="switchGuest2Btn" onclick="switchActiveGuest(1)">
+                                    Guest 2 (<span id="guest2BadgeCount">0</span>)
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-danger rounded-pill px-2" onclick="removeSecondGuest()" title="Remove Guest 2">
+                                    <i class="bi bi-x-lg"></i> Remove Guest 2
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Live Dynamic Guest Subtotals & Combined Group Total Banner -->
+                        <div class="card bg-light border-0 rounded-4 p-3 mb-4" id="liveSubtotalCard">
+                            <div class="row g-3 align-items-center">
+                                <div class="col-md-12" id="guest1SubtotalCol">
+                                    <div class="small text-muted fw-semibold">Guest 1 Subtotal / Total Cost</div>
+                                    <div class="fw-bold fs-5 text-pink" id="guest1SubtotalDisplay">$0.00 <span class="small text-muted fw-normal">(0 services &bull; 0 mins)</span></div>
+                                    <div class="small text-dark mt-1" id="guest1SelectedNames">No services selected yet</div>
+                                </div>
+                                <div class="col-md-4 border-start-md d-none" id="guest2SubtotalCol">
+                                    <div class="small text-muted fw-semibold">Guest 2 Subtotal / Total Cost</div>
+                                    <div class="fw-bold fs-5 text-pink" id="guest2SubtotalDisplay">$0.00 <span class="small text-muted fw-normal">(0 services &bull; 0 mins)</span></div>
+                                    <div class="small text-dark mt-1" id="guest2SelectedNames">No services selected yet</div>
+                                </div>
+                                <div class="col-md-4 border-start-md d-none" id="combinedGroupTotalCol">
+                                    <div class="small text-muted fw-semibold">Combined Group Total</div>
+                                    <div class="fw-bold fs-4 text-dark" id="combinedGroupTotalDisplay">$0.00</div>
+                                    <div class="small text-muted" id="combinedGroupDurationDisplay">0 total services &bull; 0 mins</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Solo vs. Group (+1 Guest) Prompt (Shown after Guest 1 finishes picking services) -->
+                        <div class="card border-2 rounded-4 p-4 mb-4 text-center shadow-sm d-none" id="soloOrGroupPromptCard" style="border-color: var(--bs-primary-pink);">
+                            <h5 class="fw-bold text-dark mb-2"><i class="bi bi-people-fill text-pink me-2"></i>Are you booking just for yourself or adding a guest?</h5>
+                            <p class="text-muted small mb-4" id="soloOrGroupPromptSubtitle">
+                                Guest 1 services are ready. Choose whether you are coming solo or adding a second person (+1 Guest).
+                            </p>
+                            <div class="d-flex flex-wrap justify-content-center gap-3">
+                                <button type="button" class="btn btn-pink fw-bold px-4 py-3 rounded-3" onclick="chooseJustMe()">
+                                    <i class="bi bi-person-check-fill me-1"></i> Just me (Going by myself) &rarr;
+                                </button>
+                                <button type="button" class="btn btn-outline-dark fw-bold px-4 py-3 rounded-3" onclick="chooseAddAnotherGuest()">
+                                    <i class="bi bi-person-plus-fill me-1"></i> Add another person (+1 Guest)
+                                </button>
+                            </div>
+                            <div class="mt-3">
+                                <button type="button" class="btn btn-link btn-sm text-muted" onclick="hideSoloOrGroupPrompt()">
+                                    &larr; Keep editing Guest 1 services
+                                </button>
+                            </div>
                         </div>
 
                         <!-- Compact Category Cards Grid that expand into big dropdowns -->
@@ -384,9 +437,9 @@
                         </div>
 
                         <!-- Regular Inline Next Button at bottom of Step 1 -->
-                        <div class="d-flex justify-content-end">
-                            <button type="button" class="btn btn-pink px-4 py-2 fw-semibold rounded-3" id="step1NextBtn" onclick="goNextStep()" disabled>
-                                <span id="step1NextLabel">Next: Select Staff</span> <i class="bi bi-arrow-right ms-1"></i>
+                        <div class="d-flex justify-content-end" id="step1BottomActionRow">
+                            <button type="button" class="btn btn-pink px-4 py-2 fw-semibold rounded-3" id="step1NextBtn" onclick="handleStep1Continue()" disabled>
+                                <span id="step1NextLabel">Continue</span> <i class="bi bi-arrow-right ms-1"></i>
                             </button>
                         </div>
 
@@ -401,8 +454,8 @@
                                     <div class="text-pink small fw-semibold" id="floatingServicePrice">—</div>
                                 </div>
                             </div>
-                            <button type="button" class="btn btn-pink rounded-pill px-4 py-2 fw-bold floating-btn-glow d-flex align-items-center gap-2" onclick="goNextStep()">
-                                <span id="floatingNextLabel">Select Staff</span>
+                            <button type="button" class="btn btn-pink rounded-pill px-4 py-2 fw-bold floating-btn-glow d-flex align-items-center gap-2" onclick="handleStep1Continue()">
+                                <span id="floatingNextLabel">Continue</span>
                                 <i class="bi bi-arrow-right"></i>
                             </button>
                         </div>
@@ -455,26 +508,29 @@
                         </div>
                     </section>
 
-                    <!-- ==================== FINAL STEP: CUSTOMER INFO & CONFIRMATION ==================== -->
+                    <!-- ==================== FINAL STEP: SEQUENTIAL GUEST INFO & CONFIRMATION ==================== -->
                     <section id="step3Panel" class="d-none">
-                        <h5 class="fw-bold mb-3"><i class="bi bi-clipboard2-check text-pink me-2"></i><span id="stepDetailsTitle">Customer Information & Confirmation</span></h5>
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                            <h5 class="fw-bold mb-0"><i class="bi bi-clipboard2-check text-pink me-2"></i><span id="stepDetailsTitle">Guest 1 Details &amp; Confirmation</span></h5>
+                            <span class="badge bg-pink text-white rounded-pill px-3 py-2 d-none" id="step3CombinedTotalBadge">Combined Total: $0.00</span>
+                        </div>
 
-                        <!-- Booking Summary Card -->
+                        <!-- Current Guest Services & Individual Subtotal Summary Card -->
                         <div class="card bg-light border-0 rounded-3 mb-4">
                             <div class="card-body py-3 px-4">
-                                <div class="row g-2 align-items-center">
-                                    <div class="col-md-5">
-                                        <div class="small text-muted">Selected Service</div>
-                                        <div class="fw-bold text-dark" id="summaryServiceName">—</div>
-                                        <div class="small text-pink fw-semibold" id="summaryServiceMeta">—</div>
+                                <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-2">
+                                    <span class="fw-bold text-pink" id="summaryGuestHeading">Guest 1 Selected Services</span>
+                                    <span class="fw-bold text-dark" id="summaryServiceMeta">$0.00 &bull; 0 mins</span>
+                                </div>
+                                <div class="mb-2" id="summaryServiceName">—</div>
+                                <div class="row g-2 pt-2 border-top small">
+                                    <div class="col-md-6">
+                                        <span class="text-muted">Selected Technician: </span>
+                                        <strong class="text-dark" id="summaryStaffName">—</strong>
                                     </div>
-                                    <div class="col-md-4 border-start-md">
-                                        <div class="small text-muted">Selected Technician</div>
-                                        <div class="fw-bold text-dark" id="summaryStaffName">—</div>
-                                    </div>
-                                    <div class="col-md-3 border-start-md d-none" id="summaryStationBox">
-                                        <div class="small text-muted">Station / Room</div>
-                                        <div class="fw-bold text-dark" id="summaryStationName">—</div>
+                                    <div class="col-md-6 d-none" id="summaryStationBox">
+                                        <span class="text-muted">Station / Room: </span>
+                                        <strong class="text-dark" id="summaryStationName">—</strong>
                                     </div>
                                 </div>
                             </div>
@@ -483,17 +539,17 @@
                         <form id="bookingForm" novalidate>
                             <div class="row g-3 mb-3">
                                 <div class="col-md-6">
-                                    <label for="customerName" class="form-label fw-semibold">Full Name <span class="text-danger">*</span></label>
+                                    <label for="customerName" class="form-label fw-semibold"><span id="guestNameLabel">Guest 1 Full Name</span> <span class="text-danger">*</span></label>
                                     <input type="text" class="form-control" id="customerName" required placeholder="Jane Doe">
                                 </div>
                                 <div class="col-md-6">
-                                    <label for="customerPhone" class="form-label fw-semibold">Phone Number <span class="text-danger">*</span></label>
+                                    <label for="customerPhone" class="form-label fw-semibold"><span id="guestPhoneLabel">Guest 1 Phone Number</span> <span class="text-danger">*</span></label>
                                     <input type="tel" class="form-control" id="customerPhone" required placeholder="(555) 000-0000">
                                 </div>
                             </div>
 
                             <div class="mb-3">
-                                <label for="customerEmail" class="form-label fw-semibold">Email Address <span class="text-danger">*</span></label>
+                                <label for="customerEmail" class="form-label fw-semibold"><span id="guestEmailLabel">Guest 1 Email Address</span> <span class="text-danger">*</span></label>
                                 <input type="email" class="form-control" id="customerEmail" required placeholder="jane@example.com">
                             </div>
 
@@ -514,13 +570,13 @@
                             </div>
 
                             <div class="mb-4" id="appointmentNotesWrapper">
-                                <label for="appointmentNotes" class="form-label fw-semibold">Appointment Notes / Special Requests <span class="text-muted fw-normal">(Optional)</span></label>
+                                <label for="appointmentNotes" class="form-label fw-semibold"><span id="guestNotesLabel">Guest 1 Notes / Special Requests</span> <span class="text-muted fw-normal">(Optional)</span></label>
                                 <textarea class="form-control" id="appointmentNotes" rows="3" placeholder="e.g., Nail shape preference, design reference, or allergies..."></textarea>
                             </div>
 
                             <div class="d-flex justify-content-between align-items-center pt-2">
-                                <button type="button" class="btn btn-outline-secondary px-4 py-2 fw-semibold rounded-3" onclick="goPrevStep()">
-                                    <i class="bi bi-arrow-left me-1"></i> Back
+                                <button type="button" class="btn btn-outline-secondary px-4 py-2 fw-semibold rounded-3" id="step3BackBtn" onclick="handleDetailsBack()">
+                                    <i class="bi bi-arrow-left me-1"></i> <span id="step3BackBtnLabel">Back</span>
                                 </button>
                                 <button type="submit" class="btn btn-pink px-5 py-2 btn-lg rounded-3 fw-bold" id="confirmSubmitBtn">
                                     <i class="bi bi-calendar2-check me-1"></i> Confirm Booking
@@ -585,11 +641,24 @@
         DETAILS: { label: 'Details & Confirm', panelId: 'step3Panel' }
     };
 
+    function createEmptyGuest(guestNumber) {
+        return {
+            guestNumber: guestNumber,
+            services: [],
+            customerName: '',
+            customerPhone: '',
+            customerEmail: '',
+            notes: ''
+        };
+    }
+
     const bookingState = {
         currentStep: 1,
         stepOrder: ['SERVICE', 'STAFF', 'DETAILS'],
         tenantConfig: null,
-        selectedService: null, // { id, name, description, price, durationMinutes }
+        guests: [createEmptyGuest(1)],
+        activeGuestIndex: 0, // 0 = Guest 1, 1 = Guest 2
+        detailsGuestIndex: 0, // Sequential guest index in final step
         selectedStaff: null,   // { id, name, isAnyoneAvailable }
         selectedStation: null, // string name e.g. 'Private Zen Suite A'
         servicesList: [],
@@ -890,10 +959,15 @@
             `;
 
             document.getElementById('customerName').value = activeUser;
+            if (bookingState.guests[0]) {
+                bookingState.guests[0].customerName = activeUser;
+            }
             if (decodedToken.email) {
                 document.getElementById('customerEmail').value = decodedToken.email;
+                if (bookingState.guests[0]) bookingState.guests[0].customerEmail = decodedToken.email;
             } else if (activeUser.includes('@')) {
                 document.getElementById('customerEmail').value = activeUser;
+                if (bookingState.guests[0]) bookingState.guests[0].customerEmail = activeUser;
             }
         } else {
             authNav.innerHTML = `
@@ -910,6 +984,7 @@
             const notesInput = document.getElementById('appointmentNotes');
             if (notesInput && !notesInput.value) {
                 notesInput.value = `Requested: ${selectedDesign}`;
+                if (bookingState.guests[0]) bookingState.guests[0].notes = `Requested: ${selectedDesign}`;
             }
         }
     }
@@ -991,7 +1066,7 @@
             const selectedDesign = localStorage.getItem('selectedDesign');
             let matchedServiceToSelect = null;
 
-            // Check if pre-selected service was requested from service.html
+            // Check if pre-selected service was requested from services.html (never filter out the rest of the catalog)
             if (serviceIdParam) {
                 matchedServiceToSelect = services.find(s =>
                     String(s.id) === String(serviceIdParam) ||
@@ -1001,25 +1076,31 @@
                 matchedServiceToSelect = services.find(s => s.name && s.name.toLowerCase().trim() === selectedDesign.toLowerCase().trim());
             }
 
-            const isPreselectedLocked = Boolean(serviceIdParam && matchedServiceToSelect);
-
             const enabledList = (bookingState.tenantConfig && bookingState.tenantConfig.wizard && Array.isArray(bookingState.tenantConfig.wizard.enabledCategories))
                 ? bookingState.tenantConfig.wizard.enabledCategories.map(c => c.toLowerCase().trim())
                 : [];
-            const activeCategoryConfigs = enabledList.length > 0 && !isPreselectedLocked
+            const activeCategoryConfigs = enabledList.length > 0
                 ? serviceCategoryConfigs.filter(cat =>
                     enabledList.includes(cat.id.toLowerCase()) || enabledList.includes(cat.title.toLowerCase())
                 )
                 : serviceCategoryConfigs;
 
-            activeCategoryConfigs.forEach((cat) => {
-                let catServices = categorized[cat.id] || [];
-                // If pre-selected from service.html, lock choice to only show that chosen service
-                if (isPreselectedLocked) {
-                    catServices = catServices.filter(s => s.id === matchedServiceToSelect.id);
-                }
+            const renderedCategoryList = [...activeCategoryConfigs];
+            if (uncategorized.length > 0) {
+                categorized['other-services'] = uncategorized;
+                renderedCategoryList.push({
+                    id: 'other-services',
+                    title: 'Signature & Specialty Treatments',
+                    icon: 'bi-Sparkles',
+                    keywords: []
+                });
+            }
+
+            renderedCategoryList.forEach((cat) => {
+                const catServices = categorized[cat.id] || [];
                 if (catServices.length === 0) return;
 
+                const hasPreselected = Boolean(matchedServiceToSelect && catServices.some(s => s.id === matchedServiceToSelect.id));
                 const collapseId = `bookingCollapse_${cat.id}`;
                 const cardId = `bookingCatCard_${cat.id}`;
 
@@ -1031,7 +1112,7 @@
                     rowsHtml += `
                         <div class="service-select-row d-flex justify-content-between align-items-center"
                              id="serviceRow-${srv.id}"
-                             onclick="selectService(${srv.id}, '${cat.id}')">
+                             onclick="toggleService(${srv.id}, '${cat.id}')">
                             <div class="pe-2">
                                 <h6 class="fw-bold text-dark mb-1">${srv.name}</h6>
                                 <div class="text-muted small">
@@ -1046,15 +1127,15 @@
                 const col = document.createElement('div');
                 col.className = 'col-12';
                 col.innerHTML = `
-                    <div class="category-card shadow-sm ${isPreselectedLocked ? 'is-open' : ''}" id="${cardId}">
+                    <div class="category-card shadow-sm ${hasPreselected ? 'is-open' : ''}" id="${cardId}">
                         <div class="category-card-header d-flex justify-content-between align-items-center"
                              data-bs-toggle="collapse"
                              data-bs-target="#${collapseId}"
-                             aria-expanded="${isPreselectedLocked ? 'true' : 'false'}"
+                             aria-expanded="${hasPreselected ? 'true' : 'false'}"
                              onclick="toggleBookingCategoryCard('${cat.id}')">
                             <div class="d-flex align-items-center gap-3">
                                 <div class="category-icon">
-                                    <i class="bi ${cat.icon}"></i>
+                                    <i class="bi ${cat.icon || 'bi-stars'}"></i>
                                 </div>
                                 <div>
                                     <h5 class="fw-bold text-dark mb-1 d-flex align-items-center gap-2">
@@ -1067,7 +1148,7 @@
                             </div>
                             <i class="bi bi-chevron-down chevron-icon ms-2"></i>
                         </div>
-                        <div class="collapse ${isPreselectedLocked ? 'show' : ''}" id="${collapseId}">
+                        <div class="collapse ${hasPreselected ? 'show' : ''}" id="${collapseId}">
                             <div class="border-top">
                                 ${rowsHtml}
                             </div>
@@ -1077,9 +1158,11 @@
                 grid.appendChild(col);
             });
 
-            // Auto-select if redirected from services.html
+            // Auto-preselect if redirected from services.html while keeping the full menu available
             if (matchedServiceToSelect) {
-                selectService(matchedServiceToSelect.id);
+                toggleService(matchedServiceToSelect.id);
+            } else {
+                refreshServiceSelectionUI();
             }
         } catch (err) {
             console.error('Error loading services:', err);
@@ -1101,59 +1184,209 @@
         }, 300);
     }
 
-    function selectService(serviceId, catId) {
+    function calculateGuestTotals(guest) {
+        const list = (guest && Array.isArray(guest.services)) ? guest.services : [];
+        const subtotal = list.reduce((sum, s) => sum + Number(s.price || 0), 0);
+        const duration = list.reduce((sum, s) => sum + Number(s.durationMinutes || 45), 0);
+        return { subtotal, duration, count: list.length };
+    }
+
+    function toggleService(serviceId, catId) {
         hideAlert();
         const found = bookingState.servicesList.find(s => s.id === serviceId);
         if (!found) return;
 
-        if (!bookingState.selectedService || bookingState.selectedService.id !== found.id) {
-            bookingState.selectedStaff = null;
-            document.getElementById('step2NextBtn').disabled = true;
+        const activeGuest = bookingState.guests[bookingState.activeGuestIndex] || bookingState.guests[0];
+        const existingIdx = activeGuest.services.findIndex(s => s.id === found.id);
+        if (existingIdx >= 0) {
+            activeGuest.services.splice(existingIdx, 1);
+        } else {
+            activeGuest.services.push(found);
         }
-
-        bookingState.selectedService = found;
 
         // If card is collapsed, expand it
         if (catId) {
             const collapseEl = document.getElementById(`bookingCollapse_${catId}`);
             if (collapseEl && !collapseEl.classList.contains('show')) {
-                const bsCollapse = new bootstrap.Collapse(collapseEl, { show: true });
+                new bootstrap.Collapse(collapseEl, { show: true });
                 toggleBookingCategoryCard(catId);
             }
         }
 
-        // Highlight selected service row
-        document.querySelectorAll('.service-select-row').forEach(row => row.classList.remove('selected'));
-        const activeRow = document.getElementById(`serviceRow-${serviceId}`);
-        if (activeRow) activeRow.classList.add('selected');
+        refreshServiceSelectionUI();
+    }
 
-        // Display selected service badge at top of step 1
-        const badge = document.getElementById('selectedServiceBadge');
-        const badgeName = document.getElementById('selectedServiceNameDisplay');
-        badgeName.textContent = `${found.name} ($${Number(found.price).toFixed(2)})`;
-        badge.classList.remove('d-none');
+    function refreshServiceSelectionUI() {
+        const activeGuest = bookingState.guests[bookingState.activeGuestIndex] || bookingState.guests[0];
+        const activeIds = new Set(activeGuest.services.map(s => s.id));
 
-        document.getElementById('step1NextBtn').disabled = false;
+        document.querySelectorAll('.service-select-row').forEach(row => {
+            const idNum = Number(row.id.replace('serviceRow-', ''));
+            row.classList.toggle('selected', activeIds.has(idNum));
+        });
 
-        // Show and update Floating Action Bar immediately (no scrolling needed)
+        const headerTitle = document.getElementById('step1HeaderTitle');
+        if (headerTitle) {
+            headerTitle.textContent = `Step 1: Choose Services for Guest ${bookingState.activeGuestIndex + 1}`;
+        }
+
+        const g1Totals = calculateGuestTotals(bookingState.guests[0]);
+        const hasGuest2 = bookingState.guests.length > 1;
+        const g2Totals = hasGuest2 ? calculateGuestTotals(bookingState.guests[1]) : { subtotal: 0, duration: 0, count: 0 };
+        const combinedCost = g1Totals.subtotal + g2Totals.subtotal;
+        const combinedDuration = g1Totals.duration + g2Totals.duration;
+        const combinedCount = g1Totals.count + g2Totals.count;
+
+        // Update Guest Switcher Tabs
+        const switcher = document.getElementById('guestSwitcherControls');
+        if (switcher) {
+            switcher.classList.toggle('d-none', !hasGuest2);
+            document.getElementById('guest1BadgeCount').textContent = g1Totals.count;
+            document.getElementById('guest2BadgeCount').textContent = g2Totals.count;
+            const btn1 = document.getElementById('switchGuest1Btn');
+            const btn2 = document.getElementById('switchGuest2Btn');
+            if (bookingState.activeGuestIndex === 0) {
+                btn1.className = 'btn btn-sm rounded-pill px-3 btn-pink fw-bold';
+                btn2.className = 'btn btn-sm rounded-pill px-3 btn-outline-secondary';
+            } else {
+                btn1.className = 'btn btn-sm rounded-pill px-3 btn-outline-secondary';
+                btn2.className = 'btn btn-sm rounded-pill px-3 btn-pink fw-bold';
+            }
+        }
+
+        // Update Live Subtotals Banner
+        const g1Col = document.getElementById('guest1SubtotalCol');
+        const g2Col = document.getElementById('guest2SubtotalCol');
+        const combCol = document.getElementById('combinedGroupTotalCol');
+        if (g1Col && g2Col && combCol) {
+            g1Col.className = hasGuest2 ? 'col-md-4' : 'col-md-12';
+            g2Col.classList.toggle('d-none', !hasGuest2);
+            combCol.classList.toggle('d-none', !hasGuest2);
+        }
+
+        document.getElementById('guest1SubtotalDisplay').innerHTML =
+            `$${g1Totals.subtotal.toFixed(2)} <span class="small text-muted fw-normal">(${g1Totals.count} service${g1Totals.count === 1 ? '' : 's'} &bull; ${g1Totals.duration} mins)</span>`;
+        document.getElementById('guest1SelectedNames').textContent =
+            g1Totals.count > 0 ? bookingState.guests[0].services.map(s => s.name).join(', ') : 'No services selected yet';
+
+        if (hasGuest2) {
+            document.getElementById('guest2SubtotalDisplay').innerHTML =
+                `$${g2Totals.subtotal.toFixed(2)} <span class="small text-muted fw-normal">(${g2Totals.count} service${g2Totals.count === 1 ? '' : 's'} &bull; ${g2Totals.duration} mins)</span>`;
+            document.getElementById('guest2SelectedNames').textContent =
+                g2Totals.count > 0 ? bookingState.guests[1].services.map(s => s.name).join(', ') : 'No services selected yet';
+            document.getElementById('combinedGroupTotalDisplay').textContent = `$${combinedCost.toFixed(2)}`;
+            document.getElementById('combinedGroupDurationDisplay').textContent = `${combinedCount} total services • ${combinedDuration} mins`;
+        }
+
+        const activeTotals = bookingState.activeGuestIndex === 0 ? g1Totals : g2Totals;
+        document.getElementById('step1NextBtn').disabled = activeTotals.count === 0;
+
+        // Floating Action Bar
         const floatingBar = document.getElementById('floatingActionBar');
         const floatingName = document.getElementById('floatingServiceName');
         const floatingPrice = document.getElementById('floatingServicePrice');
         if (floatingBar && floatingName && floatingPrice) {
-            floatingName.textContent = found.name;
-            floatingPrice.textContent = `$${Number(found.price).toFixed(2)} • ${found.durationMinutes || 45} mins`;
-            floatingBar.classList.add('visible');
+            if (activeTotals.count > 0) {
+                floatingName.textContent = `Guest ${bookingState.activeGuestIndex + 1}: ${activeTotals.count} service${activeTotals.count === 1 ? '' : 's'} selected`;
+                floatingPrice.textContent = hasGuest2
+                    ? `Guest ${bookingState.activeGuestIndex + 1}: $${activeTotals.subtotal.toFixed(2)} | Combined Total: $${combinedCost.toFixed(2)}`
+                    : `Subtotal: $${activeTotals.subtotal.toFixed(2)} • ${activeTotals.duration} mins`;
+                floatingBar.classList.add('visible');
+            } else {
+                floatingBar.classList.remove('visible');
+            }
         }
     }
 
+    function switchActiveGuest(guestIdx) {
+        hideAlert();
+        hideSoloOrGroupPrompt();
+        bookingState.activeGuestIndex = guestIdx;
+        refreshServiceSelectionUI();
+    }
+
+    function handleStep1Continue() {
+        hideAlert();
+        const activeGuest = bookingState.guests[bookingState.activeGuestIndex];
+        if (!activeGuest || activeGuest.services.length === 0) {
+            showAlert(`Please select at least one service for Guest ${bookingState.activeGuestIndex + 1}.`);
+            return;
+        }
+
+        // After Guest 1 finishes choosing services, show the Solo vs. Group (+1 Guest) prompt
+        if (bookingState.activeGuestIndex === 0 && bookingState.guests.length === 1) {
+            const g1Totals = calculateGuestTotals(bookingState.guests[0]);
+            const subEl = document.getElementById('soloOrGroupPromptSubtitle');
+            if (subEl) {
+                subEl.textContent = `Guest 1 has ${g1Totals.count} service${g1Totals.count === 1 ? '' : 's'} selected ($${g1Totals.subtotal.toFixed(2)}). Are you going by yourself or adding another person (+1 Guest)?`;
+            }
+            document.getElementById('soloOrGroupPromptCard').classList.remove('d-none');
+            document.getElementById('categoriesGrid').classList.add('d-none');
+            document.getElementById('step1BottomActionRow').classList.add('d-none');
+            document.getElementById('floatingActionBar').classList.remove('visible');
+            document.getElementById('soloOrGroupPromptCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
+            return;
+        }
+
+        if (bookingState.guests.length > 1 && bookingState.guests[1].services.length === 0) {
+            bookingState.activeGuestIndex = 1;
+            hideSoloOrGroupPrompt();
+            refreshServiceSelectionUI();
+            showAlert('Please select at least one service for Guest 2 before continuing.');
+            return;
+        }
+
+        hideSoloOrGroupPrompt();
+        goNextStep();
+    }
+
+    function hideSoloOrGroupPrompt() {
+        document.getElementById('soloOrGroupPromptCard').classList.add('d-none');
+        document.getElementById('categoriesGrid').classList.remove('d-none');
+        document.getElementById('step1BottomActionRow').classList.remove('d-none');
+        refreshServiceSelectionUI();
+    }
+
+    function chooseJustMe() {
+        bookingState.guests = [bookingState.guests[0]];
+        bookingState.activeGuestIndex = 0;
+        hideSoloOrGroupPrompt();
+        goNextStep();
+    }
+
+    function chooseAddAnotherGuest() {
+        if (bookingState.guests.length === 1) {
+            bookingState.guests.push(createEmptyGuest(2));
+        }
+        bookingState.activeGuestIndex = 1;
+        hideSoloOrGroupPrompt();
+    }
+
+    function removeSecondGuest() {
+        bookingState.guests = [bookingState.guests[0]];
+        bookingState.activeGuestIndex = 0;
+        bookingState.detailsGuestIndex = 0;
+        hideSoloOrGroupPrompt();
+    }
+
     // ==================== STEP 2: LOAD & SELECT QUALIFIED STAFF (NAMES ONLY) ====================
-    async function loadStaffForService(serviceId) {
+    async function loadStaffForSelectedServices() {
         const staffGrid = document.getElementById('staffGrid');
         const servicePill = document.getElementById('step2ServicePill');
-        const s = bookingState.selectedService;
 
-        if (s) {
-            servicePill.textContent = `${s.name} ($${Number(s.price).toFixed(2)})`;
+        const allServiceIds = [];
+        let totalCost = 0;
+        let totalCount = 0;
+        bookingState.guests.forEach(g => {
+            g.services.forEach(s => {
+                totalCount++;
+                totalCost += Number(s.price || 0);
+                if (s.id && !allServiceIds.includes(s.id)) allServiceIds.push(s.id);
+            });
+        });
+
+        if (servicePill) {
+            servicePill.textContent = `${bookingState.guests.length} Guest${bookingState.guests.length > 1 ? 's' : ''} • ${totalCount} Service${totalCount === 1 ? '' : 's'} ($${totalCost.toFixed(2)})`;
         }
 
         staffGrid.innerHTML = `
@@ -1164,7 +1397,8 @@
         `;
 
         try {
-            const response = await fetch(`/api/nail-techs?serviceId=${encodeURIComponent(serviceId)}`, {
+            const query = allServiceIds.length > 0 ? `?serviceIds=${encodeURIComponent(allServiceIds.join(','))}` : '';
+            const response = await fetch(`/api/nail-techs${query}`, {
                 headers: getActiveTenantHeaders()
             });
             const techs = response.ok ? await response.json() : [];
@@ -1216,7 +1450,6 @@
                 staffGrid.appendChild(col);
             });
 
-            // Restore selection if returning to step 2
             if (bookingState.selectedStaff) {
                 if (bookingState.selectedStaff.isAnyoneAvailable) {
                     selectStaff('anyone');
@@ -1274,18 +1507,20 @@
         if (targetStep < 1 || targetStep > bookingState.stepOrder.length) return;
 
         const targetKey = bookingState.stepOrder[targetStep - 1];
+        const hasGuest1Services = bookingState.guests[0] && bookingState.guests[0].services.length > 0;
+        const hasGuest2Services = bookingState.guests.length === 1 || (bookingState.guests[1] && bookingState.guests[1].services.length > 0);
 
         if (targetKey === 'STAFF') {
-            if (!bookingState.selectedService) {
-                showAlert('Please select a service before choosing a technician.');
+            if (!hasGuest1Services || !hasGuest2Services) {
+                showAlert('Please select at least one service for each guest before choosing a technician.');
                 return;
             }
-            await loadStaffForService(bookingState.selectedService.id);
+            await loadStaffForSelectedServices();
         }
 
         if (targetKey === 'STATION') {
-            if (!bookingState.selectedService) {
-                showAlert('Please select a service first.');
+            if (!hasGuest1Services || !hasGuest2Services) {
+                showAlert('Please select services first.');
                 return;
             }
             if (!bookingState.selectedStaff) {
@@ -1296,15 +1531,16 @@
         }
 
         if (targetKey === 'DETAILS') {
-            if (!bookingState.selectedService) {
-                showAlert('Please select a service first.');
+            if (!hasGuest1Services || !hasGuest2Services) {
+                showAlert('Please select services first.');
                 return;
             }
             if (!bookingState.selectedStaff) {
                 showAlert('Please select a technician before proceeding.');
                 return;
             }
-            populateStep3Summary();
+            bookingState.detailsGuestIndex = 0;
+            renderGuestDetailsForm(0);
         }
 
         bookingState.currentStep = targetStep;
@@ -1365,10 +1601,11 @@
         document.getElementById('confirmationPanel').classList.add('d-none');
         document.getElementById('wizardStepper').classList.remove('d-none');
 
-        // Only show floating bar during SERVICE step if a service is actively chosen
         const floatingBar = document.getElementById('floatingActionBar');
         if (floatingBar) {
-            if (activeKey === 'SERVICE' && bookingState.selectedService) {
+            const activeGuest = bookingState.guests[bookingState.activeGuestIndex] || bookingState.guests[0];
+            const promptVisible = !document.getElementById('soloOrGroupPromptCard').classList.contains('d-none');
+            if (activeKey === 'SERVICE' && !promptVisible && activeGuest && activeGuest.services.length > 0) {
                 floatingBar.classList.add('visible');
             } else {
                 floatingBar.classList.remove('visible');
@@ -1398,15 +1635,51 @@
         }
     }
 
-    function populateStep3Summary() {
-        const s = bookingState.selectedService;
+    // ==================== SEQUENTIAL GUEST DETAILS STEP ====================
+    function saveCurrentGuestFormFields() {
+        const guest = bookingState.guests[bookingState.detailsGuestIndex];
+        if (!guest) return;
+        guest.customerName = document.getElementById('customerName').value.trim();
+        guest.customerPhone = document.getElementById('customerPhone').value.trim();
+        guest.customerEmail = document.getElementById('customerEmail').value.trim();
+        guest.notes = document.getElementById('appointmentNotes').value.trim();
+    }
+
+    function renderGuestDetailsForm(guestIdx) {
+        bookingState.detailsGuestIndex = guestIdx;
+        const guest = bookingState.guests[guestIdx] || bookingState.guests[0];
+        const guestNum = guestIdx + 1;
+        const totalGuests = bookingState.guests.length;
+        const gTotals = calculateGuestTotals(guest);
+
+        const g1Totals = calculateGuestTotals(bookingState.guests[0]);
+        const g2Totals = totalGuests > 1 ? calculateGuestTotals(bookingState.guests[1]) : { subtotal: 0, duration: 0 };
+        const grandTotal = g1Totals.subtotal + g2Totals.subtotal;
+
+        document.getElementById('stepDetailsTitle').textContent =
+            totalGuests > 1
+                ? `Guest ${guestNum} of ${totalGuests} — Contact Details & Services`
+                : `Guest 1 Contact Details & Confirmation`;
+
+        const combBadge = document.getElementById('step3CombinedTotalBadge');
+        if (combBadge) {
+            combBadge.classList.toggle('d-none', totalGuests <= 1);
+            combBadge.textContent = `Combined Group Total: $${grandTotal.toFixed(2)}`;
+        }
+
+        document.getElementById('summaryGuestHeading').textContent = `Guest ${guestNum} Selected Services`;
+        document.getElementById('summaryServiceMeta').textContent =
+            `Guest ${guestNum} Subtotal: $${gTotals.subtotal.toFixed(2)} • ${gTotals.duration} mins`;
+
+        const serviceListHtml = guest.services.map(s =>
+            `<div class="d-flex justify-content-between small py-1 border-bottom">
+                <span class="fw-semibold text-dark">${s.name}</span>
+                <span class="text-pink fw-bold">$${Number(s.price || 0).toFixed(2)} (${s.durationMinutes || 45} mins)</span>
+            </div>`
+        ).join('');
+        document.getElementById('summaryServiceName').innerHTML = serviceListHtml || '—';
+
         const t = bookingState.selectedStaff;
-
-        document.getElementById('summaryServiceName').textContent = s ? s.name : '—';
-        document.getElementById('summaryServiceMeta').textContent = s
-            ? `$${Number(s.price).toFixed(2)} • ${s.durationMinutes || 60} mins`
-            : '—';
-
         document.getElementById('summaryStaffName').textContent = t ? t.name : '—';
 
         const stationBox = document.getElementById('summaryStationBox');
@@ -1416,27 +1689,70 @@
             stationBox.classList.toggle('d-none', !hasStationStep);
             stationNameEl.textContent = bookingState.selectedStation || 'Any Available Station';
         }
+
+        // Update form field labels and values for the active guest
+        document.getElementById('guestNameLabel').textContent = `Guest ${guestNum} Full Name`;
+        document.getElementById('guestPhoneLabel').textContent = `Guest ${guestNum} Phone Number`;
+        document.getElementById('guestEmailLabel').textContent = `Guest ${guestNum} Email Address`;
+        document.getElementById('guestNotesLabel').textContent = `Guest ${guestNum} Notes / Special Requests`;
+
+        document.getElementById('customerName').value = guest.customerName || '';
+        document.getElementById('customerPhone').value = guest.customerPhone || '';
+        document.getElementById('customerEmail').value = guest.customerEmail || '';
+        document.getElementById('appointmentNotes').value = guest.notes || '';
+
+        const backLabel = document.getElementById('step3BackBtnLabel');
+        if (backLabel) {
+            backLabel.textContent = guestIdx > 0 ? 'Back to Guest 1 Details' : 'Back';
+        }
+
+        const submitBtn = document.getElementById('confirmSubmitBtn');
+        if (submitBtn) {
+            if (guestIdx + 1 < totalGuests) {
+                submitBtn.innerHTML = `Next: Guest ${guestNum + 1} Details <i class="bi bi-arrow-right ms-1"></i>`;
+            } else if (totalGuests > 1) {
+                submitBtn.innerHTML = `<i class="bi bi-calendar2-check me-1"></i> Confirm Group Booking ($${grandTotal.toFixed(2)})`;
+            } else {
+                submitBtn.innerHTML = `<i class="bi bi-calendar2-check me-1"></i> Confirm Booking ($${gTotals.subtotal.toFixed(2)})`;
+            }
+        }
     }
 
-    // ==================== STEP 3: SUBMIT BOOKING ====================
+    function handleDetailsBack() {
+        hideAlert();
+        saveCurrentGuestFormFields();
+        if (bookingState.detailsGuestIndex > 0) {
+            renderGuestDetailsForm(bookingState.detailsGuestIndex - 1);
+            return;
+        }
+        goPrevStep();
+    }
+
+    // ==================== STEP 3: SEQUENTIAL GUEST SUBMIT & BOOKING ====================
     document.getElementById('bookingForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         hideAlert();
 
-        const customerName = document.getElementById('customerName').value.trim();
-        const customerPhone = document.getElementById('customerPhone').value.trim();
-        const customerEmail = document.getElementById('customerEmail').value.trim();
+        saveCurrentGuestFormFields();
+        const activeIdx = bookingState.detailsGuestIndex;
+        const currentGuest = bookingState.guests[activeIdx];
         const selectedDate = document.getElementById('appointmentDate').value;
         const selectedTime = document.getElementById('appointmentTimeSlot').value;
-        const notes = document.getElementById('appointmentNotes').value.trim();
 
-        if (!customerName || !customerPhone || !customerEmail) {
-            showAlert('Please fill in your Full Name, Phone Number, and Email Address.');
+        if (!currentGuest.customerName || !currentGuest.customerPhone || !currentGuest.customerEmail) {
+            showAlert(`Please fill in Full Name, Phone Number, and Email Address for Guest ${activeIdx + 1}.`);
             return;
         }
 
         if (!selectedDate || !selectedTime) {
             showAlert('Please select both an Appointment Date and a 15-minute Time Slot (10:00 AM – 7:00 PM).');
+            return;
+        }
+
+        // If Guest 1 just finished and Guest 2 exists, transition sequentially to Guest 2's form
+        if (activeIdx + 1 < bookingState.guests.length) {
+            renderGuestDetailsForm(activeIdx + 1);
+            document.getElementById('step3Panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
             return;
         }
 
@@ -1446,18 +1762,21 @@
         submitBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Submitting...`;
 
         const bookingPayload = {
-            customerName: customerName,
-            customerPhone: customerPhone,
-            customerEmail: customerEmail,
-            notes: notes,
+            appointmentTime: `${selectedDate}T${selectedTime}`,
             stationPreference: bookingState.stepOrder.includes('STATION')
                 ? (bookingState.selectedStation || 'Any Available Station')
                 : null,
-            service: { id: bookingState.selectedService.id },
             nailTech: (bookingState.selectedStaff && bookingState.selectedStaff.id)
                 ? { id: bookingState.selectedStaff.id }
                 : null,
-            appointmentTime: `${selectedDate}T${selectedTime}`
+            guests: bookingState.guests.map((g, idx) => ({
+                guestNumber: idx + 1,
+                customerName: g.customerName,
+                customerPhone: g.customerPhone,
+                customerEmail: g.customerEmail,
+                notes: g.notes,
+                serviceIds: g.services.map(s => s.id)
+            }))
         };
 
         const headers = getActiveTenantHeaders({ 'Content-Type': 'application/json' });
@@ -1511,18 +1830,43 @@
             ? payload.appointmentTime
             : dt.toLocaleString([], { dateStyle: 'full', timeStyle: 'short' });
 
+        let grandTotal = 0;
+        let totalDuration = 0;
+        const guestsHtml = bookingState.guests.map((g, idx) => {
+            const totals = calculateGuestTotals(g);
+            grandTotal += totals.subtotal;
+            totalDuration += totals.duration;
+            const servicesLines = g.services.map(s =>
+                `<li class="d-flex justify-content-between small py-1">
+                    <span>${s.name} (${s.durationMinutes || 45} mins)</span>
+                    <span class="fw-semibold text-pink">$${Number(s.price || 0).toFixed(2)}</span>
+                </li>`
+            ).join('');
+
+            return `
+                <div class="border rounded-3 bg-white p-3 mb-3">
+                    <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-2">
+                        <strong class="text-pink">Guest ${idx + 1}: ${g.customerName}</strong>
+                        <span class="badge bg-danger-subtle text-pink border border-danger-subtle rounded-pill">
+                            Subtotal: $${totals.subtotal.toFixed(2)} (${totals.duration} mins)
+                        </span>
+                    </div>
+                    <div class="small text-muted mb-2">${g.customerPhone} &bull; ${g.customerEmail}</div>
+                    <ul class="list-unstyled mb-0">${servicesLines}</ul>
+                    ${g.notes ? `<div class="small text-muted border-top pt-2 mt-2"><em>Notes: ${g.notes}</em></div>` : ''}
+                </div>
+            `;
+        }).join('');
+
         receipt.innerHTML = `
-            <div class="d-flex justify-content-between border-bottom pb-2 mb-2">
+            <div class="d-flex justify-content-between border-bottom pb-2 mb-3">
                 <span class="text-muted">Booking Reference</span>
                 <span class="fw-bold text-dark">#${savedBooking.id || 'NEW'}</span>
             </div>
-            <div class="d-flex justify-content-between border-bottom pb-2 mb-2">
-                <span class="text-muted">Service</span>
-                <span class="fw-bold text-pink">${bookingState.selectedService.name} ($${Number(bookingState.selectedService.price).toFixed(2)})</span>
-            </div>
+            ${guestsHtml}
             <div class="d-flex justify-content-between border-bottom pb-2 mb-2">
                 <span class="text-muted">Technician</span>
-                <span class="fw-semibold text-dark">${bookingState.selectedStaff.name}</span>
+                <span class="fw-semibold text-dark">${bookingState.selectedStaff ? bookingState.selectedStaff.name : 'Anyone Available'}</span>
             </div>
             ${payload.stationPreference ? `
             <div class="d-flex justify-content-between border-bottom pb-2 mb-2">
@@ -1530,18 +1874,13 @@
                 <span class="fw-semibold text-dark">${payload.stationPreference}</span>
             </div>` : ''}
             <div class="d-flex justify-content-between border-bottom pb-2 mb-2">
-                <span class="text-muted">Date & Time</span>
+                <span class="text-muted">Date &amp; Time</span>
                 <span class="fw-semibold text-dark">${formattedDate}</span>
             </div>
-            <div class="d-flex justify-content-between border-bottom pb-2 mb-2">
-                <span class="text-muted">Customer</span>
-                <span class="fw-semibold text-dark">${payload.customerName} (${payload.customerPhone})</span>
+            <div class="d-flex justify-content-between pt-2 fs-5">
+                <span class="fw-bold text-dark">Grand Total</span>
+                <span class="fw-bold text-pink">$${grandTotal.toFixed(2)} (${totalDuration} mins)</span>
             </div>
-            ${payload.notes ? `
-            <div class="pt-1">
-                <span class="text-muted d-block small">Notes</span>
-                <span class="text-dark small">${payload.notes}</span>
-            </div>` : ''}
         `;
 
         confirmPanel.classList.remove('d-none');
@@ -1549,15 +1888,14 @@
 
     function resetWizard() {
         bookingState.currentStep = 1;
-        bookingState.selectedService = null;
+        bookingState.guests = [createEmptyGuest(1)];
+        bookingState.activeGuestIndex = 0;
+        bookingState.detailsGuestIndex = 0;
         bookingState.selectedStaff = null;
         bookingState.selectedStation = null;
 
-        document.querySelectorAll('.service-select-row').forEach(c => c.classList.remove('selected'));
-        document.getElementById('selectedServiceBadge').classList.add('d-none');
-        const floatingBar = document.getElementById('floatingActionBar');
-        if (floatingBar) floatingBar.classList.remove('visible');
-        document.getElementById('step1NextBtn').disabled = true;
+        hideSoloOrGroupPrompt();
+        refreshServiceSelectionUI();
         document.getElementById('step2NextBtn').disabled = true;
         document.getElementById('appointmentTimeSlot').value = '';
         document.getElementById('appointmentNotes').value = '';

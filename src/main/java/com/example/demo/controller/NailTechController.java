@@ -86,7 +86,7 @@ public class NailTechController {
         return qualifiedTechs.isEmpty() ? tenantTechs : qualifiedTechs;
     }
 
-    private String categorizeService(String serviceName) {
+    public static String categorizeService(String serviceName) {
         String lower = serviceName.toLowerCase().trim();
 
         if (lower.contains("pedicure") || lower.contains("combo")) {
@@ -124,7 +124,7 @@ public class NailTechController {
         return "MANICURE";
     }
 
-    private boolean isTechQualifiedForCategory(UserEntity tech, String category) {
+    public static boolean isTechQualifiedForCategory(UserEntity tech, String category) {
         if ("PEDICURE".equals(category) || "KID_SERVICES".equals(category)) {
             return true;
         }

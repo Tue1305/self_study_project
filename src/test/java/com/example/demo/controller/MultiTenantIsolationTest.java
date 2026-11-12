@@ -242,4 +242,47 @@ class MultiTenantIsolationTest {
                 .andExpect(jsonPath("$.totalDurationMinutes").value(150))
                 .andExpect(jsonPath("$.appointments.length()").value(3));
     }
+
+    @Test
+    void availabilityPreCheckFiltersClosedSundayAndOccupiedSlots() throws Exception {
+        // 1. Sunday check -> isClosed = true
+        appointmentMockMvc.perform(get("/api/appointments/availability")
+                        .header("X-Tenant-ID", "default")
+                        .param("date", "2026-11-22") // Sunday
+                        .param("durationMinutes", "45"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.isClosed").value(true))
+                .andExpect(jsonPath("$.availableSlots.length()").value(0));
+
+        // 2. Monday with existing appointment for Tech 10
+        UserEntity tony = new UserEntity("tony@jennysnailstudio.com", "pw", "ROLE_NAIL_TECH");
+        tony.setId(10L);
+        tony.setName("Tony");
+        tony.setTenantId("default");
+
+        ServiceEntity svc = new ServiceEntity("default", "Essential Manicure", "Mani", new BigDecimal("28.00"), 30);
+        svc.setId(5L);
+
+        Appointment existingAppt = new Appointment();
+        existingAppt.setId(1001L);
+        existingAppt.setTenantId("default");
+        existingAppt.setNailTech(tony);
+        existingAppt.setService(svc);
+        existingAppt.setAppointmentTime(LocalDateTime.of(2026, 11, 23, 14, 0)); // Monday 2:00 PM
+        existingAppt.setStatus(Appointment.AppointmentStatus.CONFIRMED);
+
+        when(appointmentRepository.findByTenantIdAndAppointmentTimeBetween(
+                any(), any(), any()
+        )).thenReturn(List.of(existingAppt));
+        when(userRepository.findByTenantIdAndId("default", 10L)).thenReturn(Optional.of(tony));
+
+        appointmentMockMvc.perform(get("/api/appointments/availability")
+                        .header("X-Tenant-ID", "default")
+                        .param("date", "2026-11-23") // Monday
+                        .param("durationMinutes", "30")
+                        .param("techId", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.isClosed").value(false))
+                .andExpect(jsonPath("$.availableSlots").isArray());
+    }
 }

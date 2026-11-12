@@ -466,24 +466,60 @@
                         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
                             <div>
                                 <h5 class="fw-bold mb-1"><i class="bi bi-person-badge text-pink me-2"></i><span id="stepStaffTitle">Choose Your Technician</span></h5>
-                                <small class="text-muted" id="stepStaffSubtitle">Select an available technician for your appointment</small>
+                                <small class="text-muted" id="stepStaffSubtitle">Select how you would like technicians assigned for your visit</small>
                             </div>
                             <span class="badge bg-danger-subtle text-pink border border-danger-subtle px-3 py-2" id="step2ServicePill"></span>
                         </div>
 
-                        <!-- Per-Service Staff Selection Dropdowns (Shown when current guest has multiple services) -->
-                        <div id="perServiceStaffContainer" class="card bg-light border-0 rounded-4 p-3 mb-4 d-none">
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <h6 class="fw-bold text-dark mb-0"><i class="bi bi-sliders text-pink me-2"></i>Per-Service Technician Assignment (Optional)</h6>
-                                <span class="badge bg-white text-muted border rounded-pill">Custom tech per service</span>
+                        <!-- 3 Step 2 Staff Assignment Modes -->
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-4">
+                                <div class="card h-100 p-3 rounded-4 shadow-sm text-center staff-mode-card selected" id="modeCard-anyone" onclick="setStaffAssignmentMode('anyone')" style="cursor: pointer; border: 2px solid var(--bs-primary-pink); background-color: var(--bs-soft-pink);">
+                                    <div class="fw-bold fs-6 text-dark mb-1">⚡ Anyone Available</div>
+                                    <small class="text-muted">Fastest booking. Automatically pairs with any qualified staff.</small>
+                                </div>
                             </div>
-                            <p class="small text-muted mb-3">You can assign a specific technician for each treatment, or choose one overall technician below for all services.</p>
-                            <div id="perServiceStaffList" class="d-flex flex-column gap-2">
-                                <!-- Rendered dynamically -->
+                            <div class="col-md-4">
+                                <div class="card h-100 p-3 rounded-4 shadow-sm text-center staff-mode-card" id="modeCard-per-service" onclick="setStaffAssignmentMode('per-service')" style="cursor: pointer; border: 1px solid #dee2e6;">
+                                    <div class="fw-bold fs-6 text-dark mb-1">🔍 Specific Staff Per Service</div>
+                                    <small class="text-muted">Choose specific qualified technicians for each service category.</small>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card h-100 p-3 rounded-4 shadow-sm text-center staff-mode-card" id="modeCard-master" onclick="setStaffAssignmentMode('master')" style="cursor: pointer; border: 1px solid #dee2e6;">
+                                    <div class="fw-bold fs-6 text-dark mb-1">👑 Single Master Technician</div>
+                                    <small class="text-muted">Universal specialist who handles all your chosen treatments seamlessly.</small>
+                                </div>
                             </div>
                         </div>
 
-                        <div id="staffGrid" class="row g-3 mb-4">
+                        <!-- Mode A Container: Anyone Available notice -->
+                        <div id="modeAnyoneContainer" class="alert alert-info rounded-4 border-0 p-3 mb-4">
+                            <i class="bi bi-info-circle-fill me-2"></i><strong>No preference required:</strong> We will automatically assign any qualified technician(s) available for your selected treatments.
+                        </div>
+
+                        <!-- Mode B Container: Per-Service Staff Selection Dropdowns by Category -->
+                        <div id="perServiceStaffContainer" class="card bg-light border-0 rounded-4 p-4 mb-4 d-none">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h6 class="fw-bold text-dark mb-0"><i class="bi bi-sliders text-pink me-2"></i>Per-Service Technician Assignment by Category</h6>
+                                <span class="badge bg-white text-muted border rounded-pill">Category Grouped</span>
+                            </div>
+                            <p class="small text-muted mb-3">Below are the service categories you selected. Choose a specific technician for each treatment:</p>
+                            <div id="perServiceStaffList" class="d-flex flex-column gap-3">
+                                <!-- Rendered dynamically by category -->
+                            </div>
+                        </div>
+
+                        <!-- Mode C Container: Single Master Technician List -->
+                        <div id="masterStaffContainer" class="mb-4 d-none">
+                            <h6 class="fw-bold text-dark mb-2"><i class="bi bi-award-fill text-pink me-2"></i>Select a Master / Universal Specialist:</h6>
+                            <div id="masterStaffGrid" class="row g-3">
+                                <!-- Populated dynamically with master techs -->
+                            </div>
+                        </div>
+
+                        <!-- General Staff Grid (Fallback/Hidden when mode active) -->
+                        <div id="staffGrid" class="row g-3 mb-4 d-none">
                             <!-- Injected dynamically with only names -->
                         </div>
 
@@ -491,7 +527,7 @@
                             <button type="button" class="btn btn-outline-secondary px-4 py-2 fw-semibold rounded-3" onclick="handleStep2Back()">
                                 <i class="bi bi-arrow-left me-1"></i> <span id="step2BackLabel">Back</span>
                             </button>
-                            <button type="button" class="btn btn-pink px-4 py-2 fw-semibold rounded-3" id="step2NextBtn" onclick="handleStep2Continue()" disabled>
+                            <button type="button" class="btn btn-pink px-4 py-2 fw-semibold rounded-3" id="step2NextBtn" onclick="handleStep2Continue()">
                                 <span id="step2NextLabel">Next</span> <i class="bi bi-arrow-right ms-1"></i>
                             </button>
                         </div>
@@ -585,16 +621,22 @@
                             <div class="row g-3 mb-3">
                                 <div class="col-md-6">
                                     <label for="appointmentDate" class="form-label fw-semibold">Appointment Date <span class="text-danger">*</span></label>
-                                    <input type="date" class="form-control" id="appointmentDate" required>
+                                    <input type="date" class="form-control" id="appointmentDate" onchange="handleDateChange(this.value)" required>
+                                    <div id="dateClosedAlert" class="small text-danger fw-semibold mt-1 d-none">
+                                        <i class="bi bi-exclamation-triangle-fill me-1"></i><span id="dateClosedReason">We are closed on Sundays. Please choose Monday through Saturday.</span>
+                                    </div>
                                 </div>
                                 <div class="col-md-6">
                                     <label for="appointmentTimeSlot" class="form-label fw-semibold">Time Slot (10:00 AM – 7:00 PM) <span class="text-danger">*</span></label>
                                     <select class="form-select" id="appointmentTimeSlot" required>
-                                        <option value="">-- Choose a Time --</option>
+                                        <option value="">-- Choose an Available Time --</option>
                                     </select>
+                                    <div class="small text-muted mt-1">
+                                        <i class="bi bi-shield-check text-pink me-1"></i>Slots dynamically pre-checked against technician availability &amp; store hours.
+                                    </div>
                                 </div>
                                 <div class="col-12 mt-1">
-                                    <small class="text-muted"><i class="bi bi-clock me-1"></i>Store Hours: 10:00 AM – 7:00 PM (15-minute intervals)</small>
+                                    <small class="text-muted"><i class="bi bi-clock me-1"></i>Store Hours: Monday – Saturday: 10:00 AM – 7:00 PM (15-min intervals) | Sunday: Closed</small>
                                 </div>
                             </div>
 
@@ -1029,11 +1071,98 @@
 
     function populateStoreTimeSlots() {
         const dateInput = document.getElementById('appointmentDate');
+        const now = new Date();
+        // If today is Sunday, default to tomorrow (Monday)
+        if (now.getDay() === 0) {
+            now.setDate(now.getDate() + 1);
+        }
         const todayStr = new Date().toISOString().split('T')[0];
         dateInput.min = todayStr;
-        dateInput.value = todayStr;
+        dateInput.value = now.toISOString().split('T')[0];
 
+        // Trigger slot availability check
+        handleDateChange(dateInput.value);
+    }
+
+    async function handleDateChange(selectedDate) {
+        hideAlert();
+        const dateClosedAlert = document.getElementById('dateClosedAlert');
+        const dateClosedReason = document.getElementById('dateClosedReason');
         const timeSelect = document.getElementById('appointmentTimeSlot');
+        const submitBtn = document.getElementById('confirmSubmitBtn');
+
+        if (!selectedDate) return;
+
+        // Check for Sunday
+        const d = new Date(selectedDate + 'T00:00:00');
+        if (d.getDay() === 0) {
+            dateClosedAlert.classList.remove('d-none');
+            dateClosedReason.textContent = 'Our salon is closed on Sundays. Please choose Monday through Saturday.';
+            timeSelect.innerHTML = '<option value="">-- Closed on Sundays --</option>';
+            timeSelect.disabled = true;
+            if (submitBtn) submitBtn.disabled = true;
+            return;
+        }
+
+        dateClosedAlert.classList.add('d-none');
+        timeSelect.disabled = false;
+        if (submitBtn) submitBtn.disabled = false;
+        timeSelect.innerHTML = '<option value="">Checking slot availability...</option>';
+
+        // Calculate total service duration for slot checking
+        const g1Totals = calculateGuestTotals(bookingState.guests[0]);
+        const g2Totals = bookingState.guests.length > 1 ? calculateGuestTotals(bookingState.guests[1]) : { duration: 0 };
+        const totalDuration = g1Totals.duration + g2Totals.duration || 45;
+
+        // Determine staff parameters
+        const guest0 = bookingState.guests[0];
+        const params = new URLSearchParams();
+        params.set('date', selectedDate);
+        params.set('durationMinutes', String(totalDuration));
+
+        if (guest0 && guest0.staffMode === 'per-service') {
+            const assignedIds = Object.values(guest0.serviceStaffAssignments || {})
+                .filter(id => id != null && id !== 'anyone' && !isNaN(Number(id)));
+            if (assignedIds.length > 0) {
+                params.set('techIds', assignedIds.join(','));
+            }
+        } else if (guest0 && guest0.selectedStaff && guest0.selectedStaff.id) {
+            params.set('techId', String(guest0.selectedStaff.id));
+        }
+
+        try {
+            const resp = await fetch(`/api/appointments/availability?${params.toString()}`, {
+                headers: getActiveTenantHeaders()
+            });
+            if (resp.ok) {
+                const data = await resp.json();
+                if (data.isClosed) {
+                    dateClosedAlert.classList.remove('d-none');
+                    dateClosedReason.textContent = data.reason || 'Salon is closed on this date.';
+                    timeSelect.innerHTML = '<option value="">-- Closed on this date --</option>';
+                    timeSelect.disabled = true;
+                    if (submitBtn) submitBtn.disabled = true;
+                    return;
+                }
+
+                timeSelect.innerHTML = '<option value="">-- Choose an Available Time --</option>';
+                const slots = data.availableSlots || [];
+                slots.forEach(slot => {
+                    const opt = document.createElement('option');
+                    opt.value = slot.value;
+                    opt.textContent = slot.available
+                        ? slot.label
+                        : `${slot.label} (${slot.reason || 'Unavailable'})`;
+                    opt.disabled = !slot.available;
+                    timeSelect.appendChild(opt);
+                });
+                return;
+            }
+        } catch (e) {
+            console.warn('Availability check failed, falling back to local slots:', e);
+        }
+
+        // Fallback slot generation if API is unreachable
         timeSelect.innerHTML = '<option value="">-- Choose a Time --</option>';
         for (let hour = 10; hour <= 19; hour++) {
             const maxMinute = (hour === 19) ? 0 : 45;
@@ -1447,14 +1576,243 @@
         hideSoloOrGroupPrompt();
     }
 
+    // Helper functions for category and qualification mapping
+    function mapCategoryToBackend(catId) {
+        switch (catId) {
+            case 'pedicures':
+            case 'combos':
+                return 'PEDICURE';
+            case 'kids':
+                return 'KID_SERVICES';
+            case 'body-massage':
+                return 'BODY_MASSAGE';
+            case 'waxing':
+                return 'WAXING';
+            case 'facial':
+            case 'specialty-services':
+                return 'FACIAL';
+            case 'nail-enhancement':
+                return 'NAIL_ART';
+            case 'gift-packages':
+                return 'ALL';
+            case 'manicures':
+            default:
+                return 'MANICURE';
+        }
+    }
+
+    function isTechQualifiedForBackend(tech, backendCat) {
+        if (backendCat === 'PEDICURE' || backendCat === 'KID_SERVICES') {
+            return true;
+        }
+        const spec = tech.specialty;
+        if (!spec) return false;
+        const tags = spec.split(',').map(s => s.trim().toUpperCase());
+        if (tags.includes('ALL') || tags.includes('FULL EVERYTHING') || tags.includes('GENERAL')) {
+            return true;
+        }
+        return tags.includes(backendCat);
+    }
+
+    function isMasterUniversalTech(tech) {
+        const spec = tech.specialty;
+        if (!spec) return false;
+        const tags = spec.split(',').map(s => s.trim().toUpperCase());
+        return tags.includes('ALL') || tags.includes('FULL EVERYTHING');
+    }
+
+    function setStaffAssignmentMode(mode) {
+        hideAlert();
+        const currentGuest = bookingState.guests[bookingState.staffGuestIndex] || bookingState.guests[0];
+        currentGuest.staffMode = mode;
+
+        // Update mode cards visual selection
+        document.querySelectorAll('.staff-mode-card').forEach(card => {
+            card.classList.remove('selected');
+            card.style.borderColor = '#dee2e6';
+            card.style.backgroundColor = '#fff';
+            card.style.borderWidth = '1px';
+        });
+        const activeCard = document.getElementById(`modeCard-${mode}`);
+        if (activeCard) {
+            activeCard.classList.add('selected');
+            activeCard.style.borderColor = 'var(--bs-primary-pink)';
+            activeCard.style.backgroundColor = 'var(--bs-soft-pink)';
+            activeCard.style.borderWidth = '2px';
+        }
+
+        const modeAnyoneBox = document.getElementById('modeAnyoneContainer');
+        const perServiceBox = document.getElementById('perServiceStaffContainer');
+        const masterBox = document.getElementById('masterStaffContainer');
+        const staffGrid = document.getElementById('staffGrid');
+
+        modeAnyoneBox.classList.toggle('d-none', mode !== 'anyone');
+        perServiceBox.classList.toggle('d-none', mode !== 'per-service');
+        masterBox.classList.toggle('d-none', mode !== 'master');
+        staffGrid.classList.add('d-none');
+
+        if (mode === 'anyone') {
+            currentGuest.selectedStaff = {
+                id: null,
+                name: 'Anyone Available',
+                isAnyoneAvailable: true
+            };
+            if (bookingState.staffGuestIndex === 0) {
+                bookingState.selectedStaff = currentGuest.selectedStaff;
+            }
+            document.getElementById('step2NextBtn').disabled = false;
+            triggerStaffFloatingActionBar('Anyone Available');
+        } else if (mode === 'per-service') {
+            currentGuest.selectedStaff = {
+                id: null,
+                name: 'Specific Staff Per Service',
+                isAnyoneAvailable: false
+            };
+            if (bookingState.staffGuestIndex === 0) {
+                bookingState.selectedStaff = currentGuest.selectedStaff;
+            }
+            renderPerServiceCategoryGroups(currentGuest);
+            document.getElementById('step2NextBtn').disabled = false;
+            triggerStaffFloatingActionBar('Specific Staff Per Service');
+        } else if (mode === 'master') {
+            renderMasterTechList(currentGuest);
+        }
+    }
+
+    function renderPerServiceCategoryGroups(currentGuest) {
+        const perServiceList = document.getElementById('perServiceStaffList');
+        if (!perServiceList) return;
+        perServiceList.innerHTML = '';
+
+        const guestServices = currentGuest.services || [];
+        // Group services by category
+        const groups = {};
+        guestServices.forEach(srv => {
+            const catId = getCategoryForService(srv);
+            const backendCat = mapCategoryToBackend(catId);
+            const catCfg = serviceCategoryConfigs.find(c => c.id === catId);
+            const catTitle = catCfg ? catCfg.title : 'Treatments';
+            if (!groups[catId]) {
+                groups[catId] = { title: catTitle, backendCat: backendCat, services: [] };
+            }
+            groups[catId].services.push(srv);
+        });
+
+        Object.values(groups).forEach(grp => {
+            const qualifiedTechs = bookingState.staffList.filter(t => isTechQualifiedForBackend(t, grp.backendCat));
+            const cardDiv = document.createElement('div');
+            cardDiv.className = 'bg-white p-3 rounded-3 border';
+
+            let srvRowsHtml = '';
+            grp.services.forEach(srv => {
+                const currentAssigned = currentGuest.serviceStaffAssignments[srv.id];
+                let techOpts = `<option value="anyone">Anyone Available</option>`;
+                qualifiedTechs.forEach(t => {
+                    const sel = (currentAssigned && String(currentAssigned) === String(t.id)) ? 'selected' : '';
+                    techOpts += `<option value="${t.id}" ${sel}>${t.name || t.username}</option>`;
+                });
+
+                srvRowsHtml += `
+                    <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center pt-2 border-top">
+                        <span class="small fw-semibold text-secondary mb-1 mb-sm-0 pe-2">
+                            ${srv.name} ($${Number(srv.price || 0).toFixed(2)})
+                        </span>
+                        <div style="min-width: 240px;">
+                            <select class="form-select form-select-sm" onchange="assignServiceStaff(${srv.id}, this.value)">
+                                ${techOpts}
+                            </select>
+                        </div>
+                    </div>
+                `;
+            });
+
+            cardDiv.innerHTML = `
+                <div class="mb-2">
+                    <strong class="text-dark">${grp.title}</strong>
+                    <span class="small text-muted ms-2">(${grp.services.map(s => s.name).join(', ')})</span>
+                </div>
+                ${srvRowsHtml}
+            `;
+            perServiceList.appendChild(cardDiv);
+        });
+    }
+
+    function renderMasterTechList(currentGuest) {
+        const masterGrid = document.getElementById('masterStaffGrid');
+        if (!masterGrid) return;
+        masterGrid.innerHTML = '';
+
+        const masterTechs = bookingState.staffList.filter(t => isMasterUniversalTech(t));
+        if (masterTechs.length === 0) {
+            masterGrid.innerHTML = `
+                <div class="col-12">
+                    <div class="alert alert-warning border-0 rounded-3 mb-0">
+                        No universal master technician is currently available. Please select "Anyone Available" or "Specific Staff Per Service".
+                    </div>
+                </div>
+            `;
+            document.getElementById('step2NextBtn').disabled = true;
+            return;
+        }
+
+        masterTechs.forEach(tech => {
+            const isSel = currentGuest.selectedStaff && currentGuest.selectedStaff.id === tech.id;
+            const col = document.createElement('div');
+            col.className = 'col-md-6';
+            col.innerHTML = `
+                <div class="staff-card d-flex align-items-center justify-content-between ${isSel ? 'selected' : ''}"
+                     id="masterCard-${tech.id}"
+                     onclick="selectMasterTech(${tech.id})">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="staff-avatar"><i class="bi bi-person-check-fill"></i></div>
+                        <div>
+                            <h5 class="fw-bold text-dark mb-0">${tech.name || tech.username}</h5>
+                            <small class="text-muted">Master Specialist (All Services)</small>
+                        </div>
+                    </div>
+                    <span class="check-indicator"><i class="bi bi-check-lg"></i></span>
+                </div>
+            `;
+            masterGrid.appendChild(col);
+        });
+
+        if (currentGuest.selectedStaff && currentGuest.selectedStaff.id) {
+            document.getElementById('step2NextBtn').disabled = false;
+        } else {
+            document.getElementById('step2NextBtn').disabled = true;
+        }
+    }
+
+    function selectMasterTech(techId) {
+        hideAlert();
+        const found = bookingState.staffList.find(t => t.id === techId);
+        if (!found) return;
+
+        const currentGuest = bookingState.guests[bookingState.staffGuestIndex] || bookingState.guests[0];
+        currentGuest.selectedStaff = {
+            id: found.id,
+            name: found.name || found.username,
+            isAnyoneAvailable: false
+        };
+
+        if (bookingState.staffGuestIndex === 0) {
+            bookingState.selectedStaff = currentGuest.selectedStaff;
+        }
+
+        document.querySelectorAll('#masterStaffGrid .staff-card').forEach(c => c.classList.remove('selected'));
+        const card = document.getElementById(`masterCard-${found.id}`);
+        if (card) card.classList.add('selected');
+
+        document.getElementById('step2NextBtn').disabled = false;
+        triggerStaffFloatingActionBar(currentGuest.selectedStaff.name);
+    }
+
     // ==================== STEP 2: LOAD & SELECT QUALIFIED STAFF (NAMES ONLY) ====================
     async function loadStaffForSelectedServices() {
         const staffGrid = document.getElementById('staffGrid');
         const servicePill = document.getElementById('step2ServicePill');
         const titleEl = document.getElementById('stepStaffTitle');
         const subtitleEl = document.getElementById('stepStaffSubtitle');
-        const perServiceBox = document.getElementById('perServiceStaffContainer');
-        const perServiceList = document.getElementById('perServiceStaffList');
 
         const currentGuest = bookingState.guests[bookingState.staffGuestIndex] || bookingState.guests[0];
         const guestNum = bookingState.staffGuestIndex + 1;
@@ -1467,8 +1825,8 @@
         }
         if (subtitleEl) {
             subtitleEl.textContent = totalGuests > 1
-                ? `Select an overall technician for Guest ${guestNum}, or assign specific staff per service.`
-                : `Select an available technician for your appointment, or assign specific staff per service.`;
+                ? `Select how you would like technicians assigned for Guest ${guestNum}.`
+                : `Select how you would like technicians assigned for your visit.`;
         }
 
         const guestServices = currentGuest.services || [];
@@ -1481,13 +1839,6 @@
         const floatingStaffBar = document.getElementById('floatingStaffActionBar');
         if (floatingStaffBar) floatingStaffBar.classList.remove('visible');
 
-        staffGrid.innerHTML = `
-            <div class="col-12 text-center py-4">
-                <div class="spinner-border text-pink" role="status"></div>
-                <p class="text-muted mt-2 mb-0">Finding available technicians...</p>
-            </div>
-        `;
-
         try {
             const serviceIds = guestServices.map(s => s.id).filter(id => id != null);
             const query = serviceIds.length > 0 ? `?serviceIds=${encodeURIComponent(serviceIds.join(','))}` : '';
@@ -1497,87 +1848,9 @@
             const techs = response.ok ? await response.json() : [];
             bookingState.staffList = techs;
 
-            // Render Per-Service Staff Selection Dropdowns if current guest has multiple services
-            if (perServiceBox && perServiceList) {
-                if (guestServices.length > 1) {
-                    perServiceBox.classList.remove('d-none');
-                    perServiceList.innerHTML = '';
-                    guestServices.forEach(srv => {
-                        const currentAssignedId = currentGuest.serviceStaffAssignments[srv.id];
-                        let techOptionsHtml = `<option value="">-- Same as overall technician --</option>`;
-                        techOptionsHtml += `<option value="anyone">Anyone Available</option>`;
-                        techs.forEach(t => {
-                            const isOptSelected = currentAssignedId && String(currentAssignedId) === String(t.id);
-                            techOptionsHtml += `<option value="${t.id}" ${isOptSelected ? 'selected' : ''}>${t.name || t.username}</option>`;
-                        });
-
-                        const rowDiv = document.createElement('div');
-                        rowDiv.className = 'd-flex flex-column flex-sm-row justify-content-between align-items-sm-center bg-white p-2 px-3 rounded-3 border';
-                        rowDiv.innerHTML = `
-                            <div class="mb-1 mb-sm-0 pe-2">
-                                <span class="fw-semibold text-dark small">${srv.name}</span>
-                                <span class="text-muted small">($${Number(srv.price || 0).toFixed(2)})</span>
-                            </div>
-                            <div style="min-width: 220px;">
-                                <select class="form-select form-select-sm" onchange="assignServiceStaff(${srv.id}, this.value)">
-                                    ${techOptionsHtml}
-                                </select>
-                            </div>
-                        `;
-                        perServiceList.appendChild(rowDiv);
-                    });
-                } else {
-                    perServiceBox.classList.add('d-none');
-                }
-            }
-
-            staffGrid.innerHTML = '';
-
-            // Option 0: Anyone Available (No Preference)
-            const isAnyoneSelected = currentGuest.selectedStaff && currentGuest.selectedStaff.isAnyoneAvailable;
-            const anyoneCol = document.createElement('div');
-            anyoneCol.className = 'col-md-6';
-            anyoneCol.innerHTML = `
-                <div class="staff-card d-flex align-items-center justify-content-between ${isAnyoneSelected ? 'selected' : ''}"
-                     id="staffCard-anyone"
-                     onclick="selectStaff('anyone')">
-                    <div class="d-flex align-items-center gap-3">
-                        <div class="staff-avatar" style="background: linear-gradient(135deg, #6c757d, #adb5bd);">
-                            <i class="bi bi-people-fill"></i>
-                        </div>
-                        <div>
-                            <h5 class="fw-bold text-dark mb-0">Anyone Available</h5>
-                            <small class="text-muted">No preference</small>
-                        </div>
-                    </div>
-                    <span class="check-indicator"><i class="bi bi-check-lg"></i></span>
-                </div>
-            `;
-            staffGrid.appendChild(anyoneCol);
-
-            // Available Technicians (JUST NAMES, no specialty tags or "qualified" labels)
-            techs.forEach(tech => {
-                const displayName = tech.name || tech.username || 'Nail Technician';
-                const initials = displayName.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
-                const isTechSelected = currentGuest.selectedStaff && currentGuest.selectedStaff.id === tech.id;
-
-                const col = document.createElement('div');
-                col.className = 'col-md-6';
-                col.innerHTML = `
-                    <div class="staff-card d-flex align-items-center justify-content-between ${isTechSelected ? 'selected' : ''}"
-                         id="staffCard-${tech.id}"
-                         onclick="selectStaff(${tech.id})">
-                        <div class="d-flex align-items-center gap-3">
-                            <div class="staff-avatar">${initials}</div>
-                            <div>
-                                <h5 class="fw-bold text-dark mb-0">${displayName}</h5>
-                            </div>
-                        </div>
-                        <span class="check-indicator"><i class="bi bi-check-lg"></i></span>
-                    </div>
-                `;
-                staffGrid.appendChild(col);
-            });
+            // Initialize or apply default staff mode
+            const activeMode = currentGuest.staffMode || 'anyone';
+            setStaffAssignmentMode(activeMode);
 
             // Update next buttons and labels
             const nextBtn = document.getElementById('step2NextBtn');
@@ -1590,13 +1863,6 @@
             }
             if (floatingNextBtnLabel) {
                 floatingNextBtnLabel.textContent = isLastStaffStep ? 'Next: Details & Confirm' : 'Next: Guest 2 Staff';
-            }
-
-            if (currentGuest.selectedStaff) {
-                if (nextBtn) nextBtn.disabled = false;
-                triggerStaffFloatingActionBar(currentGuest.selectedStaff.name);
-            } else {
-                if (nextBtn) nextBtn.disabled = true;
             }
         } catch (err) {
             console.error('Error loading staff:', err);
@@ -1747,11 +2013,15 @@
                 return;
             }
             if (!bookingState.selectedStaff) {
-                showAlert('Please select a technician before proceeding.');
+                showAlert('Please select a technician option before proceeding.');
                 return;
             }
             bookingState.detailsGuestIndex = 0;
             renderGuestDetailsForm(0);
+            const dateInput = document.getElementById('appointmentDate');
+            if (dateInput && dateInput.value) {
+                handleDateChange(dateInput.value);
+            }
         }
 
         bookingState.currentStep = targetStep;

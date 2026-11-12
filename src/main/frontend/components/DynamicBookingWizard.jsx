@@ -35,7 +35,7 @@ const SERVICE_CATEGORIES = [
   },
   { id: 'body-massage', title: 'Body Massage', keywords: ['massage', 'hot stone'] },
   { id: 'waxing', title: 'Waxing', keywords: ['wax', 'waxing'] },
-  { id: 'facial', title: 'Facial Treatments (Babor®)', keywords: ['facial', 'babor'] },
+  { id: 'facial', title: 'Facial Treatments (Babor®)', keywords: ['facial', 'babor', 'collagen'] },
   { id: 'specialty-services', title: 'Specialty Services', keywords: ['tinting', 'tint'] },
   { id: 'gift-packages', title: 'Gift Packages', keywords: ['rejuvenation', 'executive', 'package'] },
 ];
@@ -69,11 +69,56 @@ function getCategoryForService(srv) {
   return 'manicures';
 }
 
+function mapToBackendCategory(catId) {
+  switch (catId) {
+    case 'pedicures':
+    case 'combos':
+      return 'PEDICURE';
+    case 'kids':
+      return 'KID_SERVICES';
+    case 'body-massage':
+      return 'BODY_MASSAGE';
+    case 'waxing':
+      return 'WAXING';
+    case 'facial':
+    case 'specialty-services':
+      return 'FACIAL';
+    case 'nail-enhancement':
+      return 'NAIL_ART';
+    case 'gift-packages':
+      return 'ALL';
+    case 'manicures':
+    default:
+      return 'MANICURE';
+  }
+}
+
+function isTechQualifiedForBackendCategory(tech, category) {
+  if (category === 'PEDICURE' || category === 'KID_SERVICES') {
+    return true;
+  }
+  const spec = tech?.specialty;
+  if (!spec || !spec.trim()) return false;
+  const tags = spec.split(',').map((s) => s.trim().toUpperCase());
+  if (tags.includes('ALL') || tags.includes('FULL EVERYTHING') || tags.includes('GENERAL')) {
+    return true;
+  }
+  return tags.includes(category);
+}
+
+function isUniversalMasterTech(tech) {
+  const spec = tech?.specialty;
+  if (!spec) return false;
+  const tags = spec.split(',').map((s) => s.trim().toUpperCase());
+  return tags.includes('ALL') || tags.includes('FULL EVERYTHING');
+}
+
 function createEmptyGuest(guestNumber) {
   return {
     guestNumber,
     services: [],
     selectedStaff: null,
+    staffMode: 'anyone', // 'anyone' | 'per-service' | 'master'
     serviceStaffAssignments: {},
     customerName: '',
     customerPhone: '',
@@ -115,16 +160,31 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
 
   const [selectedStaff, setSelectedStaff] = useState(null);
   const [selectedStation, setSelectedStation] = useState('Any Available Station');
+  
+  // Date & Availability state
+  const getInitialBookingDate = () => {
+    const d = new Date();
+    // If today is Sunday, skip to Monday
+    if (d.getDay() === 0) {
+      d.setDate(d.getDate() + 1);
+    }
+    return d.toISOString().split('T')[0];
+  };
+
   const [appointmentSchedule, setAppointmentSchedule] = useState(() => ({
-    appointmentDate: new Date().toISOString().split('T')[0],
+    appointmentDate: getInitialBookingDate(),
     appointmentTime: '',
   }));
+
+  const [availableSlots, setAvailableSlots] = useState([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
+  const [isDateClosed, setIsDateClosed] = useState(false);
+  const [closedReason, setClosedReason] = useState('');
 
   const [alertMessage, setAlertMessage] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [confirmedBooking, setConfirmedBooking] = useState(null);
 
-  const timeSlots = useMemo(() => buildStoreTimeSlots(), []);
   const currentStepKey = activeSteps[currentStepIdx] || 'SERVICE';
 
   const guest1Totals = useMemo(() => calculateGuestTotals(guests[0]), [guests]);
@@ -151,7 +211,7 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
     setSelectedStaff(null);
     setSelectedStation('Any Available Station');
     setAppointmentSchedule({
-      appointmentDate: new Date().toISOString().split('T')[0],
+      appointmentDate: getInitialBookingDate(),
       appointmentTime: '',
     });
     setAlertMessage(null);
@@ -166,7 +226,7 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
     }
   }, [onRegisterResetHandler, resetToBlankWizard]);
 
-  // Fetch FULL service catalog scoped to active tenant, pre-selecting ?serviceId=XYZ without hiding the rest
+  // Fetch FULL service catalog scoped to active tenant
   useEffect(() => {
     fetch('/api/services', {
       headers: { 'X-Tenant-ID': tenant.tenantKey },
@@ -193,7 +253,6 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
               return [updatedFirst, ...prev.slice(1)];
             });
 
-            // Automatically expand the category containing the preselected service
             const targetCatId = getCategoryForService(matched);
             setOpenCategoryId(targetCatId);
           }
@@ -202,21 +261,12 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
       .catch(() => setAlertMessage('Unable to load salon services.'));
   }, [preselectedServiceId, tenant.tenantKey]);
 
-  // Dynamically fetch qualified staff scoped to active tenant for current guest's selected services
+  // Dynamically fetch staff scoped to active tenant
   useEffect(() => {
-    if (currentStepKey !== 'STAFF') return;
+    if (currentStepKey !== 'STAFF' && currentStepKey !== 'DETAILS') return;
     setLoadingStaff(true);
-    const currentStaffGuest = guests[staffGuestIndex] || guests[0];
-    const guestServiceIds = (currentStaffGuest?.services || [])
-      .map((s) => s.id)
-      .filter((id, idx, arr) => id != null && arr.indexOf(id) === idx);
 
-    const query =
-      guestServiceIds.length > 0
-        ? `?serviceIds=${encodeURIComponent(guestServiceIds.join(','))}`
-        : '';
-
-    fetch(`/api/nail-techs${query}`, {
+    fetch('/api/nail-techs', {
       headers: { 'X-Tenant-ID': tenant.tenantKey },
     })
       .then((res) => (res.ok ? res.json() : []))
@@ -226,9 +276,86 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
       })
       .catch(() => setAlertMessage('Unable to load available technicians.'))
       .finally(() => setLoadingStaff(false));
-  }, [currentStepKey, guests, staffGuestIndex, tenant.tenantKey]);
+  }, [currentStepKey, tenant.tenantKey]);
 
-  // Categorize the FULL tenant service catalog (matching services.html and booking.html)
+  // Dynamically fetch available time slots whenever date, staff mode, or staff assignment changes
+  useEffect(() => {
+    if (currentStepKey !== 'DETAILS') return;
+    const selectedDate = appointmentSchedule.appointmentDate;
+    if (!selectedDate) return;
+
+    // Check Sunday client-side
+    const d = new Date(selectedDate + 'T00:00:00');
+    if (d.getDay() === 0) {
+      setIsDateClosed(true);
+      setClosedReason('Our salon is closed on Sundays. Please choose Monday through Saturday.');
+      setAvailableSlots([]);
+      setAppointmentSchedule((prev) => ({ ...prev, appointmentTime: '' }));
+      return;
+    }
+
+    setIsDateClosed(false);
+    setClosedReason('');
+    setLoadingSlots(true);
+
+    const activeStaffGuest = guests[0];
+    const duration = combinedTotals.totalDurationMinutes || 45;
+    const params = new URLSearchParams();
+    params.set('date', selectedDate);
+    params.set('durationMinutes', String(duration));
+
+    // Handle staff parameters
+    if (activeStaffGuest?.staffMode === 'per-service') {
+      const assignedIds = Object.values(activeStaffGuest.serviceStaffAssignments || {})
+        .filter((id) => id != null && id !== 'anyone' && !isNaN(Number(id)));
+      if (assignedIds.length > 0) {
+        params.set('techIds', assignedIds.join(','));
+      }
+    } else if (activeStaffGuest?.selectedStaff?.id) {
+      params.set('techId', String(activeStaffGuest.selectedStaff.id));
+    }
+
+    fetch(`/api/appointments/availability?${params.toString()}`, {
+      headers: { 'X-Tenant-ID': tenant.tenantKey },
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!data) {
+          setAvailableSlots(buildStoreTimeSlots().map((s) => ({ ...s, available: true })));
+          return;
+        }
+        if (data.isClosed) {
+          setIsDateClosed(true);
+          setClosedReason(data.reason || 'Salon is closed on this date.');
+          setAvailableSlots([]);
+          setAppointmentSchedule((prev) => ({ ...prev, appointmentTime: '' }));
+        } else {
+          setIsDateClosed(false);
+          const slots = data.availableSlots || [];
+          setAvailableSlots(slots);
+          // If current selected time is not available or passed, reset it
+          const currentValid = slots.find(
+            (s) => s.value === appointmentSchedule.appointmentTime && s.available
+          );
+          if (!currentValid) {
+            setAppointmentSchedule((prev) => ({ ...prev, appointmentTime: '' }));
+          }
+        }
+      })
+      .catch((err) => {
+        console.warn('Availability check failed, using local slots:', err);
+        setAvailableSlots(buildStoreTimeSlots().map((s) => ({ ...s, available: true })));
+      })
+      .finally(() => setLoadingSlots(false));
+  }, [
+    appointmentSchedule.appointmentDate,
+    combinedTotals.totalDurationMinutes,
+    currentStepKey,
+    guests,
+    tenant.tenantKey,
+  ]);
+
+  // Categorize the FULL tenant service catalog
   const categorizedServices = useMemo(() => {
     const enabledLower = (wizard?.enabledCategories || []).map((c) => c.toLowerCase().trim());
     const visibleCategories =
@@ -262,9 +389,7 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
       .filter((cat) => cat.items.length > 0);
   }, [services, wizard?.enabledCategories]);
 
-  // Toggle a service in/out of the currently active guest's service list
-  // Single Selection per Category Rule: Choosing a new option within the same category
-  // automatically replaces the previously selected service in that category.
+  // Single Selection per Category Rule
   const toggleServiceForActiveGuest = (srv) => {
     setAlertMessage(null);
     const targetCat = getCategoryForService(srv);
@@ -285,18 +410,6 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
       })
     );
   };
-    setAlertMessage(null);
-    setGuests((prev) =>
-      prev.map((guest, idx) => {
-        if (idx !== activeGuestIndex) return guest;
-        const exists = guest.services.some((item) => item.id === srv.id);
-        const updatedServices = exists
-          ? guest.services.filter((item) => item.id !== srv.id)
-          : [...guest.services, srv];
-        return { ...guest, services: updatedServices };
-      })
-    );
-  };
 
   const handleFinishServiceSelectionForActiveGuest = () => {
     setAlertMessage(null);
@@ -306,13 +419,11 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
       return;
     }
 
-    // After Guest 1 finishes choosing services, prompt "Just me" vs "Add another person (+1 Guest)"
     if (activeGuestIndex === 0 && guests.length === 1) {
       setShowSoloOrGroupPrompt(true);
       return;
     }
 
-    // If Guest 2 just finished selecting services (or Guest 1 edited while Guest 2 exists)
     if (guests.length > 1 && guests[1].services.length === 0) {
       setActiveGuestIndex(1);
       setShowSoloOrGroupPrompt(false);
@@ -351,11 +462,40 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
     setDetailsGuestIndex(0);
   };
 
+  // Staff Mode handlers
+  const handleSetStaffMode = (mode) => {
+    setAlertMessage(null);
+    setGuests((prev) =>
+      prev.map((g, idx) => {
+        if (idx !== staffGuestIndex) return g;
+        let chosenStaff = g.selectedStaff;
+        if (mode === 'anyone') {
+          chosenStaff = { id: null, name: 'Anyone Available', isAnyoneAvailable: true };
+        } else if (mode === 'master') {
+          // Find first universal tech if not already set to a master
+          const masterTech = staffList.find((t) => isUniversalMasterTech(t));
+          chosenStaff = masterTech
+            ? { id: masterTech.id, name: masterTech.name || masterTech.username, isAnyoneAvailable: false }
+            : null;
+        } else if (mode === 'per-service') {
+          chosenStaff = { id: null, name: 'Specific Staff Per Service', isAnyoneAvailable: false };
+        }
+        return { ...g, staffMode: mode, selectedStaff: chosenStaff };
+      })
+    );
+
+    if (staffGuestIndex === 0) {
+      if (mode === 'anyone') {
+        setSelectedStaff({ id: null, name: 'Anyone Available', isAnyoneAvailable: true });
+      }
+    }
+  };
+
   const handleSelectStaff = (tech) => {
     setAlertMessage(null);
     const chosen = tech
       ? { id: tech.id, name: tech.name || tech.username, isAnyoneAvailable: false }
-      : { id: null, name: 'Anyone Available (No Preference)', isAnyoneAvailable: true };
+      : { id: null, name: 'Anyone Available', isAnyoneAvailable: true };
 
     setGuests((prev) =>
       prev.map((g, idx) => (idx === staffGuestIndex ? { ...g, selectedStaff: chosen } : g))
@@ -387,17 +527,15 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
     setAlertMessage(null);
     const activeStaffGuest = guests[staffGuestIndex] || guests[0];
     if (!activeStaffGuest?.selectedStaff) {
-      setAlertMessage(`Please choose a technician for Guest ${staffGuestIndex + 1}.`);
+      setAlertMessage(`Please choose a technician option for Guest ${staffGuestIndex + 1}.`);
       return;
     }
 
-    // Multi-Guest Staff Selection: repeat flow for Guest 2 if present
     if (staffGuestIndex + 1 < guests.length) {
       setStaffGuestIndex((prev) => prev + 1);
       return;
     }
 
-    // Finished staff selection for all guests; proceed to next step
     if (currentStepIdx + 1 < activeSteps.length) {
       const upcomingKey = activeSteps[currentStepIdx + 1];
       if (upcomingKey === 'DETAILS') {
@@ -429,11 +567,11 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
     }
     if (stepKey === 'STAFF') {
       if (!guests[0]?.selectedStaff) {
-        setAlertMessage('Please choose a technician for Guest 1.');
+        setAlertMessage('Please choose a technician option for Guest 1.');
         return false;
       }
       if (guests.length > 1 && !guests[1]?.selectedStaff) {
-        setAlertMessage('Please choose a technician for Guest 2.');
+        setAlertMessage('Please choose a technician option for Guest 2.');
         return false;
       }
     }
@@ -481,6 +619,21 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
     );
   };
 
+  const handleDateChange = (newDate) => {
+    setAlertMessage(null);
+    if (!newDate) return;
+    const d = new Date(newDate + 'T00:00:00');
+    if (d.getDay() === 0) {
+      setIsDateClosed(true);
+      setClosedReason('Our studio is closed on Sundays. Please pick Monday through Saturday.');
+      setAppointmentSchedule({ appointmentDate: newDate, appointmentTime: '' });
+      return;
+    }
+    setIsDateClosed(false);
+    setClosedReason('');
+    setAppointmentSchedule({ appointmentDate: newDate, appointmentTime: '' });
+  };
+
   const handleGuestDetailsAction = async (e) => {
     e.preventDefault();
     setAlertMessage(null);
@@ -497,12 +650,16 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
       return;
     }
 
-    if (!appointmentSchedule.appointmentDate || !appointmentSchedule.appointmentTime) {
-      setAlertMessage('Please select an Appointment Date and Time Slot.');
+    if (isDateClosed) {
+      setAlertMessage('Selected date is closed. Please choose another date.');
       return;
     }
 
-    // If there is another guest whose details haven't been entered yet, advance sequentially to Guest 2
+    if (!appointmentSchedule.appointmentDate || !appointmentSchedule.appointmentTime) {
+      setAlertMessage('Please select an available Appointment Date and Time Slot.');
+      return;
+    }
+
     if (detailsGuestIndex + 1 < guests.length) {
       setDetailsGuestIndex((prev) => prev + 1);
       return;
@@ -607,7 +764,7 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
 
             <div className="d-flex justify-content-between py-1 border-bottom">
               <span className="text-muted">Technician</span>
-              <strong>{selectedStaff?.name}</strong>
+              <strong>{selectedStaff?.name || 'Anyone Available'}</strong>
             </div>
             {confirmedBooking.submittedPayload?.stationPreference && (
               <div className="d-flex justify-content-between py-1 border-bottom">
@@ -647,6 +804,29 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
   const activeGuestTotals = activeGuestIndex === 0 ? guest1Totals : guest2Totals;
   const currentStaffGuest = guests[staffGuestIndex] || guests[0];
   const currentGuestStaff = currentStaffGuest?.selectedStaff;
+  const currentStaffMode = currentStaffGuest?.staffMode || 'anyone';
+
+  // Group services by category for "Specific Staff Per Service" mode
+  const currentGuestCategoryGroups = useMemo(() => {
+    const list = currentStaffGuest?.services || [];
+    const groupMap = new Map();
+    list.forEach((srv) => {
+      const catId = getCategoryForService(srv);
+      const backendCat = mapToBackendCategory(catId);
+      const catConfig = SERVICE_CATEGORIES.find((c) => c.id === catId);
+      const catTitle = catConfig ? catConfig.title : 'Treatments';
+      if (!groupMap.has(catId)) {
+        groupMap.set(catId, { catId, catTitle, backendCat, services: [] });
+      }
+      groupMap.get(catId).services.push(srv);
+    });
+    return Array.from(groupMap.values());
+  }, [currentStaffGuest?.services]);
+
+  // Master / Universal techs list
+  const masterTechs = useMemo(() => {
+    return staffList.filter((t) => isUniversalMasterTech(t));
+  }, [staffList]);
 
   return (
     <main className={`container my-5 flex-grow-1 layout-${layoutVariant}`}>
@@ -718,7 +898,7 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
                 </div>
               )}
 
-              {/* ==================== STEP: SERVICE (MULTI-SELECT + SOLO/GROUP PROMPT) ==================== */}
+              {/* ==================== STEP 1: SERVICE (MULTI-SELECT + SOLO/GROUP PROMPT) ==================== */}
               {currentStepKey === 'SERVICE' && (
                 <section>
                   <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
@@ -731,7 +911,6 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
                       </small>
                     </div>
 
-                    {/* Guest switcher tabs when +1 Guest is enabled */}
                     {guests.length > 1 && (
                       <div className="d-flex align-items-center gap-2">
                         <button
@@ -774,49 +953,37 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
                           onClick={handleRemoveSecondGuest}
                           title="Remove Guest 2"
                         >
-                          ✕ Remove Guest 2
+                          ✕ Remove
                         </button>
                       </div>
                     )}
                   </div>
 
-                  {/* Live Dynamic Guest Subtotal & Combined Group Total Banner */}
+                  {/* Subtotal Banner */}
                   <div className="card bg-light border-0 rounded-4 p-3 mb-4">
                     <div className="row g-3 align-items-center">
-                      <div className={guests.length > 1 ? 'col-md-4' : 'col-md-8'}>
+                      <div className={guests.length > 1 ? 'col-md-4' : 'col-md-12'}>
                         <div className="small text-muted fw-semibold">Guest 1 Subtotal</div>
                         <div className="fw-bold fs-5" style={{ color: 'var(--primary-color)' }}>
                           ${guest1Totals.subtotal.toFixed(2)}{' '}
                           <span className="small text-muted fw-normal">
-                            ({guest1Totals.count} service{guest1Totals.count === 1 ? '' : 's'} •{' '}
-                            {guest1Totals.durationMinutes} mins)
+                            ({guest1Totals.count} services • {guest1Totals.durationMinutes} mins)
                           </span>
                         </div>
-                        {guests[0]?.services.length > 0 && (
-                          <div className="small text-dark mt-1">
-                            {guests[0].services.map((s) => s.name).join(', ')}
-                          </div>
-                        )}
                       </div>
 
                       {guests.length > 1 && (
                         <>
-                          <div className="col-md-4 border-start-md">
+                          <div className="col-md-4 border-start">
                             <div className="small text-muted fw-semibold">Guest 2 Subtotal</div>
                             <div className="fw-bold fs-5" style={{ color: 'var(--primary-color)' }}>
                               ${guest2Totals.subtotal.toFixed(2)}{' '}
                               <span className="small text-muted fw-normal">
-                                ({guest2Totals.count} service{guest2Totals.count === 1 ? '' : 's'} •{' '}
-                                {guest2Totals.durationMinutes} mins)
+                                ({guest2Totals.count} services • {guest2Totals.durationMinutes} mins)
                               </span>
                             </div>
-                            {guests[1]?.services.length > 0 && (
-                              <div className="small text-dark mt-1">
-                                {guests[1].services.map((s) => s.name).join(', ')}
-                              </div>
-                            )}
                           </div>
-                          <div className="col-md-4 border-start-md">
+                          <div className="col-md-4 border-start">
                             <div className="small text-muted fw-semibold">Combined Group Total</div>
                             <div className="fw-bold fs-4 text-dark">
                               ${combinedTotals.grandTotal.toFixed(2)}
@@ -831,14 +998,19 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
                     </div>
                   </div>
 
-                  {/* Solo vs. Group (+1 Guest) Prompt after Guest 1 finishes choosing services */}
+                  {/* Solo vs. Group Prompt */}
                   {showSoloOrGroupPrompt ? (
-                    <div className="card border-2 rounded-4 p-4 mb-4 text-center shadow-sm" style={{ borderColor: 'var(--primary-color)' }}>
-                      <h5 className="fw-bold mb-2">Are you booking just for yourself or adding a guest?</h5>
+                    <div
+                      className="card border-2 rounded-4 p-4 mb-4 text-center shadow-sm"
+                      style={{ borderColor: 'var(--primary-color)' }}
+                    >
+                      <h5 className="fw-bold text-dark mb-2">
+                        Are you booking just for yourself or adding a guest?
+                      </h5>
                       <p className="text-muted small mb-4">
-                        Guest 1 has {guest1Totals.count} selected service
-                        {guest1Totals.count === 1 ? '' : 's'} (${guest1Totals.subtotal.toFixed(2)}).
-                        Would you like to continue solo or add a second person (+1 Guest)?
+                        Guest 1 has {guest1Totals.count} service
+                        {guest1Totals.count === 1 ? '' : 's'} selected ($
+                        {guest1Totals.subtotal.toFixed(2)}).
                       </p>
                       <div className="d-flex flex-wrap justify-content-center gap-3">
                         <button
@@ -854,7 +1026,7 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
                           className="btn btn-outline-dark fw-bold px-4 py-3 rounded-3"
                           onClick={handleChooseAddGuest}
                         >
-                          + Add another person (+1 Guest)
+                          Add another person (+1 Guest)
                         </button>
                       </div>
                       <div className="mt-3">
@@ -872,8 +1044,8 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
                       <div className="d-flex flex-column gap-3 mb-4">
                         {categorizedServices.map((cat) => {
                           const isOpen = openCategoryId === cat.id;
-                          const selectedInCat = cat.items.filter((srv) =>
-                            activeGuest.services.some((s) => s.id === srv.id)
+                          const selectedInCat = activeGuest.services.filter(
+                            (s) => getCategoryForService(s) === cat.id
                           ).length;
 
                           return (
@@ -993,7 +1165,7 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
                 </section>
               )}
 
-              {/* ==================== STEP: STAFF ==================== */}
+              {/* ==================== STEP 2: STAFF & ASSIGNMENT MODES ==================== */}
               {currentStepKey === 'STAFF' && (
                 <section>
                   <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
@@ -1004,9 +1176,7 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
                           : `Step ${currentStepIdx + 1}: ${STEP_METADATA.STAFF.title}`}
                       </h5>
                       <p className="text-muted small mb-0">
-                        {guests.length > 1
-                          ? `Select an overall technician for Guest ${staffGuestIndex + 1}, or assign specific staff per service.`
-                          : 'Select an available technician for your appointment, or assign specific staff per service.'}
+                        Select how you would like technicians assigned for your visit
                       </p>
                     </div>
                     <span
@@ -1018,100 +1188,170 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
                     </span>
                   </div>
 
-                  {/* Per-Service Staff Selection Dropdowns if current guest has multiple services */}
-                  {currentStaffGuest?.services.length > 1 && (
-                    <div className="card bg-light border-0 rounded-4 p-3 mb-4">
-                      <div className="d-flex justify-content-between align-items-center mb-2">
-                        <h6 className="fw-bold text-dark mb-0">Per-Service Technician Assignment (Optional)</h6>
-                        <span className="badge bg-white text-muted border rounded-pill">Custom tech per service</span>
-                      </div>
-                      <p className="small text-muted mb-3">
-                        You can assign a specific technician for each treatment, or choose one overall technician below for all services.
-                      </p>
-                      <div className="d-flex flex-column gap-2">
-                        {currentStaffGuest.services.map((srv) => {
-                          const currentVal = currentStaffGuest.serviceStaffAssignments?.[srv.id];
-                          const selectValue =
-                            currentVal === null ? 'anyone' : currentVal != null ? String(currentVal) : '';
-                          return (
-                            <div
-                              key={srv.id}
-                              className="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center bg-white p-2 px-3 rounded-3 border"
-                            >
-                              <div className="mb-1 mb-sm-0 pe-2">
-                                <span className="fw-semibold text-dark small">{srv.name}</span>{' '}
-                                <span className="text-muted small">(${Number(srv.price || 0).toFixed(2)})</span>
-                              </div>
-                              <div style={{ minWidth: 220 }}>
-                                <select
-                                  className="form-select form-select-sm"
-                                  value={selectValue}
-                                  onChange={(e) => handleAssignServiceStaff(srv.id, e.target.value)}
-                                >
-                                  <option value="">-- Same as overall technician --</option>
-                                  <option value="anyone">Anyone Available</option>
-                                  {staffList.map((t) => (
-                                    <option key={t.id} value={t.id}>
-                                      {t.name || t.username}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-                            </div>
-                          );
-                        })}
+                  {/* 3 Staff Assignment Modes */}
+                  <div className="row g-3 mb-4">
+                    {/* Option A: Anyone Available */}
+                    <div className="col-md-4">
+                      <div
+                        className="card h-100 p-3 rounded-4 shadow-sm text-center"
+                        style={{
+                          cursor: 'pointer',
+                          borderColor: currentStaffMode === 'anyone' ? 'var(--primary-color)' : '#dee2e6',
+                          borderWidth: currentStaffMode === 'anyone' ? '2px' : '1px',
+                          backgroundColor: currentStaffMode === 'anyone' ? 'var(--primary-color-soft)' : '#fff',
+                        }}
+                        onClick={() => handleSetStaffMode('anyone')}
+                      >
+                        <div className="fw-bold fs-6 text-dark mb-1">⚡ Anyone Available</div>
+                        <small className="text-muted">
+                          Fastest booking. Automatically pairs with any qualified staff.
+                        </small>
                       </div>
                     </div>
-                  )}
 
+                    {/* Option B: Specific Staff Per Service */}
+                    <div className="col-md-4">
+                      <div
+                        className="card h-100 p-3 rounded-4 shadow-sm text-center"
+                        style={{
+                          cursor: 'pointer',
+                          borderColor: currentStaffMode === 'per-service' ? 'var(--primary-color)' : '#dee2e6',
+                          borderWidth: currentStaffMode === 'per-service' ? '2px' : '1px',
+                          backgroundColor: currentStaffMode === 'per-service' ? 'var(--primary-color-soft)' : '#fff',
+                        }}
+                        onClick={() => handleSetStaffMode('per-service')}
+                      >
+                        <div className="fw-bold fs-6 text-dark mb-1">🔍 Specific Staff Per Service</div>
+                        <small className="text-muted">
+                          Choose specific qualified technicians for each service category.
+                        </small>
+                      </div>
+                    </div>
+
+                    {/* Option C: Single Master Technician */}
+                    <div className="col-md-4">
+                      <div
+                        className="card h-100 p-3 rounded-4 shadow-sm text-center"
+                        style={{
+                          cursor: 'pointer',
+                          borderColor: currentStaffMode === 'master' ? 'var(--primary-color)' : '#dee2e6',
+                          borderWidth: currentStaffMode === 'master' ? '2px' : '1px',
+                          backgroundColor: currentStaffMode === 'master' ? 'var(--primary-color-soft)' : '#fff',
+                        }}
+                        onClick={() => handleSetStaffMode('master')}
+                      >
+                        <div className="fw-bold fs-6 text-dark mb-1">👑 Single Master Technician</div>
+                        <small className="text-muted">
+                          Universal specialist who handles all your chosen treatments seamlessly.
+                        </small>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Mode Content Views */}
                   {loadingStaff ? (
                     <div className="text-center py-4 text-muted">Loading available staff...</div>
                   ) : (
-                    <div className="row g-3 mb-4">
-                      <div className="col-md-6">
-                        <div
-                          className="card p-3 h-100"
-                          style={{
-                            cursor: 'pointer',
-                            borderColor: currentGuestStaff?.isAnyoneAvailable
-                              ? 'var(--primary-color)'
-                              : '#dee2e6',
-                            backgroundColor: currentGuestStaff?.isAnyoneAvailable
-                              ? 'var(--primary-color-soft)'
-                              : '#fff',
-                          }}
-                          onClick={() => handleSelectStaff(null)}
-                        >
-                          <div className="fw-bold text-dark">Anyone Available</div>
-                          <small className="text-muted">No preference</small>
+                    <>
+                      {/* Mode A: Anyone Available Active */}
+                      {currentStaffMode === 'anyone' && (
+                        <div className="alert alert-info rounded-4 border-0 p-3 mb-4">
+                          <strong>No preference needed:</strong> We will automatically assign the best available specialist for Guest {staffGuestIndex + 1}'s treatments.
                         </div>
-                      </div>
+                      )}
 
-                      {staffList.map((tech) => {
-                        const displayName = tech.name || tech.username || 'Nail Technician';
-                        const isSelected = currentGuestStaff?.id === tech.id;
-                        return (
-                          <div key={tech.id} className="col-md-6">
-                            <div
-                              className="card p-3 h-100 d-flex flex-row align-items-center justify-content-between"
-                              style={{
-                                cursor: 'pointer',
-                                borderColor: isSelected ? 'var(--primary-color)' : '#dee2e6',
-                                backgroundColor: isSelected ? 'var(--primary-color-soft)' : '#fff',
-                              }}
-                              onClick={() => handleSelectStaff(tech)}
-                            >
-                              <span className="fw-bold text-dark">{displayName}</span>
-                              {isSelected && (
-                                <span style={{ color: 'var(--primary-color)', fontWeight: 700 }}>
-                                  ✓
-                                </span>
-                              )}
+                      {/* Mode B: Specific Staff Per Service */}
+                      {currentStaffMode === 'per-service' && (
+                        <div className="card bg-light border-0 rounded-4 p-4 mb-4">
+                          <h6 className="fw-bold text-dark mb-3">Assign Technicians by Service Category:</h6>
+                          {currentGuestCategoryGroups.map((group) => {
+                            const qualifiedForGroup = staffList.filter((tech) =>
+                              isTechQualifiedForBackendCategory(tech, group.backendCat)
+                            );
+
+                            return (
+                              <div key={group.catId} className="bg-white p-3 rounded-3 border mb-3">
+                                <div className="d-flex justify-content-between align-items-center mb-2">
+                                  <div>
+                                    <strong className="text-dark">{group.catTitle}</strong>
+                                    <span className="small text-muted ms-2">
+                                      ({group.services.map((s) => s.name).join(', ')})
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="row g-2">
+                                  {group.services.map((srv) => {
+                                    const currentAssignedId = currentStaffGuest.serviceStaffAssignments?.[srv.id];
+                                    const selectValue =
+                                      currentAssignedId === null ? 'anyone' : currentAssignedId != null ? String(currentAssignedId) : '';
+                                    return (
+                                      <div key={srv.id} className="col-12 d-flex flex-column flex-sm-row justify-content-between align-items-sm-center pt-2">
+                                        <span className="small fw-semibold text-secondary mb-1 mb-sm-0 pe-2">
+                                          {srv.name} (${Number(srv.price || 0).toFixed(2)})
+                                        </span>
+                                        <div style={{ minWidth: 240 }}>
+                                          <select
+                                            className="form-select form-select-sm"
+                                            value={selectValue}
+                                            onChange={(e) => handleAssignServiceStaff(srv.id, e.target.value)}
+                                          >
+                                            <option value="anyone">Anyone Available</option>
+                                            {qualifiedForGroup.map((tech) => (
+                                              <option key={tech.id} value={tech.id}>
+                                                {tech.name || tech.username}
+                                              </option>
+                                            ))}
+                                          </select>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {/* Mode C: Single Master Technician */}
+                      {currentStaffMode === 'master' && (
+                        <div className="mb-4">
+                          <h6 className="fw-bold text-dark mb-2">Select a Master / Universal Specialist:</h6>
+                          {masterTechs.length === 0 ? (
+                            <div className="alert alert-warning rounded-4 border-0 p-3">
+                              No universal master technician is currently registered for this studio. Please choose "Anyone Available" or "Specific Staff Per Service".
                             </div>
-                          </div>
-                        );
-                      })}
-                    </div>
+                          ) : (
+                            <div className="row g-3">
+                              {masterTechs.map((tech) => {
+                                const isSelected = currentGuestStaff?.id === tech.id;
+                                return (
+                                  <div key={tech.id} className="col-md-6">
+                                    <div
+                                      className="card p-3 h-100 d-flex flex-row align-items-center justify-content-between rounded-3"
+                                      style={{
+                                        cursor: 'pointer',
+                                        borderColor: isSelected ? 'var(--primary-color)' : '#dee2e6',
+                                        backgroundColor: isSelected ? 'var(--primary-color-soft)' : '#fff',
+                                      }}
+                                      onClick={() => handleSelectStaff(tech)}
+                                    >
+                                      <div>
+                                        <span className="fw-bold text-dark d-block">{tech.name || tech.username}</span>
+                                        <small className="text-muted">Master Specialist (All Services)</small>
+                                      </div>
+                                      {isSelected && (
+                                        <span style={{ color: 'var(--primary-color)', fontWeight: 700 }}>✓</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </>
                   )}
 
                   <div className="d-flex justify-content-between">
@@ -1135,7 +1375,7 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
                     </button>
                   </div>
 
-                  {/* Sticky Floating Action Button: pops up immediately on clicking any staff card */}
+                  {/* Sticky Floating Action Button */}
                   {currentGuestStaff && (
                     <div
                       className="position-fixed bottom-0 start-50 translate-middle-x mb-4 px-4 py-3 bg-white rounded-pill shadow-lg d-flex align-items-center gap-3"
@@ -1143,10 +1383,10 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
                     >
                       <div>
                         <div className="fw-bold small text-dark">
-                          {currentGuestStaff.name}
+                          {currentGuestStaff.name || 'Mode Selected'}
                         </div>
                         <div className="small fw-semibold" style={{ color: 'var(--primary-color)' }}>
-                          Selected for Guest {staffGuestIndex + 1}
+                          Ready for Guest {staffGuestIndex + 1}
                         </div>
                       </div>
                       <button
@@ -1263,8 +1503,8 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
                         </ul>
                         <div className="row g-2 pt-2 border-top small">
                           <div className="col-md-6">
-                            <span className="text-muted">Technician: </span>
-                            <strong>{currentGuest.selectedStaff?.name || selectedStaff?.name || '—'}</strong>
+                            <span className="text-muted">Technician Assignment: </span>
+                            <strong>{currentGuest.selectedStaff?.name || selectedStaff?.name || 'Anyone Available'}</strong>
                           </div>
                           {wizard?.enableStationSelection && activeSteps.includes('STATION') && (
                             <div className="col-md-6">
@@ -1332,13 +1572,13 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
                         required
                         min={new Date().toISOString().split('T')[0]}
                         value={appointmentSchedule.appointmentDate}
-                        onChange={(e) =>
-                          setAppointmentSchedule({
-                            ...appointmentSchedule,
-                            appointmentDate: e.target.value,
-                          })
-                        }
+                        onChange={(e) => handleDateChange(e.target.value)}
                       />
+                      {isDateClosed && (
+                        <div className="text-danger small mt-1 fw-semibold">
+                          ⚠️ {closedReason}
+                        </div>
+                      )}
                     </div>
                     <div className="col-md-6">
                       <label className="form-label fw-semibold">
@@ -1347,6 +1587,7 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
                       <select
                         className="form-select"
                         required
+                        disabled={isDateClosed || loadingSlots}
                         value={appointmentSchedule.appointmentTime}
                         onChange={(e) =>
                           setAppointmentSchedule({
@@ -1355,13 +1596,26 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
                           })
                         }
                       >
-                        <option value="">-- Choose a Time --</option>
-                        {timeSlots.map((slot) => (
-                          <option key={slot.value} value={slot.value}>
-                            {slot.label}
+                        <option value="">
+                          {loadingSlots
+                            ? 'Checking real-time slot availability...'
+                            : isDateClosed
+                            ? '-- Closed on this date --'
+                            : '-- Choose an Available Time --'}
+                        </option>
+                        {availableSlots.map((slot) => (
+                          <option
+                            key={slot.value}
+                            value={slot.value}
+                            disabled={!slot.available}
+                          >
+                            {slot.label} {!slot.available ? `(${slot.reason || 'Unavailable'})` : ''}
                           </option>
                         ))}
                       </select>
+                      <div className="small text-muted mt-1">
+                        Slots dynamically pre-checked against existing salon appointments.
+                      </div>
                     </div>
                   </div>
 
@@ -1393,7 +1647,7 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
                       type="submit"
                       className="btn text-white fw-bold px-5 py-2"
                       style={{ backgroundColor: 'var(--primary-color)' }}
-                      disabled={submitting}
+                      disabled={submitting || isDateClosed}
                     >
                       {submitting
                         ? 'Submitting...'

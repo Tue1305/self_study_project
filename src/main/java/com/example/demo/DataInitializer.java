@@ -277,26 +277,25 @@ public class DataInitializer implements CommandLineRunner {
             userRepository.save(tech);
         }
 
-        // Seed dedicated technicians for "luxe" tenant
-        List<StaffConfig> luxeStaff = List.of(
-                new StaffConfig("sophia@luxenailspa.com", "Sophia Laurent", "sophia@luxenailspa.com", "ALL, NAIL_ART"),
-                new StaffConfig("chloe@luxenailspa.com", "Chloe Vance", "chloe@luxenailspa.com", "MANICURE, FACIAL"),
-                new StaffConfig("marcus@luxenailspa.com", "Marcus Reed", "marcus@luxenailspa.com", "BODY_MASSAGE, MANICURE")
-        );
-        for (StaffConfig config : luxeStaff) {
-            UserEntity tech = userRepository.findByUsername(config.username()).orElseGet(UserEntity::new);
-            tech.setTenantId("luxe");
-            tech.setUsername(config.username());
-            tech.setName(config.name());
-            tech.setEmail(config.email());
-            tech.setSpecialty(config.specialty());
-            tech.setRole("ROLE_NAIL_TECH");
-            if (tech.getPassword() == null || tech.getPassword().isEmpty()) {
-                tech.setPassword(passwordEncoder.encode("defaultPassword123"));
+        // Clean up any extra Luxe accounts so only 1 admin account exists for Luxe
+        List<UserEntity> existingLuxeUsers = userRepository.findAllByTenantId("luxe");
+        for (UserEntity u : existingLuxeUsers) {
+            if (!"admin@luxenailspa.com".equalsIgnoreCase(u.getUsername())) {
+                userRepository.delete(u);
             }
-            userRepository.save(tech);
         }
-        System.out.println("✅ Configured tenant-isolated salon technicians for 'default' and 'luxe'!");
+
+        // Seed or update the sole Luxe Admin account: admin@luxenailspa.com
+        UserEntity luxeAdmin = userRepository.findByUsername("admin@luxenailspa.com").orElseGet(UserEntity::new);
+        luxeAdmin.setTenantId("luxe");
+        luxeAdmin.setUsername("admin@luxenailspa.com");
+        luxeAdmin.setName("Luxe Admin");
+        luxeAdmin.setEmail("admin@luxenailspa.com");
+        luxeAdmin.setRole("ROLE_ADMIN");
+        luxeAdmin.setPassword(passwordEncoder.encode("adminLuxePass123!"));
+        userRepository.save(luxeAdmin);
+        System.out.println("✅ Configured sole Luxe admin account: admin@luxenailspa.com / adminLuxePass123!");
+        System.out.println("✅ Configured tenant-isolated salon technicians for 'default'!");
     }
 
     private void seedSampleTenantAppointments() {
@@ -321,8 +320,7 @@ public class DataInitializer implements CommandLineRunner {
 
         if (appointmentRepository.findAllByTenantId("luxe").isEmpty()) {
             List<ServiceEntity> luxeServices = serviceRepository.findAllByTenantId("luxe");
-            List<UserEntity> luxeTechs = userRepository.findAllByTenantIdAndRole("luxe", "ROLE_NAIL_TECH");
-            if (!luxeServices.isEmpty() && !luxeTechs.isEmpty()) {
+            if (!luxeServices.isEmpty()) {
                 Appointment appt = new Appointment();
                 appt.setTenantId("luxe");
                 appt.setCustomerName("Victoria Sterling");
@@ -331,7 +329,6 @@ public class DataInitializer implements CommandLineRunner {
                 appt.setAppointmentTime(tomorrowAtTwo);
                 appt.setStationPreference("Private Zen Suite A");
                 appt.setService(luxeServices.get(0));
-                appt.setNailTech(luxeTechs.get(0));
                 appt.setNotes("Initial seeded booking for Luxe Nail & Spa");
                 appointmentRepository.save(appt);
             }

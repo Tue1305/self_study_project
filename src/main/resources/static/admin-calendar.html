@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Appointment Schedule - Jenny's Nail Studio</title>
+    <title id="pageTitle">Appointment Schedule - Jenny's Nail Studio</title>
     <!-- Favicon Tag -->
     <link rel="icon" type="image/x-icon" href="/favicon.ico?=v2">
     <!-- Bootstrap 5.3 CSS -->
@@ -25,6 +25,15 @@
             background-color: var(--bs-primary-pink);
             color: #fff;
         }
+        .btn-pink {
+            background-color: var(--bs-primary-pink);
+            border-color: var(--bs-primary-pink);
+            color: #fff;
+        }
+        .btn-pink:hover {
+            filter: brightness(0.9);
+            color: #fff;
+        }
         #calendar {
             background: white;
             padding: 20px;
@@ -38,8 +47,10 @@
 <!-- Unified Header Navigation -->
 <header class="navbar navbar-expand-lg bg-white shadow-sm px-4">
     <div class="container-fluid">
-        <span class="navbar-brand fw-bold text-dark fs-5">
-            <i class="bi bi-shield-lock-fill text-pink me-2"></i>Jenny's Admin Portal
+        <span class="navbar-brand fw-bold text-dark fs-5 d-flex align-items-center gap-2">
+            <i class="bi bi-shield-lock-fill text-pink"></i>
+            <span id="portalBrandTitle">Jenny's Admin Portal</span>
+            <span id="tenantPill" class="badge bg-secondary ms-1">DEFAULT</span>
         </span>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#adminNav">
             <span class="navbar-toggler-icon"></span>
@@ -47,22 +58,22 @@
         <div class="collapse navbar-collapse" id="adminNav">
             <ul class="navbar-nav me-auto mb-2 mb-lg-0 ms-lg-4 gap-1">
                 <li class="nav-item">
-                    <a class="nav-link btn btn-light btn-sm px-3 fw-semibold text-dark me-1" href="./admin-dashboard.html">
+                    <a id="navDashboardLink" class="nav-link btn btn-light btn-sm px-3 fw-semibold text-dark me-1" href="./admin-dashboard.html">
                         <i class="bi bi-speedometer2 me-1"></i> Dashboard
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link btn btn-light btn-sm px-3 fw-semibold text-dark me-1" href="./nail-techs.html">
+                    <a id="navTechsLink" class="nav-link btn btn-light btn-sm px-3 fw-semibold text-dark me-1" href="./nail-techs.html">
                         <i class="bi bi-people me-1"></i> Nail Techs
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link btn btn-light btn-sm px-3 fw-semibold text-dark me-1" href="./admin-customers.html">
+                    <a id="navCustomersLink" class="nav-link btn btn-light btn-sm px-3 fw-semibold text-dark me-1" href="./admin-customers.html">
                         <i class="bi bi-person-lines-fill me-1"></i> Customers
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link btn btn-outline-secondary btn-sm px-3 fw-semibold text-dark" href="./index.html">
+                    <a id="navWebsiteLink" class="nav-link btn btn-outline-secondary btn-sm px-3 fw-semibold text-dark" href="./index.html">
                         <i class="bi bi-globe me-1"></i> Main Website
                     </a>
                 </li>
@@ -78,7 +89,7 @@
 <main class="container my-5 flex-grow-1">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2 class="h3 fw-bold text-dark mb-0">
-            <i class="bi bi-calendar-check-fill text-pink me-2"></i>Appointment Schedule
+            <i class="bi bi-calendar-check-fill text-pink me-2"></i><span id="scheduleHeading">Appointment Schedule</span>
         </h2>
     </div>
 
@@ -99,12 +110,14 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body" id="modalBody">
-                <!-- Populated dynamically -->
+                <!-- Injected via JavaScript -->
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-success btn-sm" onclick="updateAppointmentStatus('CONFIRMED')">Confirm</button>
-                <button type="button" class="btn btn-danger btn-sm" onclick="updateAppointmentStatus('CANCELLED')">Cancel</button>
-                <button type="button" class="btn btn-secondary btn-sm ms-auto" data-bs-dismiss="modal">Close</button>
+            <div class="modal-footer d-flex justify-content-between">
+                <div>
+                    <button class="btn btn-sm btn-outline-success me-1" onclick="updateAppointmentStatus('CONFIRMED')">Confirm</button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="updateAppointmentStatus('CANCELLED')">Cancel</button>
+                </div>
+                <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
     </div>
@@ -118,26 +131,122 @@
             <span class="small fw-semibold text-dark">Store Hours: Monday – Saturday: 10:00 AM – 7:00 PM | Sunday: Closed</span>
         </div>
         <div>
-            <small class="text-muted">&copy; Jenny's Nail Studio — Admin Management Panel</small>
+            <small id="footerCopyright" class="text-muted">&copy; Jenny's Nail Studio — Appointment Management System</small>
         </div>
     </div>
 </footer>
 
+<!-- FullCalendar 6 JavaScript Bundle -->
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
 <!-- Bootstrap 5.3 JavaScript Bundle -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-<!-- FullCalendar 6 JS -->
-<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
 
 <script>
-    let currentAppointmentId = null;
     const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
+    let currentAppointmentId = null;
 
-    // Token verification check on page load
-    if (!token) {
-        window.location.href = './login.html';
-    } else {
-        document.addEventListener('DOMContentLoaded', initCalendar);
+    // --- ADMIN ROUTE GUARD ---
+    (function() {
+        if (!token) {
+            window.location.href = './login.html';
+            return;
+        }
+
+        const role = parseJwtRole(token);
+        localStorage.setItem('userRole', role);
+
+        if (role !== 'ROLE_ADMIN' && role !== 'ADMIN') {
+            alert('Access Denied: Administrator privileges are required to view this page.');
+            window.location.href = './index.html';
+        }
+
+        function parseJwtRole(jwtToken) {
+            try {
+                const base64Url = jwtToken.split('.')[1];
+                const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+                const jsonPayload = decodeURIComponent(atob(base64).split('').map(c => {
+                    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                }).join(''));
+
+                const payload = JSON.parse(jsonPayload);
+                return payload.role || payload.authorities || (payload.roles ? payload.roles[0] : null) || 'ROLE_USER';
+            } catch (e) {
+                console.error('Failed to parse JWT role:', e);
+                return 'ROLE_USER';
+            }
+        }
+    })();
+    // --- END ADMIN GUARD ---
+
+    function getActiveTenant() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const queryTenant = urlParams.get('tenant');
+        if (queryTenant) return queryTenant.toLowerCase();
+
+        const host = window.location.hostname.toLowerCase();
+        if (host.startsWith('luxe.')) return 'luxe';
+
+        const storedTenant = localStorage.getItem('tenant');
+        if (storedTenant) return storedTenant.toLowerCase();
+
+        return 'default';
     }
+
+    const activeTenant = getActiveTenant();
+    localStorage.setItem('tenant', activeTenant);
+
+    // Apply links
+    const tenantQuery = `?tenant=${encodeURIComponent(activeTenant)}`;
+    document.getElementById('navDashboardLink').href = `./admin-dashboard.html${tenantQuery}`;
+    document.getElementById('navTechsLink').href = `./nail-techs.html${tenantQuery}`;
+    document.getElementById('navCustomersLink').href = `./admin-customers.html${tenantQuery}`;
+    document.getElementById('navWebsiteLink').href = activeTenant === 'luxe' ? `./booking.html${tenantQuery}` : `./index.html${tenantQuery}`;
+
+    // Apply dynamic branding
+    async function loadBranding() {
+        try {
+            const resp = await fetch(`/api/public/tenant-config?tenant=${encodeURIComponent(activeTenant)}`);
+            if (resp.ok) {
+                const cfg = await resp.json();
+                const name = cfg.salonName || (activeTenant === 'luxe' ? 'Luxe Nail & Spa Sanctuary' : "Jenny's Nail Studio");
+                const primaryColor = cfg.primaryColor || (activeTenant === 'luxe' ? '#00b4d8' : '#e91e63');
+
+                document.documentElement.style.setProperty('--bs-primary-pink', primaryColor);
+                document.getElementById('pageTitle').innerText = `Appointment Schedule - ${name}`;
+                document.getElementById('portalBrandTitle').innerText = `${name} Portal`;
+                document.getElementById('footerCopyright').innerHTML = `&copy; ${name} — Appointment Management System`;
+
+                const pill = document.getElementById('tenantPill');
+                if (pill) {
+                    pill.innerText = activeTenant.toUpperCase();
+                    pill.style.backgroundColor = primaryColor;
+                    pill.classList.remove('bg-secondary');
+                }
+            } else if (activeTenant === 'luxe') {
+                applyLuxeBrandingFallback();
+            }
+        } catch (e) {
+            if (activeTenant === 'luxe') applyLuxeBrandingFallback();
+        }
+    }
+
+    function applyLuxeBrandingFallback() {
+        document.documentElement.style.setProperty('--bs-primary-pink', '#00b4d8');
+        document.getElementById('pageTitle').innerText = "Appointment Schedule - Luxe Nail & Spa Sanctuary";
+        document.getElementById('portalBrandTitle').innerText = "Luxe Nail & Spa Portal";
+        document.getElementById('footerCopyright').innerHTML = "&copy; Luxe Nail & Spa Sanctuary — Appointment Management System";
+        const pill = document.getElementById('tenantPill');
+        if (pill) {
+            pill.innerText = "LUXE";
+            pill.style.backgroundColor = '#00b4d8';
+            pill.classList.remove('bg-secondary');
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        loadBranding();
+        initCalendar();
+    });
 
     function initCalendar() {
         const calendarEl = document.getElementById('calendar');
@@ -145,7 +254,7 @@
         const calendar = new FullCalendar.Calendar(calendarEl, {
             initialView: 'timeGridWeek',
             slotMinTime: '10:00:00',
-            slotMaxTime: '19:00:00',
+            slotMaxTime: '19:30:00',
             slotDuration: '00:15:00',
             slotLabelInterval: '00:30:00',
             allDaySlot: false,
@@ -160,10 +269,13 @@
                 center: 'title',
                 right: 'dayGridMonth,timeGridWeek,timeGridDay'
             },
-            // Fetch appointments from your Spring Boot backend
+            // Fetch appointments strictly scoped by tenant
             events: function(fetchInfo, successCallback, failureCallback) {
                 fetch('/api/appointments', {
-                    headers: { 'Authorization': 'Bearer ' + token }
+                    headers: {
+                        'Authorization': 'Bearer ' + token,
+                        'X-Tenant-ID': activeTenant
+                    }
                 })
                     .then(response => {
                         if (!response.ok) throw new Error('Failed to fetch appointments');
@@ -193,6 +305,7 @@
                                     status: apt.status,
                                     serviceName: serviceName,
                                     techName: techName,
+                                    stationPreference: apt.stationPreference || '',
                                     notes: apt.notes || ''
                                 }
                             };
@@ -204,7 +317,6 @@
                         failureCallback(error);
                     });
             },
-            // Open modal showing booking info when admin clicks an appointment block
             eventClick: function(info) {
                 currentAppointmentId = info.event.id;
                 const props = info.event.extendedProps;
@@ -217,6 +329,7 @@
                     <p class="mb-2"><strong>Email:</strong> <a href="mailto:${props.email}" class="text-decoration-none">${props.email || 'N/A'}</a></p>
                     <p class="mb-2"><strong>Service:</strong> ${props.serviceName}</p>
                     <p class="mb-2"><strong>Nail Technician:</strong> ${props.techName || 'Anyone Available'}</p>
+                    ${props.stationPreference ? `<p class="mb-2"><strong>Station / Suite:</strong> ${props.stationPreference}</p>` : ''}
                     <p class="mb-2"><strong>Time:</strong> ${info.event.start.toLocaleString()}</p>
                     ${props.notes ? `<p class="mb-2"><strong>Notes:</strong> ${props.notes}</p>` : ''}
                     <p class="mb-0"><strong>Status:</strong> <span class="badge bg-secondary">${props.status}</span></p>
@@ -236,7 +349,10 @@
         try {
             const response = await fetch(`/api/appointments/${currentAppointmentId}/status?status=${newStatus}`, {
                 method: 'PATCH',
-                headers: { 'Authorization': 'Bearer ' + token }
+                headers: {
+                    'Authorization': 'Bearer ' + token,
+                    'X-Tenant-ID': activeTenant
+                }
             });
 
             if (response.ok) {
@@ -251,51 +367,13 @@
     }
 
     function handleLogout() {
+        const tenant = getActiveTenant();
         localStorage.removeItem('accessToken');
         localStorage.removeItem('token');
         localStorage.removeItem('userRole');
-        window.location.href = './index.html';
+        localStorage.removeItem('tenant');
+        window.location.href = tenant === 'luxe' ? './login.html?tenant=luxe' : './index.html';
     }
-
-    // --- ADMIN ROUTE GUARD ---
-    (function() {
-        const guardToken = localStorage.getItem('accessToken') || localStorage.getItem('token');
-        let role = localStorage.getItem('userRole');
-
-        // 1. Check if token exists
-        if (!guardToken) {
-            window.location.href = './login.html';
-            return;
-        }
-
-        // Always verify role directly from the JWT token claims
-        role = parseJwtRole(guardToken);
-        localStorage.setItem('userRole', role);
-
-        // 3. Enforce Admin Role
-        if (role !== 'ROLE_ADMIN' && role !== 'ADMIN') {
-            alert('Access Denied: Administrator privileges are required to view this page.');
-            window.location.href = './index.html';
-        }
-
-        // JWT Role Parser Helper
-        function parseJwtRole(jwtToken) {
-            try {
-                const base64Url = jwtToken.split('.')[1];
-                const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-                const jsonPayload = decodeURIComponent(atob(base64).split('').map(c => {
-                    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-                }).join(''));
-
-                const payload = JSON.parse(jsonPayload);
-                return payload.role || payload.authorities || (payload.roles ? payload.roles[0] : null) || 'ROLE_USER';
-            } catch (e) {
-                console.error('Failed to parse JWT role:', e);
-                return 'ROLE_USER';
-            }
-        }
-    })();
-    // --- END ADMIN GUARD ---
 </script>
 </body>
 </html>

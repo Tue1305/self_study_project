@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Manage Nail Techs - Jenny's Nail Studio</title>
+    <title id="pageTitle">Manage Nail Techs - Jenny's Nail Studio</title>
     <!-- Favicon -->
     <link rel="icon" type="image/x-icon" href="/favicon.ico?=v2">
     <!-- Bootstrap 5.3 CSS -->
@@ -15,8 +15,8 @@
         .text-pink { color: var(--bs-primary-pink) !important; }
         .btn-outline-pink { color: var(--bs-primary-pink); border-color: var(--bs-primary-pink); }
         .btn-outline-pink:hover { background-color: var(--bs-primary-pink); color: #fff; }
-        .btn-pink { background-color: var(--bs-primary-pink); color: #fff; }
-        .btn-pink:hover { background-color: #d81b60; color: #fff; }
+        .btn-pink { background-color: var(--bs-primary-pink); border-color: var(--bs-primary-pink); color: #fff; }
+        .btn-pink:hover { filter: brightness(0.9); color: #fff; }
     </style>
 </head>
 <body class="bg-light d-flex flex-column min-vh-100">
@@ -24,8 +24,10 @@
 <!-- Unified Header Navigation -->
 <header class="navbar navbar-expand-lg bg-white shadow-sm px-4">
     <div class="container-fluid">
-        <span class="navbar-brand fw-bold text-dark fs-5">
-            <i class="bi bi-shield-lock-fill text-pink me-2"></i>Jenny's Admin Portal
+        <span class="navbar-brand fw-bold text-dark fs-5 d-flex align-items-center gap-2">
+            <i class="bi bi-shield-lock-fill text-pink"></i>
+            <span id="portalBrandTitle">Jenny's Admin Portal</span>
+            <span id="tenantPill" class="badge bg-secondary ms-1">DEFAULT</span>
         </span>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#adminNav">
             <span class="navbar-toggler-icon"></span>
@@ -33,22 +35,22 @@
         <div class="collapse navbar-collapse" id="adminNav">
             <ul class="navbar-nav me-auto mb-2 mb-lg-0 ms-lg-4 gap-1">
                 <li class="nav-item">
-                    <a class="nav-link btn btn-light btn-sm px-3 fw-semibold text-dark me-1" href="./admin-dashboard.html">
+                    <a id="navDashboardLink" class="nav-link btn btn-light btn-sm px-3 fw-semibold text-dark me-1" href="./admin-dashboard.html">
                         <i class="bi bi-speedometer2 me-1"></i> Dashboard
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link btn btn-light btn-sm px-3 fw-semibold text-dark me-1" href="./admin-calendar.html">
+                    <a id="navCalendarLink" class="nav-link btn btn-light btn-sm px-3 fw-semibold text-dark me-1" href="./admin-calendar.html">
                         <i class="bi bi-calendar-week me-1"></i> Calendar
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link btn btn-light btn-sm px-3 fw-semibold text-dark me-1" href="./admin-customers.html">
+                    <a id="navCustomersLink" class="nav-link btn btn-light btn-sm px-3 fw-semibold text-dark me-1" href="./admin-customers.html">
                         <i class="bi bi-person-lines-fill me-1"></i> Customers
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link btn btn-outline-secondary btn-sm px-3 fw-semibold text-dark" href="./index.html">
+                    <a id="navWebsiteLink" class="nav-link btn btn-outline-secondary btn-sm px-3 fw-semibold text-dark" href="./index.html">
                         <i class="bi bi-globe me-1"></i> Main Website
                     </a>
                 </li>
@@ -64,7 +66,7 @@
 <main class="container my-5 flex-grow-1">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2 class="h3 fw-bold text-dark mb-0">
-            <i class="bi bi-people-fill text-pink me-2"></i>Manage Nail Technicians
+            <i class="bi bi-people-fill text-pink me-2"></i><span id="staffHeading">Manage Nail Technicians</span>
         </h2>
         <button class="btn btn-pink btn-sm fw-semibold" onclick="openAddModal()">
             <i class="bi bi-plus-lg me-1"></i> Add Nail Tech
@@ -98,28 +100,27 @@
         <div class="modal-content border-0 shadow rounded-4">
             <div class="modal-header border-0 pb-0">
                 <h5 class="modal-title fw-bold text-dark" id="modalTitle">Add New Nail Technician</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body py-4">
-                <form id="techForm">
-                    <input type="hidden" id="techId">
-                    <div class="mb-3">
-                        <label for="techName" class="form-label fw-semibold">Full Name</label>
-                        <input type="text" class="form-control" id="techName" required placeholder="e.g., Jessica Smith">
-                    </div>
-                    <div class="mb-3">
-                        <label for="techEmail" class="form-label fw-semibold">Email / Username</label>
-                        <input type="text" class="form-control" id="techEmail" required placeholder="jessica@jennysnailstudio.com">
-                    </div>
-                    <div class="mb-3">
-                        <label for="techSpecialty" class="form-label fw-semibold">Specialty</label>
-                        <input type="text" class="form-control" id="techSpecialty" placeholder="e.g., Gel Art, Acrylics">
-                    </div>
-                </form>
+                <input type="hidden" id="techId">
+                <div class="mb-3">
+                    <label for="techName" class="form-label fw-semibold text-secondary small">Full Name</label>
+                    <input type="text" class="form-control rounded-3" id="techName" placeholder="e.g. Jenny Tran" required>
+                </div>
+                <div class="mb-3">
+                    <label for="techEmail" class="form-label fw-semibold text-secondary small">Email / Username</label>
+                    <input type="email" class="form-control rounded-3" id="techEmail" placeholder="e.g. jenny@example.com" required>
+                </div>
+                <div class="mb-3">
+                    <label for="techSpecialty" class="form-label fw-semibold text-secondary small">Specialty / Capabilities</label>
+                    <input type="text" class="form-control rounded-3" id="techSpecialty" placeholder="e.g. ALL, NAIL_ART or MANICURE">
+                    <div class="form-text">Comma-separated tags (e.g. ALL, NAIL_ART, MANICURE, BODY_MASSAGE, WAXING, FACIAL)</div>
+                </div>
             </div>
             <div class="modal-footer border-0 pt-0">
-                <button type="button" class="btn btn-light btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-pink btn-sm px-3" onclick="saveNailTech()">Save Technician</button>
+                <button type="button" class="btn btn-light rounded-3 px-4 fw-semibold" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-pink rounded-3 px-4 fw-semibold" onclick="saveNailTech()">Save Staff</button>
             </div>
         </div>
     </div>
@@ -133,7 +134,7 @@
             <span class="small fw-semibold text-dark">Store Hours: Monday – Saturday: 10:00 AM – 7:00 PM | Sunday: Closed</span>
         </div>
         <div>
-            <small class="text-muted">&copy; Jenny's Nail Studio — Admin Management Panel</small>
+            <small id="footerCopyright" class="text-muted">&copy; Jenny's Nail Studio — Nail Tech Management System</small>
         </div>
     </div>
 </footer>
@@ -142,24 +143,121 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
-    // Fallback-safe token lookup matching both token storage conventions
     const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
     let techModalInstance = null;
 
-    if (!token) {
-        window.location.href = './login.html';
-    } else {
-        document.addEventListener('DOMContentLoaded', () => {
-            techModalInstance = new bootstrap.Modal(document.getElementById('techModal'));
-            loadNailTechs();
-        });
+    // --- ADMIN ROUTE GUARD ---
+    (function() {
+        if (!token) {
+            window.location.href = './login.html';
+            return;
+        }
+
+        const role = parseJwtRole(token);
+        localStorage.setItem('userRole', role);
+
+        if (role !== 'ROLE_ADMIN' && role !== 'ADMIN') {
+            alert('Access Denied: Administrator privileges are required to view this page.');
+            window.location.href = './index.html';
+        }
+
+        function parseJwtRole(jwtToken) {
+            try {
+                const base64Url = jwtToken.split('.')[1];
+                const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+                const jsonPayload = decodeURIComponent(atob(base64).split('').map(c => {
+                    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                }).join(''));
+
+                const payload = JSON.parse(jsonPayload);
+                return payload.role || payload.authorities || (payload.roles ? payload.roles[0] : null) || 'ROLE_USER';
+            } catch (e) {
+                console.error('Failed to parse JWT role:', e);
+                return 'ROLE_USER';
+            }
+        }
+    })();
+    // --- END ADMIN GUARD ---
+
+    function getActiveTenant() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const queryTenant = urlParams.get('tenant');
+        if (queryTenant) return queryTenant.toLowerCase();
+
+        const host = window.location.hostname.toLowerCase();
+        if (host.startsWith('luxe.')) return 'luxe';
+
+        const storedTenant = localStorage.getItem('tenant');
+        if (storedTenant) return storedTenant.toLowerCase();
+
+        return 'default';
     }
 
-    // Fetch nail techs from backend REST endpoint
+    const activeTenant = getActiveTenant();
+    localStorage.setItem('tenant', activeTenant);
+
+    // Apply links
+    const tenantQuery = `?tenant=${encodeURIComponent(activeTenant)}`;
+    document.getElementById('navDashboardLink').href = `./admin-dashboard.html${tenantQuery}`;
+    document.getElementById('navCalendarLink').href = `./admin-calendar.html${tenantQuery}`;
+    document.getElementById('navCustomersLink').href = `./admin-customers.html${tenantQuery}`;
+    document.getElementById('navWebsiteLink').href = activeTenant === 'luxe' ? `./booking.html${tenantQuery}` : `./index.html${tenantQuery}`;
+
+    // Apply dynamic branding
+    async function loadBranding() {
+        try {
+            const resp = await fetch(`/api/public/tenant-config?tenant=${encodeURIComponent(activeTenant)}`);
+            if (resp.ok) {
+                const cfg = await resp.json();
+                const name = cfg.salonName || (activeTenant === 'luxe' ? 'Luxe Nail & Spa Sanctuary' : "Jenny's Nail Studio");
+                const primaryColor = cfg.primaryColor || (activeTenant === 'luxe' ? '#00b4d8' : '#e91e63');
+
+                document.documentElement.style.setProperty('--bs-primary-pink', primaryColor);
+                document.getElementById('pageTitle').innerText = `Manage Nail Techs - ${name}`;
+                document.getElementById('portalBrandTitle').innerText = `${name} Portal`;
+                document.getElementById('footerCopyright').innerHTML = `&copy; ${name} — Nail Tech Management System`;
+
+                const pill = document.getElementById('tenantPill');
+                if (pill) {
+                    pill.innerText = activeTenant.toUpperCase();
+                    pill.style.backgroundColor = primaryColor;
+                    pill.classList.remove('bg-secondary');
+                }
+            } else if (activeTenant === 'luxe') {
+                applyLuxeBrandingFallback();
+            }
+        } catch (e) {
+            if (activeTenant === 'luxe') applyLuxeBrandingFallback();
+        }
+    }
+
+    function applyLuxeBrandingFallback() {
+        document.documentElement.style.setProperty('--bs-primary-pink', '#00b4d8');
+        document.getElementById('pageTitle').innerText = "Manage Nail Techs - Luxe Nail & Spa Sanctuary";
+        document.getElementById('portalBrandTitle').innerText = "Luxe Nail & Spa Portal";
+        document.getElementById('footerCopyright').innerHTML = "&copy; Luxe Nail & Spa Sanctuary — Nail Tech Management System";
+        const pill = document.getElementById('tenantPill');
+        if (pill) {
+            pill.innerText = "LUXE";
+            pill.style.backgroundColor = '#00b4d8';
+            pill.classList.remove('bg-secondary');
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        techModalInstance = new bootstrap.Modal(document.getElementById('techModal'));
+        loadBranding();
+        loadNailTechs();
+    });
+
+    // Fetch nail techs scoped by tenant
     async function loadNailTechs() {
         try {
             const response = await fetch('/api/nail-techs', {
-                headers: { 'Authorization': 'Bearer ' + token }
+                headers: {
+                    'Authorization': 'Bearer ' + token,
+                    'X-Tenant-ID': activeTenant
+                }
             });
             if (!response.ok) throw new Error('Failed to fetch nail technicians');
 
@@ -168,7 +266,7 @@
             tbody.innerHTML = '';
 
             if (techs.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-4">No nail technicians found.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-4">No nail technicians found for ${activeTenant === 'luxe' ? 'Luxe' : "Jenny's"}. Click "Add Nail Tech" above to add staff.</td></tr>`;
                 return;
             }
 
@@ -228,7 +326,6 @@
         const method = id ? 'PUT' : 'POST';
         const url = id ? `/api/nail-techs/${id}` : '/api/nail-techs';
 
-        // Provide both email and username properties for backend entity compatibility
         const payload = {
             name: name,
             email: email,
@@ -241,7 +338,8 @@
                 method: method,
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + token
+                    'Authorization': 'Bearer ' + token,
+                    'X-Tenant-ID': activeTenant
                 },
                 body: JSON.stringify(payload)
             });
@@ -275,7 +373,10 @@
         try {
             const response = await fetch(`/api/nail-techs/${id}`, {
                 method: 'DELETE',
-                headers: { 'Authorization': 'Bearer ' + token }
+                headers: {
+                    'Authorization': 'Bearer ' + token,
+                    'X-Tenant-ID': activeTenant
+                }
             });
 
             if (response.ok) {
@@ -290,48 +391,13 @@
     }
 
     function handleLogout() {
+        const tenant = getActiveTenant();
         localStorage.removeItem('accessToken');
         localStorage.removeItem('token');
         localStorage.removeItem('userRole');
-        window.location.href = './index.html';
+        localStorage.removeItem('tenant');
+        window.location.href = tenant === 'luxe' ? './login.html?tenant=luxe' : './index.html';
     }
-
-    // --- ADMIN ROUTE GUARD ---
-    (function() {
-        const guardToken = localStorage.getItem('accessToken') || localStorage.getItem('token');
-        let role = localStorage.getItem('userRole');
-
-        if (!guardToken) {
-            window.location.href = './login.html';
-            return;
-        }
-
-        // Always verify role directly from the JWT token claims
-        role = parseJwtRole(guardToken);
-        localStorage.setItem('userRole', role);
-
-        if (role !== 'ROLE_ADMIN' && role !== 'ADMIN') {
-            alert('Access Denied: Administrator privileges are required to view this page.');
-            window.location.href = './index.html';
-        }
-
-        function parseJwtRole(jwtToken) {
-            try {
-                const base64Url = jwtToken.split('.')[1];
-                const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-                const jsonPayload = decodeURIComponent(atob(base64).split('').map(c => {
-                    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-                }).join(''));
-
-                const payload = JSON.parse(jsonPayload);
-                return payload.role || payload.authorities || (payload.roles ? payload.roles[0] : null) || 'ROLE_USER';
-            } catch (e) {
-                console.error('Failed to parse JWT role:', e);
-                return 'ROLE_USER';
-            }
-        }
-    })();
-    // --- END ADMIN GUARD ---
 </script>
 </body>
 </html>

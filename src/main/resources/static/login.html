@@ -135,9 +135,21 @@
                 // Check for Luxe account login to redirect to tenant subdomain / Blue Sky layout
                 const isLuxeAccount = username.toLowerCase().includes('luxe');
                 if (isLuxeAccount) {
+                    localStorage.setItem('tenant', 'luxe');
                     const host = window.location.hostname;
                     const port = window.location.port ? `:${window.location.port}` : '';
-                    if (host === 'localhost' || host === '127.0.0.1') {
+                    const isSubdomain = host.startsWith('luxe.');
+
+                    if (role === 'ROLE_ADMIN' || role === 'ADMIN') {
+                        if ((host === 'localhost' || host === '127.0.0.1') && !isSubdomain) {
+                            window.location.assign(`${window.location.protocol}//luxe.localhost${port}/admin-dashboard.html?tenant=luxe`);
+                        } else {
+                            window.location.assign('./admin-dashboard.html?tenant=luxe');
+                        }
+                        return;
+                    }
+
+                    if ((host === 'localhost' || host === '127.0.0.1') && !isSubdomain) {
                         window.location.assign(`${window.location.protocol}//luxe.localhost${port}/booking.html?tenant=luxe`);
                         return;
                     } else {
@@ -146,9 +158,12 @@
                     }
                 }
 
+                // Default tenant for regular accounts
+                localStorage.setItem('tenant', 'default');
+
                 // Route based on role
                 if (role === 'ROLE_ADMIN' || role === 'ADMIN') {
-                    window.location.assign('./admin-dashboard.html');
+                    window.location.assign('./admin-dashboard.html?tenant=default');
                 } else {
                     window.location.assign('./index.html');
                 }

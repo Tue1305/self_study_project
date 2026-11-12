@@ -3,20 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard - Jenny's Nail Studio</title>
+    <title id="pageTitle">Admin Dashboard - Jenny's Nail Studio</title>
     <!-- Favicon -->
     <link rel="icon" type="image/x-icon" href="/favicon.ico?=v2">
     <!-- Bootstrap 5.3 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Bootstrap Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
-    <style>
-        :root { --bs-primary-pink: #e91e63; }
+    <style id="themeStyles">
+        :root {
+            --bs-primary-pink: #e91e63;
+            --bs-secondary-color: #343a40;
+        }
         .text-pink { color: var(--bs-primary-pink) !important; }
         .btn-outline-pink { color: var(--bs-primary-pink); border-color: var(--bs-primary-pink); }
         .btn-outline-pink:hover { background-color: var(--bs-primary-pink); color: #fff; }
-        .btn-pink { background-color: var(--bs-primary-pink); color: #fff; }
-        .btn-pink:hover { background-color: #d81b60; color: #fff; }
+        .btn-pink { background-color: var(--bs-primary-pink); color: #fff; border-color: var(--bs-primary-pink); }
+        .btn-pink:hover { filter: brightness(0.9); color: #fff; }
         .admin-card {
             transition: transform 0.2s ease, box-shadow 0.2s ease;
             border-radius: 1rem;
@@ -25,6 +28,11 @@
             transform: translateY(-5px);
             box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important;
         }
+        .tenant-badge {
+            font-size: 0.75rem;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
     </style>
 </head>
 <body class="bg-light d-flex flex-column min-vh-100">
@@ -32,8 +40,10 @@
 <!-- Unified Header Navigation -->
 <header class="navbar navbar-expand-lg bg-white shadow-sm px-4">
     <div class="container-fluid">
-        <span class="navbar-brand fw-bold text-dark fs-5">
-            <i class="bi bi-shield-lock-fill text-pink me-2"></i>Admin Portal
+        <span class="navbar-brand fw-bold text-dark fs-5 d-flex align-items-center gap-2">
+            <i class="bi bi-shield-lock-fill text-pink"></i>
+            <span id="portalBrandTitle">Admin Portal</span>
+            <span id="tenantPill" class="badge bg-secondary tenant-badge ms-1">DEFAULT</span>
         </span>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#adminNav">
             <span class="navbar-toggler-icon"></span>
@@ -41,22 +51,22 @@
         <div class="collapse navbar-collapse" id="adminNav">
             <ul class="navbar-nav me-auto mb-2 mb-lg-0 ms-lg-4 gap-1">
                 <li class="nav-item">
-                    <a class="nav-link btn btn-light btn-sm px-3 fw-semibold text-dark me-1" href="./admin-calendar.html">
+                    <a id="navCalendarLink" class="nav-link btn btn-light btn-sm px-3 fw-semibold text-dark me-1" href="./admin-calendar.html">
                         <i class="bi bi-calendar-week me-1"></i> Calendar
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link btn btn-light btn-sm px-3 fw-semibold text-dark me-1" href="./nail-techs.html">
+                    <a id="navTechsLink" class="nav-link btn btn-light btn-sm px-3 fw-semibold text-dark me-1" href="./nail-techs.html">
                         <i class="bi bi-people me-1"></i> Nail Techs
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link btn btn-light btn-sm px-3 fw-semibold text-dark me-1" href="./admin-customers.html">
+                    <a id="navCustomersLink" class="nav-link btn btn-light btn-sm px-3 fw-semibold text-dark me-1" href="./admin-customers.html">
                         <i class="bi bi-person-lines-fill me-1"></i> Customers
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link btn btn-outline-secondary btn-sm px-3 fw-semibold text-dark" href="./index.html">
+                    <a id="navWebsiteLink" class="nav-link btn btn-outline-secondary btn-sm px-3 fw-semibold text-dark" href="./index.html">
                         <i class="bi bi-globe me-1"></i> Main Website
                     </a>
                 </li>
@@ -71,8 +81,8 @@
 <!-- Main Dashboard Container -->
 <main class="container my-5 flex-grow-1">
     <div class="mb-5 text-center">
-        <h1 class="fw-bold text-dark">Welcome to Jenny's Admin Hub</h1>
-        <p class="text-muted">Select a module below to manage your studio appointments, staff, customer database, and website.</p>
+        <h1 id="hubGreeting" class="fw-bold text-dark">Welcome to Jenny's Admin Hub</h1>
+        <p id="hubSubtitle" class="text-muted">Select a module below to manage your studio appointments, staff, customer database, and website.</p>
     </div>
 
     <div class="row g-4 justify-content-center">
@@ -85,7 +95,7 @@
                     </div>
                     <h3 class="h4 fw-bold text-dark">Customer Calendar</h3>
                     <p class="text-muted small mb-4">View scheduled appointments, track status changes, and manage bookings in real time.</p>
-                    <a href="./admin-calendar.html" class="btn btn-pink mt-auto w-100 fw-semibold">
+                    <a id="cardCalendarBtn" href="./admin-calendar.html" class="btn btn-pink mt-auto w-100 fw-semibold">
                         Open Calendar <i class="bi bi-arrow-right ms-1"></i>
                     </a>
                 </div>
@@ -101,7 +111,7 @@
                     </div>
                     <h3 class="h4 fw-bold text-dark">Nail Technicians</h3>
                     <p class="text-muted small mb-4">Add new staff members, update specialties, or remove nail technicians from the roster.</p>
-                    <a href="./nail-techs.html" class="btn btn-pink mt-auto w-100 fw-semibold">
+                    <a id="cardTechsBtn" href="./nail-techs.html" class="btn btn-pink mt-auto w-100 fw-semibold">
                         Manage Staff <i class="bi bi-arrow-right ms-1"></i>
                     </a>
                 </div>
@@ -117,7 +127,7 @@
                     </div>
                     <h3 class="h4 fw-bold text-dark">Customer Database</h3>
                     <p class="text-muted small mb-4">View existing customers, add new client contact records, edit details, or remove entries.</p>
-                    <a href="./admin-customers.html" class="btn btn-pink mt-auto w-100 fw-semibold">
+                    <a id="cardCustomersBtn" href="./admin-customers.html" class="btn btn-pink mt-auto w-100 fw-semibold">
                         Manage Customers <i class="bi bi-arrow-right ms-1"></i>
                     </a>
                 </div>
@@ -133,7 +143,7 @@
                     </div>
                     <h3 class="h4 fw-bold text-dark">Main Website</h3>
                     <p class="text-muted small mb-4">Preview customer-facing website, check active showcase designs, and test online booking flow.</p>
-                    <a href="./index.html" class="btn btn-pink mt-auto w-100 fw-semibold">
+                    <a id="cardWebsiteBtn" href="./index.html" class="btn btn-pink mt-auto w-100 fw-semibold">
                         Visit Website <i class="bi bi-arrow-right ms-1"></i>
                     </a>
                 </div>
@@ -147,10 +157,10 @@
     <div class="container text-center">
         <div class="d-inline-flex align-items-center gap-2 px-3 py-1 bg-light border rounded-pill mb-2">
             <i class="bi bi-clock-fill text-pink"></i>
-            <span class="small fw-semibold text-dark">Store Hours: Monday – Saturday: 10:00 AM – 7:00 PM | Sunday: Closed</span>
+            <span id="footerHours" class="small fw-semibold text-dark">Store Hours: Monday – Saturday: 10:00 AM – 7:00 PM | Sunday: Closed</span>
         </div>
         <div>
-            <small class="text-muted">&copy; Jenny's Nail Studio — Admin Management Panel</small>
+            <small id="footerCopyright" class="text-muted">&copy; Jenny's Nail Studio — Admin Management Panel</small>
         </div>
     </div>
 </footer>
@@ -159,52 +169,132 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
-    function handleLogout() {
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('token');
-        localStorage.removeItem('userRole');
-        window.location.href = './index.html';
-    }
-
     // --- ADMIN ROUTE GUARD ---
-    (function() {
-        const guardToken = localStorage.getItem('accessToken') || localStorage.getItem('token');
-        let role = localStorage.getItem('userRole');
+    const guardToken = localStorage.getItem('accessToken') || localStorage.getItem('token');
+    let role = localStorage.getItem('userRole');
 
-        // 1. Check if token exists
-        if (!guardToken) {
-            window.location.href = './login.html';
-            return;
-        }
-
-        // Always verify role directly from the JWT token claims
+    if (!guardToken) {
+        window.location.href = './login.html';
+    } else {
         role = parseJwtRole(guardToken);
         localStorage.setItem('userRole', role);
 
-        // 3. Enforce Admin Role
         if (role !== 'ROLE_ADMIN' && role !== 'ADMIN') {
             alert('Access Denied: Administrator privileges are required to view this page.');
             window.location.href = './index.html';
         }
+    }
 
-        // JWT Role Parser Helper
-        function parseJwtRole(jwtToken) {
-            try {
-                const base64Url = jwtToken.split('.')[1];
-                const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-                const jsonPayload = decodeURIComponent(atob(base64).split('').map(c => {
-                    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-                }).join(''));
+    function parseJwtRole(jwtToken) {
+        try {
+            const base64Url = jwtToken.split('.')[1];
+            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+            const jsonPayload = decodeURIComponent(atob(base64).split('').map(c => {
+                return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+            }).join(''));
 
-                const payload = JSON.parse(jsonPayload);
-                return payload.role || payload.authorities || (payload.roles ? payload.roles[0] : null) || 'ROLE_USER';
-            } catch (e) {
-                console.error('Failed to parse JWT role:', e);
-                return 'ROLE_USER';
+            const payload = JSON.parse(jsonPayload);
+            return payload.role || payload.authorities || (payload.roles ? payload.roles[0] : null) || 'ROLE_USER';
+        } catch (e) {
+            console.error('Failed to parse JWT role:', e);
+            return 'ROLE_USER';
+        }
+    }
+
+    function handleLogout() {
+        const tenant = getActiveTenant();
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('token');
+        localStorage.removeItem('userRole');
+        localStorage.removeItem('tenant');
+        window.location.href = tenant === 'luxe' ? './login.html?tenant=luxe' : './index.html';
+    }
+
+    // --- MULTI-TENANT DYNAMIC THEME & SCOPE RESOLUTION ---
+    function getActiveTenant() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const queryTenant = urlParams.get('tenant');
+        if (queryTenant) return queryTenant.toLowerCase();
+
+        const host = window.location.hostname.toLowerCase();
+        if (host.startsWith('luxe.')) return 'luxe';
+
+        const storedTenant = localStorage.getItem('tenant');
+        if (storedTenant) return storedTenant.toLowerCase();
+
+        return 'default';
+    }
+
+    async function initializeTenantContext() {
+        const activeTenant = getActiveTenant();
+        localStorage.setItem('tenant', activeTenant);
+
+        // Update links with ?tenant= parameter
+        const tenantQuery = `?tenant=${encodeURIComponent(activeTenant)}`;
+        document.getElementById('navCalendarLink').href = `./admin-calendar.html${tenantQuery}`;
+        document.getElementById('navTechsLink').href = `./nail-techs.html${tenantQuery}`;
+        document.getElementById('navCustomersLink').href = `./admin-customers.html${tenantQuery}`;
+        document.getElementById('navWebsiteLink').href = activeTenant === 'luxe' ? `./booking.html${tenantQuery}` : `./index.html${tenantQuery}`;
+
+        document.getElementById('cardCalendarBtn').href = `./admin-calendar.html${tenantQuery}`;
+        document.getElementById('cardTechsBtn').href = `./nail-techs.html${tenantQuery}`;
+        document.getElementById('cardCustomersBtn').href = `./admin-customers.html${tenantQuery}`;
+        document.getElementById('cardWebsiteBtn').href = activeTenant === 'luxe' ? `./booking.html${tenantQuery}` : `./index.html${tenantQuery}`;
+
+        // Fetch tenant configuration to apply dynamic theme and branding
+        try {
+            const resp = await fetch(`/api/public/tenant-config?tenant=${encodeURIComponent(activeTenant)}`);
+            if (resp.ok) {
+                const config = await resp.json();
+                applyTenantBranding(config, activeTenant);
+            } else {
+                applyFallbackBranding(activeTenant);
+            }
+        } catch (err) {
+            console.warn('Failed to load tenant config, using defaults:', err);
+            applyFallbackBranding(activeTenant);
+        }
+    }
+
+    function applyTenantBranding(config, tenantKey) {
+        const salonName = config.salonName || (tenantKey === 'luxe' ? 'Luxe Nail & Spa Sanctuary' : "Jenny's Nail Studio");
+        const primaryColor = config.primaryColor || (tenantKey === 'luxe' ? '#00b4d8' : '#e91e63');
+        const secondaryColor = config.secondaryColor || (tenantKey === 'luxe' ? '#03045e' : '#343a40');
+
+        document.documentElement.style.setProperty('--bs-primary-pink', primaryColor);
+        document.documentElement.style.setProperty('--bs-secondary-color', secondaryColor);
+
+        document.getElementById('pageTitle').innerText = `Admin Dashboard - ${salonName}`;
+        document.getElementById('portalBrandTitle').innerText = `${salonName} Portal`;
+        document.getElementById('hubGreeting').innerText = `Welcome to ${salonName} Admin Hub`;
+        document.getElementById('footerCopyright').innerHTML = `&copy; ${salonName} — Admin Management Panel`;
+
+        const tenantPill = document.getElementById('tenantPill');
+        if (tenantPill) {
+            tenantPill.innerText = tenantKey.toUpperCase();
+            tenantPill.style.backgroundColor = primaryColor;
+            tenantPill.classList.remove('bg-secondary');
+        }
+    }
+
+    function applyFallbackBranding(tenantKey) {
+        if (tenantKey === 'luxe') {
+            document.documentElement.style.setProperty('--bs-primary-pink', '#00b4d8');
+            document.documentElement.style.setProperty('--bs-secondary-color', '#03045e');
+            document.getElementById('pageTitle').innerText = "Admin Dashboard - Luxe Nail & Spa Sanctuary";
+            document.getElementById('portalBrandTitle').innerText = "Luxe Nail & Spa Portal";
+            document.getElementById('hubGreeting').innerText = "Welcome to Luxe Nail & Spa Admin Hub";
+            document.getElementById('footerCopyright').innerHTML = "&copy; Luxe Nail & Spa Sanctuary — Admin Management Panel";
+            const pill = document.getElementById('tenantPill');
+            if (pill) {
+                pill.innerText = "LUXE";
+                pill.style.backgroundColor = '#00b4d8';
+                pill.classList.remove('bg-secondary');
             }
         }
-    })();
-    // --- END ADMIN GUARD ---
+    }
+
+    document.addEventListener('DOMContentLoaded', initializeTenantContext);
 </script>
 </body>
 </html>

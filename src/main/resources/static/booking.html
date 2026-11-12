@@ -466,9 +466,21 @@
                         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
                             <div>
                                 <h5 class="fw-bold mb-1"><i class="bi bi-person-badge text-pink me-2"></i><span id="stepStaffTitle">Choose Your Technician</span></h5>
-                                <small class="text-muted">Select an available technician for your appointment</small>
+                                <small class="text-muted" id="stepStaffSubtitle">Select an available technician for your appointment</small>
                             </div>
                             <span class="badge bg-danger-subtle text-pink border border-danger-subtle px-3 py-2" id="step2ServicePill"></span>
+                        </div>
+
+                        <!-- Per-Service Staff Selection Dropdowns (Shown when current guest has multiple services) -->
+                        <div id="perServiceStaffContainer" class="card bg-light border-0 rounded-4 p-3 mb-4 d-none">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h6 class="fw-bold text-dark mb-0"><i class="bi bi-sliders text-pink me-2"></i>Per-Service Technician Assignment (Optional)</h6>
+                                <span class="badge bg-white text-muted border rounded-pill">Custom tech per service</span>
+                            </div>
+                            <p class="small text-muted mb-3">You can assign a specific technician for each treatment, or choose one overall technician below for all services.</p>
+                            <div id="perServiceStaffList" class="d-flex flex-column gap-2">
+                                <!-- Rendered dynamically -->
+                            </div>
                         </div>
 
                         <div id="staffGrid" class="row g-3 mb-4">
@@ -476,11 +488,28 @@
                         </div>
 
                         <div class="d-flex justify-content-between">
-                            <button type="button" class="btn btn-outline-secondary px-4 py-2 fw-semibold rounded-3" onclick="goPrevStep()">
+                            <button type="button" class="btn btn-outline-secondary px-4 py-2 fw-semibold rounded-3" onclick="handleStep2Back()">
                                 <i class="bi bi-arrow-left me-1"></i> <span id="step2BackLabel">Back</span>
                             </button>
-                            <button type="button" class="btn btn-pink px-4 py-2 fw-semibold rounded-3" id="step2NextBtn" onclick="goNextStep()" disabled>
+                            <button type="button" class="btn btn-pink px-4 py-2 fw-semibold rounded-3" id="step2NextBtn" onclick="handleStep2Continue()" disabled>
                                 <span id="step2NextLabel">Next</span> <i class="bi bi-arrow-right ms-1"></i>
+                            </button>
+                        </div>
+
+                        <!-- Dynamic Floating Action Bar for Step 2: Pops up immediately on staff card click -->
+                        <div id="floatingStaffActionBar" class="floating-action-bar">
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="badge bg-success-subtle text-success border border-success-subtle rounded-circle p-1">
+                                    <i class="bi bi-check-lg fs-6"></i>
+                                </span>
+                                <div>
+                                    <div class="fw-bold text-dark small" id="floatingStaffName">Technician Selected</div>
+                                    <div class="text-pink small fw-semibold" id="floatingStaffGuestLabel">Ready to proceed</div>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-pink rounded-pill px-4 py-2 fw-bold floating-btn-glow d-flex align-items-center gap-2" onclick="handleStep2Continue()">
+                                <span id="floatingStaffNextBtnLabel">Next: Details &amp; Confirm</span>
+                                <i class="bi bi-arrow-right"></i>
                             </button>
                         </div>
                     </section>
@@ -648,7 +677,9 @@
             customerName: '',
             customerPhone: '',
             customerEmail: '',
-            notes: ''
+            notes: '',
+            selectedStaff: null, // { id, name, isAnyoneAvailable }
+            serviceStaffAssignments: {} // { [serviceId]: techId }
         };
     }
 
@@ -658,8 +689,9 @@
         tenantConfig: null,
         guests: [createEmptyGuest(1)],
         activeGuestIndex: 0, // 0 = Guest 1, 1 = Guest 2
+        staffGuestIndex: 0,  // Sequential staff selection index (0 = Guest 1, 1 = Guest 2)
         detailsGuestIndex: 0, // Sequential guest index in final step
-        selectedStaff: null,   // { id, name, isAnyoneAvailable }
+        selectedStaff: null,   // Shared / overall technician
         selectedStation: null, // string name e.g. 'Private Zen Suite A'
         servicesList: [],
         staffList: []
@@ -667,7 +699,7 @@
 
     const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
 
-    // Service categories list matching services.html
+    // Service categories list matching services.html with standalone Combo and Kids cards
     const serviceCategoryConfigs = [
         {
             id: 'manicures',
@@ -677,13 +709,19 @@
         },
         {
             id: 'pedicures',
-            title: 'Pedicures & Combos',
+            title: 'Pedicures',
             icon: 'bi-gem',
-            keywords: ['pedicure', 'combo']
+            keywords: ['pedicure']
         },
         {
-            id: 'kid-services',
-            title: 'Kid Services (10 & Under)',
+            id: 'combos',
+            title: 'Combo',
+            icon: 'bi-intersect',
+            keywords: ['combo']
+        },
+        {
+            id: 'kids',
+            title: 'Kids',
             icon: 'bi-balloon-heart-fill',
             keywords: ['kid', 'kids']
         },
@@ -1041,23 +1079,43 @@
                 return;
             }
 
-            // Categorize services based on name matching
+            // Categorize services strictly matching services.html
+            // Rule 1: Combos into 'combos'
+            // Rule 2: Kids into 'kids'
+            // Rule 3: Distinct categories for Manicures, Pedicures, Enhancements, Body Massage, Waxing, Facial, Specialty, Gift Packages
             const categorized = {};
             serviceCategoryConfigs.forEach(cat => categorized[cat.id] = []);
-            const uncategorized = [];
 
             services.forEach(srv => {
                 const sNameLower = (srv.name || '').toLowerCase();
-                let matched = false;
 
+                // Standalone Combo extraction
+                if (sNameLower.includes('combo')) {
+                    categorized['combos'].push(srv);
+                    return;
+                }
+
+                // Standalone Kids extraction
+                if (sNameLower.includes('kid') || sNameLower.includes('kids')) {
+                    categorized['kids'].push(srv);
+                    return;
+                }
+
+                // Other categories
+                let matched = false;
                 for (const cat of serviceCategoryConfigs) {
+                    if (cat.id === 'combos' || cat.id === 'kids') continue;
                     if (cat.keywords.some(kw => sNameLower.includes(kw))) {
                         categorized[cat.id].push(srv);
                         matched = true;
                         break;
                     }
                 }
-                if (!matched) uncategorized.push(srv);
+
+                // If not matched, place into manicures or first sensible group rather than creating a random specialty section
+                if (!matched) {
+                    categorized['manicures'].push(srv);
+                }
             });
 
             grid.innerHTML = '';
@@ -1086,15 +1144,6 @@
                 : serviceCategoryConfigs;
 
             const renderedCategoryList = [...activeCategoryConfigs];
-            if (uncategorized.length > 0) {
-                categorized['other-services'] = uncategorized;
-                renderedCategoryList.push({
-                    id: 'other-services',
-                    title: 'Signature & Specialty Treatments',
-                    icon: 'bi-Sparkles',
-                    keywords: []
-                });
-            }
 
             renderedCategoryList.forEach((cat) => {
                 const catServices = categorized[cat.id] || [];
@@ -1160,7 +1209,15 @@
 
             // Auto-preselect if redirected from services.html while keeping the full menu available
             if (matchedServiceToSelect) {
-                toggleService(matchedServiceToSelect.id);
+                // Find category
+                let targetCatId = null;
+                for (const cat of serviceCategoryConfigs) {
+                    if ((categorized[cat.id] || []).some(s => s.id === matchedServiceToSelect.id)) {
+                        targetCatId = cat.id;
+                        break;
+                    }
+                }
+                toggleService(matchedServiceToSelect.id, targetCatId);
             } else {
                 refreshServiceSelectionUI();
             }
@@ -1191,25 +1248,46 @@
         return { subtotal, duration, count: list.length };
     }
 
+    function getCategoryForService(srv) {
+        if (!srv || !srv.name) return 'manicures';
+        const nameLower = srv.name.toLowerCase();
+        if (nameLower.includes('combo')) return 'combos';
+        if (nameLower.includes('kid') || nameLower.includes('kids')) return 'kids';
+        for (const cat of serviceCategoryConfigs) {
+            if (cat.id === 'combos' || cat.id === 'kids') continue;
+            if (cat.keywords && cat.keywords.some(kw => nameLower.includes(kw))) {
+                return cat.id;
+            }
+        }
+        return 'manicures';
+    }
+
     function toggleService(serviceId, catId) {
         hideAlert();
         const found = bookingState.servicesList.find(s => s.id === serviceId);
         if (!found) return;
 
+        const effectiveCatId = catId || getCategoryForService(found);
         const activeGuest = bookingState.guests[bookingState.activeGuestIndex] || bookingState.guests[0];
+
+        // Single Selection per Category Rule:
+        // Choosing a new option within the same category automatically replaces the previously selected service in that category.
         const existingIdx = activeGuest.services.findIndex(s => s.id === found.id);
         if (existingIdx >= 0) {
+            // Clicking the already selected service toggles it off
             activeGuest.services.splice(existingIdx, 1);
         } else {
+            // Remove any other service in the same category, then add the new service
+            activeGuest.services = activeGuest.services.filter(s => getCategoryForService(s) !== effectiveCatId);
             activeGuest.services.push(found);
         }
 
         // If card is collapsed, expand it
-        if (catId) {
-            const collapseEl = document.getElementById(`bookingCollapse_${catId}`);
+        if (effectiveCatId) {
+            const collapseEl = document.getElementById(`bookingCollapse_${effectiveCatId}`);
             if (collapseEl && !collapseEl.classList.contains('show')) {
                 new bootstrap.Collapse(collapseEl, { show: true });
-                toggleBookingCategoryCard(catId);
+                toggleBookingCategoryCard(effectiveCatId);
             }
         }
 
@@ -1373,21 +1451,35 @@
     async function loadStaffForSelectedServices() {
         const staffGrid = document.getElementById('staffGrid');
         const servicePill = document.getElementById('step2ServicePill');
+        const titleEl = document.getElementById('stepStaffTitle');
+        const subtitleEl = document.getElementById('stepStaffSubtitle');
+        const perServiceBox = document.getElementById('perServiceStaffContainer');
+        const perServiceList = document.getElementById('perServiceStaffList');
 
-        const allServiceIds = [];
-        let totalCost = 0;
-        let totalCount = 0;
-        bookingState.guests.forEach(g => {
-            g.services.forEach(s => {
-                totalCount++;
-                totalCost += Number(s.price || 0);
-                if (s.id && !allServiceIds.includes(s.id)) allServiceIds.push(s.id);
-            });
-        });
+        const currentGuest = bookingState.guests[bookingState.staffGuestIndex] || bookingState.guests[0];
+        const guestNum = bookingState.staffGuestIndex + 1;
+        const totalGuests = bookingState.guests.length;
 
-        if (servicePill) {
-            servicePill.textContent = `${bookingState.guests.length} Guest${bookingState.guests.length > 1 ? 's' : ''} • ${totalCount} Service${totalCount === 1 ? '' : 's'} ($${totalCost.toFixed(2)})`;
+        if (titleEl) {
+            titleEl.textContent = totalGuests > 1
+                ? `Choose Technician for Guest ${guestNum} of ${totalGuests}`
+                : `Choose Your Technician`;
         }
+        if (subtitleEl) {
+            subtitleEl.textContent = totalGuests > 1
+                ? `Select an overall technician for Guest ${guestNum}, or assign specific staff per service.`
+                : `Select an available technician for your appointment, or assign specific staff per service.`;
+        }
+
+        const guestServices = currentGuest.services || [];
+        const guestTotals = calculateGuestTotals(currentGuest);
+        if (servicePill) {
+            servicePill.textContent = `Guest ${guestNum}: ${guestTotals.count} Service${guestTotals.count === 1 ? '' : 's'} ($${guestTotals.subtotal.toFixed(2)})`;
+        }
+
+        // Hide floating button initially until staff is chosen or confirmed
+        const floatingStaffBar = document.getElementById('floatingStaffActionBar');
+        if (floatingStaffBar) floatingStaffBar.classList.remove('visible');
 
         staffGrid.innerHTML = `
             <div class="col-12 text-center py-4">
@@ -1397,20 +1489,56 @@
         `;
 
         try {
-            const query = allServiceIds.length > 0 ? `?serviceIds=${encodeURIComponent(allServiceIds.join(','))}` : '';
+            const serviceIds = guestServices.map(s => s.id).filter(id => id != null);
+            const query = serviceIds.length > 0 ? `?serviceIds=${encodeURIComponent(serviceIds.join(','))}` : '';
             const response = await fetch(`/api/nail-techs${query}`, {
                 headers: getActiveTenantHeaders()
             });
             const techs = response.ok ? await response.json() : [];
             bookingState.staffList = techs;
 
+            // Render Per-Service Staff Selection Dropdowns if current guest has multiple services
+            if (perServiceBox && perServiceList) {
+                if (guestServices.length > 1) {
+                    perServiceBox.classList.remove('d-none');
+                    perServiceList.innerHTML = '';
+                    guestServices.forEach(srv => {
+                        const currentAssignedId = currentGuest.serviceStaffAssignments[srv.id];
+                        let techOptionsHtml = `<option value="">-- Same as overall technician --</option>`;
+                        techOptionsHtml += `<option value="anyone">Anyone Available</option>`;
+                        techs.forEach(t => {
+                            const isOptSelected = currentAssignedId && String(currentAssignedId) === String(t.id);
+                            techOptionsHtml += `<option value="${t.id}" ${isOptSelected ? 'selected' : ''}>${t.name || t.username}</option>`;
+                        });
+
+                        const rowDiv = document.createElement('div');
+                        rowDiv.className = 'd-flex flex-column flex-sm-row justify-content-between align-items-sm-center bg-white p-2 px-3 rounded-3 border';
+                        rowDiv.innerHTML = `
+                            <div class="mb-1 mb-sm-0 pe-2">
+                                <span class="fw-semibold text-dark small">${srv.name}</span>
+                                <span class="text-muted small">($${Number(srv.price || 0).toFixed(2)})</span>
+                            </div>
+                            <div style="min-width: 220px;">
+                                <select class="form-select form-select-sm" onchange="assignServiceStaff(${srv.id}, this.value)">
+                                    ${techOptionsHtml}
+                                </select>
+                            </div>
+                        `;
+                        perServiceList.appendChild(rowDiv);
+                    });
+                } else {
+                    perServiceBox.classList.add('d-none');
+                }
+            }
+
             staffGrid.innerHTML = '';
 
             // Option 0: Anyone Available (No Preference)
+            const isAnyoneSelected = currentGuest.selectedStaff && currentGuest.selectedStaff.isAnyoneAvailable;
             const anyoneCol = document.createElement('div');
             anyoneCol.className = 'col-md-6';
             anyoneCol.innerHTML = `
-                <div class="staff-card d-flex align-items-center justify-content-between"
+                <div class="staff-card d-flex align-items-center justify-content-between ${isAnyoneSelected ? 'selected' : ''}"
                      id="staffCard-anyone"
                      onclick="selectStaff('anyone')">
                     <div class="d-flex align-items-center gap-3">
@@ -1431,11 +1559,12 @@
             techs.forEach(tech => {
                 const displayName = tech.name || tech.username || 'Nail Technician';
                 const initials = displayName.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
+                const isTechSelected = currentGuest.selectedStaff && currentGuest.selectedStaff.id === tech.id;
 
                 const col = document.createElement('div');
                 col.className = 'col-md-6';
                 col.innerHTML = `
-                    <div class="staff-card d-flex align-items-center justify-content-between"
+                    <div class="staff-card d-flex align-items-center justify-content-between ${isTechSelected ? 'selected' : ''}"
                          id="staffCard-${tech.id}"
                          onclick="selectStaff(${tech.id})">
                         <div class="d-flex align-items-center gap-3">
@@ -1450,17 +1579,54 @@
                 staffGrid.appendChild(col);
             });
 
-            if (bookingState.selectedStaff) {
-                if (bookingState.selectedStaff.isAnyoneAvailable) {
-                    selectStaff('anyone');
-                } else {
-                    const stillPresent = techs.some(t => t.id === bookingState.selectedStaff.id);
-                    if (stillPresent) selectStaff(bookingState.selectedStaff.id);
-                }
+            // Update next buttons and labels
+            const nextBtn = document.getElementById('step2NextBtn');
+            const nextLabel = document.getElementById('step2NextLabel');
+            const floatingNextBtnLabel = document.getElementById('floatingStaffNextBtnLabel');
+            const isLastStaffStep = (bookingState.staffGuestIndex + 1 >= bookingState.guests.length);
+
+            if (nextLabel) {
+                nextLabel.textContent = isLastStaffStep ? 'Next: Details & Confirm' : 'Next: Guest 2 Staff';
+            }
+            if (floatingNextBtnLabel) {
+                floatingNextBtnLabel.textContent = isLastStaffStep ? 'Next: Details & Confirm' : 'Next: Guest 2 Staff';
+            }
+
+            if (currentGuest.selectedStaff) {
+                if (nextBtn) nextBtn.disabled = false;
+                triggerStaffFloatingActionBar(currentGuest.selectedStaff.name);
+            } else {
+                if (nextBtn) nextBtn.disabled = true;
             }
         } catch (err) {
             console.error('Error loading staff:', err);
             staffGrid.innerHTML = `<div class="col-12 text-center text-danger py-4">Unable to load technicians. Please try again.</div>`;
+        }
+    }
+
+    function assignServiceStaff(serviceId, staffValue) {
+        const currentGuest = bookingState.guests[bookingState.staffGuestIndex] || bookingState.guests[0];
+        if (!currentGuest.serviceStaffAssignments) currentGuest.serviceStaffAssignments = {};
+
+        if (!staffValue || staffValue === '') {
+            delete currentGuest.serviceStaffAssignments[serviceId];
+        } else if (staffValue === 'anyone') {
+            currentGuest.serviceStaffAssignments[serviceId] = null;
+        } else {
+            currentGuest.serviceStaffAssignments[serviceId] = Number(staffValue);
+        }
+    }
+
+    function triggerStaffFloatingActionBar(staffName) {
+        const floatingBar = document.getElementById('floatingStaffActionBar');
+        const nameEl = document.getElementById('floatingStaffName');
+        const guestEl = document.getElementById('floatingStaffGuestLabel');
+        if (floatingBar && nameEl) {
+            nameEl.textContent = staffName;
+            if (guestEl) {
+                guestEl.textContent = `Selected for Guest ${bookingState.staffGuestIndex + 1}`;
+            }
+            floatingBar.classList.add('visible');
         }
     }
 
@@ -1470,8 +1636,10 @@
             card.classList.remove('selected');
         });
 
+        const currentGuest = bookingState.guests[bookingState.staffGuestIndex] || bookingState.guests[0];
+
         if (staffIdentifier === 'anyone') {
-            bookingState.selectedStaff = {
+            currentGuest.selectedStaff = {
                 id: null,
                 name: 'Anyone Available (No Preference)',
                 isAnyoneAvailable: true
@@ -1481,7 +1649,7 @@
         } else {
             const found = bookingState.staffList.find(t => t.id === staffIdentifier);
             if (!found) return;
-            bookingState.selectedStaff = {
+            currentGuest.selectedStaff = {
                 id: found.id,
                 name: found.name || found.username,
                 isAnyoneAvailable: false
@@ -1490,7 +1658,50 @@
             if (card) card.classList.add('selected');
         }
 
+        // Keep bookingState.selectedStaff synchronized to primary/first guest selection
+        if (bookingState.staffGuestIndex === 0) {
+            bookingState.selectedStaff = currentGuest.selectedStaff;
+        }
+
         document.getElementById('step2NextBtn').disabled = false;
+
+        // Immediately trigger sticky floating action button so customer doesn't have to scroll
+        triggerStaffFloatingActionBar(currentGuest.selectedStaff.name);
+    }
+
+    function handleStep2Continue() {
+        hideAlert();
+        const currentGuest = bookingState.guests[bookingState.staffGuestIndex];
+        if (!currentGuest || !currentGuest.selectedStaff) {
+            showAlert(`Please choose a technician for Guest ${bookingState.staffGuestIndex + 1}.`);
+            return;
+        }
+
+        // Multi-Guest Staff Selection: If Guest 1 finished and Guest 2 exists, repeat exact same flow for Guest 2
+        if (bookingState.staffGuestIndex + 1 < bookingState.guests.length) {
+            bookingState.staffGuestIndex += 1;
+            loadStaffForSelectedServices();
+            document.getElementById('step2Panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+            return;
+        }
+
+        // Otherwise proceed to next wizard step (STATION or DETAILS)
+        const floatingBar = document.getElementById('floatingStaffActionBar');
+        if (floatingBar) floatingBar.classList.remove('visible');
+        goNextStep();
+    }
+
+    function handleStep2Back() {
+        hideAlert();
+        const floatingBar = document.getElementById('floatingStaffActionBar');
+        if (floatingBar) floatingBar.classList.remove('visible');
+
+        if (bookingState.staffGuestIndex > 0) {
+            bookingState.staffGuestIndex -= 1;
+            loadStaffForSelectedServices();
+            return;
+        }
+        goPrevStep();
     }
 
     // ==================== WIZARD STEP NAVIGATION (DYNAMIC STEP ORDER) ====================
@@ -1775,7 +1986,8 @@
                 customerPhone: g.customerPhone,
                 customerEmail: g.customerEmail,
                 notes: g.notes,
-                serviceIds: g.services.map(s => s.id)
+                serviceIds: g.services.map(s => s.id),
+                serviceStaffAssignments: g.serviceStaffAssignments || {}
             }))
         };
 
@@ -1890,9 +2102,13 @@
         bookingState.currentStep = 1;
         bookingState.guests = [createEmptyGuest(1)];
         bookingState.activeGuestIndex = 0;
+        bookingState.staffGuestIndex = 0;
         bookingState.detailsGuestIndex = 0;
         bookingState.selectedStaff = null;
         bookingState.selectedStation = null;
+
+        const floatingStaffBar = document.getElementById('floatingStaffActionBar');
+        if (floatingStaffBar) floatingStaffBar.classList.remove('visible');
 
         hideSoloOrGroupPrompt();
         refreshServiceSelectionUI();

@@ -154,7 +154,26 @@ public class AppointmentController {
                     appt.setCustomerPhone(guest.getCustomerPhone().trim());
                     appt.setAppointmentTime(bookingRequest.getAppointmentTime());
                     appt.setStationPreference(bookingRequest.getStationPreference());
-                    appt.setNailTech(resolvedTech);
+
+                    // Check if per-service staff selection was assigned for this service
+                    UserEntity serviceSpecificTech = resolvedTech;
+                    if (guest.getServiceStaffAssignments() != null && srv.getId() != null) {
+                        Long assignedTechId = guest.getServiceStaffAssignments().get(String.valueOf(srv.getId()));
+                        if (assignedTechId == null) {
+                            // Try Long key if any
+                            for (Map.Entry<String, Long> entry : guest.getServiceStaffAssignments().entrySet()) {
+                                if (String.valueOf(srv.getId()).equals(entry.getKey())) {
+                                    assignedTechId = entry.getValue();
+                                    break;
+                                }
+                            }
+                        }
+                        if (assignedTechId != null) {
+                            serviceSpecificTech = userRepository.findByTenantIdAndId(tenantId, assignedTechId).orElse(resolvedTech);
+                        }
+                    }
+
+                    appt.setNailTech(serviceSpecificTech);
                     appt.setService(srv);
 
                     String baseNotes = guest.getNotes() != null ? guest.getNotes().trim() : "";

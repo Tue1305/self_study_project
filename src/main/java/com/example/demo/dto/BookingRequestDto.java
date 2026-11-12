@@ -30,6 +30,7 @@ public class BookingRequestDto {
     private String notes;
     private ServiceEntity service;
     private List<Long> serviceIds = new ArrayList<>();
+    private java.util.Map<String, Long> serviceStaffAssignments = new java.util.HashMap<>();
 
     public static class GuestBookingItem {
         private Integer guestNumber;
@@ -39,6 +40,7 @@ public class BookingRequestDto {
         private String notes;
         private List<Long> serviceIds = new ArrayList<>();
         private List<ServiceEntity> services = new ArrayList<>();
+        private java.util.Map<String, Long> serviceStaffAssignments = new java.util.HashMap<>();
 
         public GuestBookingItem() {
         }
@@ -97,6 +99,14 @@ public class BookingRequestDto {
 
         public void setServices(List<ServiceEntity> services) {
             this.services = services != null ? services : new ArrayList<>();
+        }
+
+        public java.util.Map<String, Long> getServiceStaffAssignments() {
+            return serviceStaffAssignments;
+        }
+
+        public void setServiceStaffAssignments(java.util.Map<String, Long> serviceStaffAssignments) {
+            this.serviceStaffAssignments = serviceStaffAssignments != null ? serviceStaffAssignments : new java.util.HashMap<>();
         }
     }
 
@@ -181,5 +191,13 @@ public class BookingRequestDto {
 
     public void setServiceIds(List<Long> serviceIds) {
         this.serviceIds = serviceIds != null ? serviceIds : new ArrayList<>();
+    }
+
+    public java.util.Map<String, Long> getServiceStaffAssignments() {
+        return serviceStaffAssignments;
+    }
+
+    public void setServiceStaffAssignments(java.util.Map<String, Long> serviceStaffAssignments) {
+        this.serviceStaffAssignments = serviceStaffAssignments != null ? serviceStaffAssignments : new java.util.HashMap<>();
     }
 }

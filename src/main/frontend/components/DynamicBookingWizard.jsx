@@ -10,8 +10,9 @@ const STEP_METADATA = {
 
 const SERVICE_CATEGORIES = [
   { id: 'manicures', title: 'Manicures', keywords: ['manicure'] },
-  { id: 'pedicures', title: 'Pedicures & Combos', keywords: ['pedicure', 'combo'] },
-  { id: 'kid-services', title: 'Kid Services (10 & Under)', keywords: ['kid', 'kids'] },
+  { id: 'pedicures', title: 'Pedicures', keywords: ['pedicure'] },
+  { id: 'combos', title: 'Combo', keywords: ['combo'] },
+  { id: 'kids', title: 'Kids', keywords: ['kid', 'kids'] },
   {
     id: 'nail-enhancement',
     title: 'Nail Enhancement & Art',
@@ -33,7 +34,7 @@ const SERVICE_CATEGORIES = [
     ],
   },
   { id: 'body-massage', title: 'Body Massage', keywords: ['massage', 'hot stone'] },
-  { id: 'waxing', title: 'Waxing & Combos', keywords: ['wax', 'waxing'] },
+  { id: 'waxing', title: 'Waxing', keywords: ['wax', 'waxing'] },
   { id: 'facial', title: 'Facial Treatments (Babor®)', keywords: ['facial', 'babor'] },
   { id: 'specialty-services', title: 'Specialty Services', keywords: ['tinting', 'tint'] },
   { id: 'gift-packages', title: 'Gift Packages', keywords: ['rejuvenation', 'executive', 'package'] },
@@ -54,10 +55,26 @@ function buildStoreTimeSlots() {
   return slots;
 }
 
+function getCategoryForService(srv) {
+  if (!srv || !srv.name) return 'manicures';
+  const nameLower = srv.name.toLowerCase();
+  if (nameLower.includes('combo')) return 'combos';
+  if (nameLower.includes('kid') || nameLower.includes('kids')) return 'kids';
+  for (const cat of SERVICE_CATEGORIES) {
+    if (cat.id === 'combos' || cat.id === 'kids') continue;
+    if (cat.keywords && cat.keywords.some((kw) => nameLower.includes(kw))) {
+      return cat.id;
+    }
+  }
+  return 'manicures';
+}
+
 function createEmptyGuest(guestNumber) {
   return {
     guestNumber,
     services: [],
+    selectedStaff: null,
+    serviceStaffAssignments: {},
     customerName: '',
     customerPhone: '',
     customerEmail: '',
@@ -93,6 +110,7 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
   const [guests, setGuests] = useState(() => [createEmptyGuest(1)]);
   const [activeGuestIndex, setActiveGuestIndex] = useState(0); // 0 = Guest 1, 1 = Guest 2
   const [showSoloOrGroupPrompt, setShowSoloOrGroupPrompt] = useState(false);
+  const [staffGuestIndex, setStaffGuestIndex] = useState(0); // Sequential guest staff step index
   const [detailsGuestIndex, setDetailsGuestIndex] = useState(0); // Sequential guest details step index
 
   const [selectedStaff, setSelectedStaff] = useState(null);
@@ -128,6 +146,7 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
     setGuests([createEmptyGuest(1)]);
     setActiveGuestIndex(0);
     setShowSoloOrGroupPrompt(false);
+    setStaffGuestIndex(0);
     setDetailsGuestIndex(0);
     setSelectedStaff(null);
     setSelectedStation('Any Available Station');
@@ -175,29 +194,26 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
             });
 
             // Automatically expand the category containing the preselected service
-            const matchingCat = SERVICE_CATEGORIES.find((cat) =>
-              cat.keywords.some((kw) => (matched.name || '').toLowerCase().includes(kw))
-            );
-            if (matchingCat) {
-              setOpenCategoryId(matchingCat.id);
-            }
+            const targetCatId = getCategoryForService(matched);
+            setOpenCategoryId(targetCatId);
           }
         }
       })
       .catch(() => setAlertMessage('Unable to load salon services.'));
   }, [preselectedServiceId, tenant.tenantKey]);
 
-  // Dynamically fetch qualified staff scoped to active tenant for all selected services
+  // Dynamically fetch qualified staff scoped to active tenant for current guest's selected services
   useEffect(() => {
     if (currentStepKey !== 'STAFF') return;
     setLoadingStaff(true);
-    const allServiceIds = guests
-      .flatMap((g) => g.services.map((s) => s.id))
+    const currentStaffGuest = guests[staffGuestIndex] || guests[0];
+    const guestServiceIds = (currentStaffGuest?.services || [])
+      .map((s) => s.id)
       .filter((id, idx, arr) => id != null && arr.indexOf(id) === idx);
 
     const query =
-      allServiceIds.length > 0
-        ? `?serviceIds=${encodeURIComponent(allServiceIds.join(','))}`
+      guestServiceIds.length > 0
+        ? `?serviceIds=${encodeURIComponent(guestServiceIds.join(','))}`
         : '';
 
     fetch(`/api/nail-techs${query}`, {
@@ -207,19 +223,12 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
       .then((data) => {
         const list = Array.isArray(data) ? data : [];
         setStaffList(list);
-        if (
-          selectedStaff &&
-          !selectedStaff.isAnyoneAvailable &&
-          !list.some((t) => t.id === selectedStaff.id)
-        ) {
-          setSelectedStaff(null);
-        }
       })
       .catch(() => setAlertMessage('Unable to load available technicians.'))
       .finally(() => setLoadingStaff(false));
-  }, [currentStepKey, guests, tenant.tenantKey]);
+  }, [currentStepKey, guests, staffGuestIndex, tenant.tenantKey]);
 
-  // Categorize the FULL tenant service catalog (never hide unselected services)
+  // Categorize the FULL tenant service catalog (matching services.html and booking.html)
   const categorizedServices = useMemo(() => {
     const enabledLower = (wizard?.enabledCategories || []).map((c) => c.toLowerCase().trim());
     const visibleCategories =
@@ -231,31 +240,51 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
           )
         : SERVICE_CATEGORIES;
 
-    const mapped = visibleCategories
-      .map((cat) => {
-        const items = services.filter((srv) => {
-          const nameLower = (srv.name || '').toLowerCase();
-          return cat.keywords.some((kw) => nameLower.includes(kw));
-        });
-        return { ...cat, items };
-      })
-      .filter((cat) => cat.items.length > 0);
+    const categorizedMap = {};
+    visibleCategories.forEach((cat) => {
+      categorizedMap[cat.id] = [];
+    });
 
-    // Include any custom tenant services that didn't match standard keywords
-    const matchedIds = new Set(mapped.flatMap((c) => c.items.map((i) => i.id)));
-    const otherItems = services.filter((s) => !matchedIds.has(s.id));
-    if (otherItems.length > 0) {
-      mapped.push({
-        id: 'other-services',
-        title: 'Signature & Specialty Treatments',
-        items: otherItems,
-      });
-    }
-    return mapped;
+    services.forEach((srv) => {
+      const catId = getCategoryForService(srv);
+      if (categorizedMap[catId]) {
+        categorizedMap[catId].push(srv);
+      } else if (categorizedMap['manicures']) {
+        categorizedMap['manicures'].push(srv);
+      }
+    });
+
+    return visibleCategories
+      .map((cat) => ({
+        ...cat,
+        items: categorizedMap[cat.id] || [],
+      }))
+      .filter((cat) => cat.items.length > 0);
   }, [services, wizard?.enabledCategories]);
 
   // Toggle a service in/out of the currently active guest's service list
+  // Single Selection per Category Rule: Choosing a new option within the same category
+  // automatically replaces the previously selected service in that category.
   const toggleServiceForActiveGuest = (srv) => {
+    setAlertMessage(null);
+    const targetCat = getCategoryForService(srv);
+    setGuests((prev) =>
+      prev.map((guest, idx) => {
+        if (idx !== activeGuestIndex) return guest;
+        const exists = guest.services.some((item) => item.id === srv.id);
+        let updatedServices;
+        if (exists) {
+          updatedServices = guest.services.filter((item) => item.id !== srv.id);
+        } else {
+          updatedServices = [
+            ...guest.services.filter((item) => getCategoryForService(item) !== targetCat),
+            srv,
+          ];
+        }
+        return { ...guest, services: updatedServices };
+      })
+    );
+  };
     setAlertMessage(null);
     setGuests((prev) =>
       prev.map((guest, idx) => {
@@ -318,7 +347,73 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
     setAlertMessage(null);
     setGuests((prev) => [prev[0]]);
     setActiveGuestIndex(0);
+    setStaffGuestIndex(0);
     setDetailsGuestIndex(0);
+  };
+
+  const handleSelectStaff = (tech) => {
+    setAlertMessage(null);
+    const chosen = tech
+      ? { id: tech.id, name: tech.name || tech.username, isAnyoneAvailable: false }
+      : { id: null, name: 'Anyone Available (No Preference)', isAnyoneAvailable: true };
+
+    setGuests((prev) =>
+      prev.map((g, idx) => (idx === staffGuestIndex ? { ...g, selectedStaff: chosen } : g))
+    );
+
+    if (staffGuestIndex === 0) {
+      setSelectedStaff(chosen);
+    }
+  };
+
+  const handleAssignServiceStaff = (serviceId, val) => {
+    setGuests((prev) =>
+      prev.map((g, idx) => {
+        if (idx !== staffGuestIndex) return g;
+        const currentAssignments = { ...(g.serviceStaffAssignments || {}) };
+        if (!val || val === '') {
+          delete currentAssignments[serviceId];
+        } else if (val === 'anyone') {
+          currentAssignments[serviceId] = null;
+        } else {
+          currentAssignments[serviceId] = Number(val);
+        }
+        return { ...g, serviceStaffAssignments: currentAssignments };
+      })
+    );
+  };
+
+  const handleStep2Next = () => {
+    setAlertMessage(null);
+    const activeStaffGuest = guests[staffGuestIndex] || guests[0];
+    if (!activeStaffGuest?.selectedStaff) {
+      setAlertMessage(`Please choose a technician for Guest ${staffGuestIndex + 1}.`);
+      return;
+    }
+
+    // Multi-Guest Staff Selection: repeat flow for Guest 2 if present
+    if (staffGuestIndex + 1 < guests.length) {
+      setStaffGuestIndex((prev) => prev + 1);
+      return;
+    }
+
+    // Finished staff selection for all guests; proceed to next step
+    if (currentStepIdx + 1 < activeSteps.length) {
+      const upcomingKey = activeSteps[currentStepIdx + 1];
+      if (upcomingKey === 'DETAILS') {
+        setDetailsGuestIndex(0);
+      }
+      setCurrentStepIdx((prev) => prev + 1);
+    }
+  };
+
+  const handleStep2Back = () => {
+    setAlertMessage(null);
+    if (staffGuestIndex > 0) {
+      setStaffGuestIndex((prev) => prev - 1);
+      return;
+    }
+    handlePrevStep();
   };
 
   const validateBeforeNext = (stepKey) => {
@@ -332,9 +427,15 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
         return false;
       }
     }
-    if (stepKey === 'STAFF' && !selectedStaff) {
-      setAlertMessage('Please choose a technician (or "Anyone Available") before continuing.');
-      return false;
+    if (stepKey === 'STAFF') {
+      if (!guests[0]?.selectedStaff) {
+        setAlertMessage('Please choose a technician for Guest 1.');
+        return false;
+      }
+      if (guests.length > 1 && !guests[1]?.selectedStaff) {
+        setAlertMessage('Please choose a technician for Guest 2.');
+        return false;
+      }
     }
     return true;
   };
@@ -343,6 +444,10 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
     setAlertMessage(null);
     if (currentStepKey === 'SERVICE') {
       handleFinishServiceSelectionForActiveGuest();
+      return;
+    }
+    if (currentStepKey === 'STAFF') {
+      handleStep2Next();
       return;
     }
     if (!validateBeforeNext(currentStepKey)) return;
@@ -359,6 +464,10 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
     setAlertMessage(null);
     if (currentStepKey === 'DETAILS' && detailsGuestIndex > 0) {
       setDetailsGuestIndex((prev) => prev - 1);
+      return;
+    }
+    if (currentStepKey === 'STAFF' && staffGuestIndex > 0) {
+      setStaffGuestIndex((prev) => prev - 1);
       return;
     }
     if (currentStepIdx > 0) {
@@ -406,7 +515,9 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
         wizard?.enableStationSelection && activeSteps.includes('STATION')
           ? selectedStation
           : null,
-      nailTech: selectedStaff?.id ? { id: selectedStaff.id } : null,
+      nailTech: (guests[0]?.selectedStaff?.id || selectedStaff?.id)
+        ? { id: guests[0]?.selectedStaff?.id || selectedStaff.id }
+        : null,
       guests: guests.map((g, idx) => ({
         guestNumber: idx + 1,
         customerName: g.customerName.trim(),
@@ -414,6 +525,7 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
         customerEmail: g.customerEmail.trim(),
         notes: wizard?.showAppointmentNotes ? g.notes.trim() : '',
         serviceIds: g.services.map((s) => s.id),
+        serviceStaffAssignments: g.serviceStaffAssignments || {},
       })),
     };
 
@@ -533,6 +645,8 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
   const nextStepLabel = nextStepKey ? STEP_METADATA[nextStepKey]?.title : 'Next';
   const activeGuest = guests[activeGuestIndex] || guests[0];
   const activeGuestTotals = activeGuestIndex === 0 ? guest1Totals : guest2Totals;
+  const currentStaffGuest = guests[staffGuestIndex] || guests[0];
+  const currentGuestStaff = currentStaffGuest?.selectedStaff;
 
   return (
     <main className={`container my-5 flex-grow-1 layout-${layoutVariant}`}>
@@ -882,12 +996,73 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
               {/* ==================== STEP: STAFF ==================== */}
               {currentStepKey === 'STAFF' && (
                 <section>
-                  <h5 className="fw-bold mb-1">
-                    Step {currentStepIdx + 1}: {STEP_METADATA.STAFF.title}
-                  </h5>
-                  <p className="text-muted small mb-3">
-                    Select an available technician for your appointment
-                  </p>
+                  <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                    <div>
+                      <h5 className="fw-bold mb-1">
+                        {guests.length > 1
+                          ? `Step ${currentStepIdx + 1}: Choose Technician for Guest ${staffGuestIndex + 1} of ${guests.length}`
+                          : `Step ${currentStepIdx + 1}: ${STEP_METADATA.STAFF.title}`}
+                      </h5>
+                      <p className="text-muted small mb-0">
+                        {guests.length > 1
+                          ? `Select an overall technician for Guest ${staffGuestIndex + 1}, or assign specific staff per service.`
+                          : 'Select an available technician for your appointment, or assign specific staff per service.'}
+                      </p>
+                    </div>
+                    <span
+                      className="badge rounded-pill px-3 py-2 text-white"
+                      style={{ backgroundColor: 'var(--primary-color)' }}
+                    >
+                      Guest {staffGuestIndex + 1}: {currentStaffGuest?.services.length || 0} Service
+                      {currentStaffGuest?.services.length === 1 ? '' : 's'}
+                    </span>
+                  </div>
+
+                  {/* Per-Service Staff Selection Dropdowns if current guest has multiple services */}
+                  {currentStaffGuest?.services.length > 1 && (
+                    <div className="card bg-light border-0 rounded-4 p-3 mb-4">
+                      <div className="d-flex justify-content-between align-items-center mb-2">
+                        <h6 className="fw-bold text-dark mb-0">Per-Service Technician Assignment (Optional)</h6>
+                        <span className="badge bg-white text-muted border rounded-pill">Custom tech per service</span>
+                      </div>
+                      <p className="small text-muted mb-3">
+                        You can assign a specific technician for each treatment, or choose one overall technician below for all services.
+                      </p>
+                      <div className="d-flex flex-column gap-2">
+                        {currentStaffGuest.services.map((srv) => {
+                          const currentVal = currentStaffGuest.serviceStaffAssignments?.[srv.id];
+                          const selectValue =
+                            currentVal === null ? 'anyone' : currentVal != null ? String(currentVal) : '';
+                          return (
+                            <div
+                              key={srv.id}
+                              className="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center bg-white p-2 px-3 rounded-3 border"
+                            >
+                              <div className="mb-1 mb-sm-0 pe-2">
+                                <span className="fw-semibold text-dark small">{srv.name}</span>{' '}
+                                <span className="text-muted small">(${Number(srv.price || 0).toFixed(2)})</span>
+                              </div>
+                              <div style={{ minWidth: 220 }}>
+                                <select
+                                  className="form-select form-select-sm"
+                                  value={selectValue}
+                                  onChange={(e) => handleAssignServiceStaff(srv.id, e.target.value)}
+                                >
+                                  <option value="">-- Same as overall technician --</option>
+                                  <option value="anyone">Anyone Available</option>
+                                  {staffList.map((t) => (
+                                    <option key={t.id} value={t.id}>
+                                      {t.name || t.username}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
 
                   {loadingStaff ? (
                     <div className="text-center py-4 text-muted">Loading available staff...</div>
@@ -898,20 +1073,14 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
                           className="card p-3 h-100"
                           style={{
                             cursor: 'pointer',
-                            borderColor: selectedStaff?.isAnyoneAvailable
+                            borderColor: currentGuestStaff?.isAnyoneAvailable
                               ? 'var(--primary-color)'
                               : '#dee2e6',
-                            backgroundColor: selectedStaff?.isAnyoneAvailable
+                            backgroundColor: currentGuestStaff?.isAnyoneAvailable
                               ? 'var(--primary-color-soft)'
                               : '#fff',
                           }}
-                          onClick={() =>
-                            setSelectedStaff({
-                              id: null,
-                              name: 'Anyone Available',
-                              isAnyoneAvailable: true,
-                            })
-                          }
+                          onClick={() => handleSelectStaff(null)}
                         >
                           <div className="fw-bold text-dark">Anyone Available</div>
                           <small className="text-muted">No preference</small>
@@ -920,7 +1089,7 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
 
                       {staffList.map((tech) => {
                         const displayName = tech.name || tech.username || 'Nail Technician';
-                        const isSelected = selectedStaff?.id === tech.id;
+                        const isSelected = currentGuestStaff?.id === tech.id;
                         return (
                           <div key={tech.id} className="col-md-6">
                             <div
@@ -930,13 +1099,7 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
                                 borderColor: isSelected ? 'var(--primary-color)' : '#dee2e6',
                                 backgroundColor: isSelected ? 'var(--primary-color-soft)' : '#fff',
                               }}
-                              onClick={() =>
-                                setSelectedStaff({
-                                  id: tech.id,
-                                  name: displayName,
-                                  isAnyoneAvailable: false,
-                                })
-                              }
+                              onClick={() => handleSelectStaff(tech)}
                             >
                               <span className="fw-bold text-dark">{displayName}</span>
                               {isSelected && (
@@ -952,25 +1115,52 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
                   )}
 
                   <div className="d-flex justify-content-between">
-                    {currentStepIdx > 0 && (
-                      <button
-                        type="button"
-                        className="btn btn-outline-secondary px-4 py-2"
-                        onClick={handlePrevStep}
-                      >
-                        ← Back
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      className="btn btn-outline-secondary px-4 py-2"
+                      onClick={handleStep2Back}
+                    >
+                      ← {staffGuestIndex > 0 ? 'Back to Guest 1 Staff' : 'Back'}
+                    </button>
                     <button
                       type="button"
                       className="btn text-white fw-semibold px-4 py-2 ms-auto"
                       style={{ backgroundColor: 'var(--primary-color)' }}
-                      disabled={!selectedStaff}
-                      onClick={handleNextStep}
+                      disabled={!currentGuestStaff}
+                      onClick={handleStep2Next}
                     >
-                      Next: {nextStepLabel} →
+                      {staffGuestIndex + 1 < guests.length
+                        ? 'Next: Guest 2 Staff →'
+                        : `Next: ${nextStepLabel} →`}
                     </button>
                   </div>
+
+                  {/* Sticky Floating Action Button: pops up immediately on clicking any staff card */}
+                  {currentGuestStaff && (
+                    <div
+                      className="position-fixed bottom-0 start-50 translate-middle-x mb-4 px-4 py-3 bg-white rounded-pill shadow-lg d-flex align-items-center gap-3"
+                      style={{ zIndex: 1050, border: '1px solid var(--primary-color)' }}
+                    >
+                      <div>
+                        <div className="fw-bold small text-dark">
+                          {currentGuestStaff.name}
+                        </div>
+                        <div className="small fw-semibold" style={{ color: 'var(--primary-color)' }}>
+                          Selected for Guest {staffGuestIndex + 1}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn rounded-pill px-4 py-2 fw-bold text-white"
+                        style={{ backgroundColor: 'var(--primary-color)' }}
+                        onClick={handleStep2Next}
+                      >
+                        {staffGuestIndex + 1 < guests.length
+                          ? 'Next: Guest 2 Staff →'
+                          : 'Next: Details & Confirm →'}
+                      </button>
+                    </div>
+                  )}
                 </section>
               )}
 
@@ -1074,7 +1264,7 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
                         <div className="row g-2 pt-2 border-top small">
                           <div className="col-md-6">
                             <span className="text-muted">Technician: </span>
-                            <strong>{selectedStaff?.name || '—'}</strong>
+                            <strong>{currentGuest.selectedStaff?.name || selectedStaff?.name || '—'}</strong>
                           </div>
                           {wizard?.enableStationSelection && activeSteps.includes('STATION') && (
                             <div className="col-md-6">

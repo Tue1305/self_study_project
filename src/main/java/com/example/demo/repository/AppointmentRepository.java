@@ -16,6 +16,10 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
 
     Optional<Appointment> findByTenantIdAndId(String tenantId, Long id);
 
+    Optional<Appointment> findByCancellationToken(String cancellationToken);
+
+    Optional<Appointment> findByTenantIdAndCancellationToken(String tenantId, String cancellationToken);
+
     List<Appointment> findByTenantIdAndAppointmentTimeBetween(String tenantId, LocalDateTime start, LocalDateTime end);
 
     boolean existsByTenantIdAndNailTechIdAndAppointmentTimeAndStatusNot(

@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.*;
 import java.math.BigDecimal;
 import com.example.demo.entity.Customer;
 import com.example.demo.service.AppointmentAuditService;
+import com.example.demo.service.NotificationService;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.time.LocalDateTime;
@@ -26,6 +27,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 @RestController
 @RequestMapping({"/api/appointments", "/api/bookings"})
@@ -38,6 +40,7 @@ public class AppointmentController {
     private final UserRepository userRepository;
     private final TenantContextResolver tenantContextResolver;
     private final AppointmentAuditService auditService;
+    private final NotificationService notificationService;
 
     @Autowired
     public AppointmentController(
@@ -46,7 +49,8 @@ public class AppointmentController {
             ServiceRepository serviceRepository,
             UserRepository userRepository,
             TenantContextResolver tenantContextResolver,
-            @Autowired(required = false) AppointmentAuditService auditService
+            @Autowired(required = false) AppointmentAuditService auditService,
+            @Autowired(required = false) NotificationService notificationService
     ) {
         this.appointmentRepository = appointmentRepository;
         this.customerRepository = customerRepository;
@@ -54,6 +58,7 @@ public class AppointmentController {
         this.userRepository = userRepository;
         this.tenantContextResolver = tenantContextResolver;
         this.auditService = auditService;
+        this.notificationService = notificationService;
     }
 
     public AppointmentController(
@@ -63,7 +68,7 @@ public class AppointmentController {
             UserRepository userRepository,
             TenantContextResolver tenantContextResolver
     ) {
-        this(appointmentRepository, customerRepository, serviceRepository, userRepository, tenantContextResolver, null);
+        this(appointmentRepository, customerRepository, serviceRepository, userRepository, tenantContextResolver, null, null);
     }
 
     @GetMapping
@@ -364,6 +369,7 @@ public class AppointmentController {
                     appt.setCustomerPhone(guest.getCustomerPhone().trim());
                     appt.setAppointmentTime(bookingRequest.getAppointmentTime());
                     appt.setStationPreference(bookingRequest.getStationPreference());
+                    appt.setCancellationToken(UUID.randomUUID().toString());
 
                     // Check if per-service staff selection was assigned for this service
                     UserEntity serviceSpecificTech = resolvedTech;
@@ -442,6 +448,18 @@ public class AppointmentController {
             responseBody.put("totalDurationMinutes", totalDurationMinutes);
             responseBody.put("appointments", savedAppointments);
 
+            if (notificationService != null) {
+                try {
+                    notificationService.sendMultiGuestBookingConfirmations(
+                            savedAppointments,
+                            guestReceipts,
+                            tenantId,
+                            grandTotal
+                    );
+                } catch (Exception ignored) {
+                }
+            }
+
             return ResponseEntity.ok(responseBody);
         }
 
@@ -487,6 +505,7 @@ public class AppointmentController {
         appointment.setAppointmentTime(bookingRequest.getAppointmentTime());
         appointment.setNotes(bookingRequest.getNotes());
         appointment.setStationPreference(bookingRequest.getStationPreference());
+        appointment.setCancellationToken(UUID.randomUUID().toString());
         appointment.setService(tenantService.get());
         appointment.setNailTech(resolvedTech);
 
@@ -507,6 +526,13 @@ public class AppointmentController {
                     performedBy,
                     saved.getNotes()
             );
+        }
+
+        if (notificationService != null) {
+            try {
+                notificationService.sendBookingConfirmation(saved);
+            } catch (Exception ignored) {
+            }
         }
 
         return ResponseEntity.ok(saved);
@@ -626,5 +652,81 @@ public class AppointmentController {
                 })
                 .orElse(ResponseEntity.status(HttpStatus.NOT_FOUND)
                         .body(Map.of("message", "Appointment not found")));
+    }
+
+    @GetMapping("/by-token/{token}")
+    public ResponseEntity<?> getAppointmentByToken(@PathVariable String token) {
+        if (token == null || token.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Token is required"));
+        }
+        return appointmentRepository.findByCancellationToken(token.trim())
+                .map(appt -> {
+                    Map<String, Object> details = new LinkedHashMap<>();
+                    details.put("id", appt.getId());
+                    details.put("tenantId", appt.getTenantId());
+                    details.put("customerName", appt.getCustomerName());
+                    details.put("customerEmail", appt.getCustomerEmail());
+                    details.put("customerPhone", appt.getCustomerPhone());
+                    details.put("appointmentTime", appt.getAppointmentTime());
+                    details.put("service", appt.getService());
+                    details.put("nailTech", appt.getNailTech());
+                    details.put("stationPreference", appt.getStationPreference());
+                    details.put("status", appt.getStatus());
+                    details.put("notes", appt.getNotes());
+                    details.put("cancellationToken", appt.getCancellationToken());
+                    return ResponseEntity.ok(details);
+                })
+                .orElse(ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", "Appointment not found for provided token")));
+    }
+
+    @PostMapping("/by-token/{token}/cancel")
+    public ResponseEntity<?> cancelAppointmentByToken(
+            @PathVariable String token,
+            @RequestParam(required = false) String reason,
+            @RequestBody(required = false) Map<String, Object> body
+    ) {
+        if (token == null || token.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Token is required"));
+        }
+        String effectiveReason = reason;
+        if (body != null && effectiveReason == null && body.containsKey("reason")) {
+            effectiveReason = String.valueOf(body.get("reason"));
+        }
+
+        final String finalReason = effectiveReason != null ? effectiveReason.trim() : "Cancelled by customer via self-service portal";
+
+        return appointmentRepository.findByCancellationToken(token.trim())
+                .map(appt -> {
+                    appt.setStatus(Appointment.AppointmentStatus.CANCELLED);
+                    String existingNotes = appt.getNotes() != null ? appt.getNotes().trim() : "";
+                    String reasonTag = "[CANCELLED Reason: " + finalReason + "]";
+                    appt.setNotes(existingNotes.isEmpty() ? reasonTag : existingNotes + " | " + reasonTag);
+                    Appointment updated = appointmentRepository.save(appt);
+
+                    if (auditService != null) {
+                        Customer customer = null;
+                        if (appt.getCustomerEmail() != null && !appt.getCustomerEmail().isBlank()) {
+                            customer = customerRepository.findByEmail(appt.getCustomerEmail().trim()).orElse(null);
+                        }
+                        auditService.logActivity(
+                                appt.getTenantId(),
+                                customer != null ? customer.getId() : null,
+                                updated.getId(),
+                                updated.getCustomerName(),
+                                updated.getCustomerEmail(),
+                                updated.getCustomerPhone(),
+                                "CANCELLED",
+                                "CUSTOMER",
+                                finalReason
+                        );
+                    }
+
+                    return ResponseEntity.ok(Map.of(
+                            "message", "Appointment cancelled successfully",
+                            "status", "CANCELLED",
+                            "appointment", updated
+                    ));
+                })
+                .orElse(ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", "Appointment not found for provided token")));
     }
 }

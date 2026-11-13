@@ -32,6 +32,9 @@ public class Appointment {
     @Column(length = 120)
     private String stationPreference;
 
+    @Column(name = "cancellation_token", length = 64)
+    private String cancellationToken;
+
     @ManyToOne
     @JoinColumn(name = "service_id", nullable = false)
     private ServiceEntity service;
@@ -71,6 +74,9 @@ public class Appointment {
 
     public String getStationPreference() { return stationPreference; }
     public void setStationPreference(String stationPreference) { this.stationPreference = stationPreference; }
+
+    public String getCancellationToken() { return cancellationToken; }
+    public void setCancellationToken(String cancellationToken) { this.cancellationToken = cancellationToken; }
 
     public ServiceEntity getService() { return service; }
     public void setService(ServiceEntity service) { this.service = service; }

@@ -89,8 +89,8 @@ export default function AdminDailyTimelineCalendar({
   const totalGridHeightPx = totalStoreHours * HOUR_ROW_HEIGHT_PX;
 
   // Fetch active tenant staff and appointments
-  const fetchScheduleData = useCallback(async () => {
-    setLoading(true);
+  const fetchScheduleData = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     const token = authToken || localStorage.getItem('accessToken') || localStorage.getItem('token');
     const headers = {
       'X-Tenant-ID': tenantKey,
@@ -111,12 +111,17 @@ export default function AdminDailyTimelineCalendar({
     } catch (err) {
       console.error('Failed to load daily staff timeline data:', err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [tenantKey, authToken]);
 
   useEffect(() => {
     fetchScheduleData();
+    // Background polling every 30 seconds for live updates
+    const pollId = setInterval(() => {
+      fetchScheduleData(true);
+    }, 30000);
+    return () => clearInterval(pollId);
   }, [fetchScheduleData]);
 
   // Day navigation handlers (Previous Day, Today, Next Day)
@@ -331,6 +336,14 @@ export default function AdminDailyTimelineCalendar({
         </div>
       </div>
 
+      {/* Sunday Closed Alert */}
+      {selectedDate.getDay() === 0 && (
+        <div className="alert alert-warning border-0 rounded-0 m-0 px-4 py-2 small d-flex align-items-center gap-2">
+          <span>⚠️</span>
+          <span>Store is closed on Sundays. Operating hours: Monday – Saturday: 10:00 AM – 7:00 PM.</span>
+        </div>
+      )}
+
       {/* ==================== 2. STAFF COLUMN TIMELINE GRID ==================== */}
       {loading ? (
         <div className="text-center py-5">
@@ -420,20 +433,22 @@ export default function AdminDailyTimelineCalendar({
                   style={{ top: `${totalGridHeightPx}px` }}
                 />
 
-                {/* ==================== 3. REAL-TIME DYNAMIC TIMELINE INDICATOR ==================== */}
-                <div
-                  className={`timeline-live-indicator ${
-                    !liveTimeIndicator.isWithinStoreHours ? 'outside-hours' : ''
-                  }`}
-                  style={{ top: `${liveTimeIndicator.topPx}px` }}
-                  title={`Current Time: ${liveTimeIndicator.formattedTime}`}
-                >
-                  <span className="live-indicator-time-pill">
-                    <span className="live-pulse-dot" />
-                    {liveTimeIndicator.formattedTime}
-                  </span>
-                  <div className="live-indicator-line" />
-                </div>
+                {/* ==================== 3. REAL-TIME DYNAMIC TIMELINE INDICATOR (ACTIVE ON TODAY) ==================== */}
+                {isSelectedDateToday && (
+                  <div
+                    className={`timeline-live-indicator ${
+                      !liveTimeIndicator.isWithinStoreHours ? 'outside-hours' : ''
+                    }`}
+                    style={{ top: `${liveTimeIndicator.topPx}px` }}
+                    title={`Current Time: ${liveTimeIndicator.formattedTime}`}
+                  >
+                    <span className="live-indicator-time-pill">
+                      <span className="live-pulse-dot" />
+                      {liveTimeIndicator.formattedTime}
+                    </span>
+                    <div className="live-indicator-line" />
+                  </div>
+                )}
 
                 {/* Individual Staff Member Columns */}
                 {staffColumns.map((col) => {

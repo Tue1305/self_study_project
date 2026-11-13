@@ -344,6 +344,11 @@
                     </a>
                 </li>
                 <li class="nav-item">
+                    <a id="navCalendarLink" class="nav-link btn btn-pink text-white btn-sm px-3 fw-semibold me-1" href="./admin-calendar.html">
+                        <i class="bi bi-calendar-check me-1"></i> Calendar
+                    </a>
+                </li>
+                <li class="nav-item">
                     <a id="navTechsLink" class="nav-link btn btn-light btn-sm px-3 fw-semibold text-dark me-1" href="./nail-techs.html">
                         <i class="bi bi-people me-1"></i> Nail Techs
                     </a>
@@ -444,6 +449,9 @@
     // Apply navigation links
     const tenantQuery = `?tenant=${encodeURIComponent(activeTenant)}`;
     document.getElementById('navDashboardLink').href = `./admin-dashboard.html${tenantQuery}`;
+    if (document.getElementById('navCalendarLink')) {
+        document.getElementById('navCalendarLink').href = `./admin-calendar.html${tenantQuery}`;
+    }
     document.getElementById('navTechsLink').href = `./nail-techs.html${tenantQuery}`;
     document.getElementById('navCustomersLink').href = `./admin-customers.html${tenantQuery}`;
     document.getElementById('navWebsiteLink').href = activeTenant === 'luxe' ? `./booking.html${tenantQuery}` : `./index.html${tenantQuery}`;
@@ -544,8 +552,8 @@
         const totalStoreMinutes = totalStoreHours * 60;
         const totalGridHeightPx = totalStoreHours * HOUR_ROW_HEIGHT_PX;
 
-        const fetchScheduleData = useCallback(async () => {
-            setLoading(true);
+        const fetchScheduleData = useCallback(async (silent = false) => {
+            if (!silent) setLoading(true);
             const headers = {
                 'X-Tenant-ID': activeTenant,
                 ...(token ? { 'Authorization': 'Bearer ' + token } : {})
@@ -563,12 +571,17 @@
             } catch (err) {
                 console.error('Error loading timeline data:', err);
             } finally {
-                setLoading(false);
+                if (!silent) setLoading(false);
             }
         }, []);
 
         useEffect(() => {
             fetchScheduleData();
+            // Background polling every 30 seconds for live updates
+            const pollId = setInterval(() => {
+                fetchScheduleData(true);
+            }, 30000);
+            return () => clearInterval(pollId);
         }, [fetchScheduleData]);
 
         const selectedDateKey = useMemo(() => toDateKey(selectedDate), [selectedDate]);
@@ -728,6 +741,12 @@
                 )
             ),
 
+            /* Sunday Closed Notice */
+            selectedDate.getDay() === 0 && h('div', { className: 'alert alert-warning border-0 rounded-0 m-0 px-4 py-2 small d-flex align-items-center gap-2' },
+                h('i', { className: 'bi bi-info-circle-fill text-warning' }),
+                h('span', null, 'Store is closed on Sundays. Operating hours: Monday – Saturday: 10:00 AM – 7:00 PM.')
+            ),
+
             /* 2. Staff Column Timeline Grid */
             loading
                 ? h('div', { className: 'text-center py-5' },
@@ -786,8 +805,8 @@
                                 ),
                                 h('div', { className: 'timeline-hour-line', style: { top: `${totalGridHeightPx}px` } }),
 
-                                /* Real-Time Dynamic Timeline Indicator */
-                                h('div', {
+                                /* Real-Time Dynamic Timeline Indicator (Active on Today) */
+                                isSelectedDateToday && h('div', {
                                     className: `timeline-live-indicator ${!liveTimeIndicator.isWithinStoreHours ? 'outside-hours' : ''}`,
                                     style: { top: `${liveTimeIndicator.topPx}px` },
                                     title: `Current Time: ${liveTimeIndicator.formattedTime}`

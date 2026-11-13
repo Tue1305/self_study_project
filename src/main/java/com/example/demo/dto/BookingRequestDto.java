@@ -31,6 +31,7 @@ public class BookingRequestDto {
     private ServiceEntity service;
     private List<Long> serviceIds = new ArrayList<>();
     private java.util.Map<String, Long> serviceStaffAssignments = new java.util.HashMap<>();
+    private Boolean manualOverride = false;
 
     public static class GuestBookingItem {
         private Integer guestNumber;
@@ -199,5 +200,13 @@ public class BookingRequestDto {
 
     public void setServiceStaffAssignments(java.util.Map<String, Long> serviceStaffAssignments) {
         this.serviceStaffAssignments = serviceStaffAssignments != null ? serviceStaffAssignments : new java.util.HashMap<>();
+    }
+
+    public Boolean getManualOverride() {
+        return manualOverride != null && manualOverride;
+    }
+
+    public void setManualOverride(Boolean manualOverride) {
+        this.manualOverride = manualOverride;
     }
 }

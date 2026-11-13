@@ -234,6 +234,19 @@ public class AppointmentController {
 
         String tenantId = tenantContextResolver.resolveTenantId(request);
 
+        // For manual/walk-in admin overrides, provide friendly defaults if omitted
+        if (Boolean.TRUE.equals(bookingRequest.getManualOverride())) {
+            if (bookingRequest.getCustomerName() == null || bookingRequest.getCustomerName().isBlank()) {
+                bookingRequest.setCustomerName("Walk-In Guest");
+            }
+            if (bookingRequest.getCustomerEmail() == null || bookingRequest.getCustomerEmail().isBlank()) {
+                bookingRequest.setCustomerEmail("walkin@salon.com");
+            }
+            if (bookingRequest.getCustomerPhone() == null || bookingRequest.getCustomerPhone().isBlank()) {
+                bookingRequest.setCustomerPhone("(555) 000-0000");
+            }
+        }
+
         // Validate technician belongs to active tenant and has no conflict at the requested time slot
         UserEntity resolvedTech = null;
         if (bookingRequest.getNailTech() != null && bookingRequest.getNailTech().getId() != null) {
@@ -244,12 +257,13 @@ public class AppointmentController {
             }
             resolvedTech = tenantTech.get();
 
-            boolean hasConflict = appointmentRepository.existsByTenantIdAndNailTechIdAndAppointmentTimeAndStatusNot(
-                    tenantId,
-                    techId,
-                    bookingRequest.getAppointmentTime(),
-                    Appointment.AppointmentStatus.CANCELLED
-            );
+            boolean hasConflict = !Boolean.TRUE.equals(bookingRequest.getManualOverride()) &&
+                    appointmentRepository.existsByTenantIdAndNailTechIdAndAppointmentTimeAndStatusNot(
+                            tenantId,
+                            techId,
+                            bookingRequest.getAppointmentTime(),
+                            Appointment.AppointmentStatus.CANCELLED
+                    );
             if (hasConflict) {
                 return ResponseEntity.status(HttpStatus.CONFLICT)
                         .body(Map.of("message", "This technician is already booked at the selected time slot. Please choose another time or technician."));

@@ -197,11 +197,12 @@
             position: relative;
             border-right: 1px solid var(--timeline-border);
             z-index: 2;
+            cursor: pointer;
             transition: background-color 0.15s ease;
         }
 
         .timeline-staff-column:hover {
-            background-color: rgba(248, 249, 250, 0.6);
+            background-color: rgba(233, 30, 99, 0.035);
         }
 
         /* Appointment Block Cards */
@@ -223,8 +224,52 @@
 
         .timeline-appt-block:hover {
             transform: translateY(-1px);
-            box-shadow: 0 6px 14px rgba(15, 23, 42, 0.14);
+            box-shadow: 0 6px 14px rgba(15, 23, 42, 0.16);
             z-index: 10;
+        }
+
+        /* Side-by-side collision stacking styles */
+        .timeline-appt-block.is-colliding {
+            box-shadow: 0 2px 8px rgba(245, 159, 0, 0.22);
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            border-left-width: 4px;
+        }
+
+        .collision-badge {
+            font-size: 0.62rem;
+            font-weight: 700;
+            padding: 1px 4px;
+            border-radius: 4px;
+            background-color: rgba(245, 159, 0, 0.2);
+            color: #855b00;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+        }
+
+        /* Quick Walk-In Modal Styling */
+        .walkin-service-catalog {
+            max-height: 210px;
+            overflow-y: auto;
+        }
+
+        .service-select-card {
+            transition: all 0.15s ease;
+            user-select: none;
+            cursor: pointer;
+        }
+
+        .service-select-card:hover {
+            border-color: var(--bs-primary-pink);
+            background-color: #fff9fb;
+        }
+
+        .service-select-card.selected {
+            border-color: var(--bs-primary-pink) !important;
+            background-color: #fff0f5 !important;
+        }
+
+        .border-pink {
+            border-color: var(--bs-primary-pink) !important;
         }
 
         .timeline-appt-block.status-pending {
@@ -531,13 +576,128 @@
         return `${hours12}:${String(mins).padStart(2, '0')} ${period}`;
     }
 
+    /**
+     * Side-by-Side Collision Stacking Algorithm
+     */
+    function computeStaffColumnLayout(colAppointments, openHour) {
+        if (!colAppointments || colAppointments.length === 0) return [];
+
+        const parsed = colAppointments.map(apt => {
+            const dt = new Date(apt.appointmentTime);
+            const startMinutes = dt.getHours() * 60 + dt.getMinutes();
+            const durationMinutes = Number((apt.service && apt.service.durationMinutes) || 45);
+            const endMinutes = startMinutes + durationMinutes;
+            return { apt, startMinutes, endMinutes, durationMinutes };
+        });
+
+        parsed.sort((a, b) => {
+            if (a.startMinutes !== b.startMinutes) return a.startMinutes - b.startMinutes;
+            return b.durationMinutes - a.durationMinutes;
+        });
+
+        const clusters = [];
+        let currentCluster = [];
+        let clusterEnd = -1;
+
+        for (const item of parsed) {
+            if (currentCluster.length === 0) {
+                currentCluster.push(item);
+                clusterEnd = item.endMinutes;
+            } else if (item.startMinutes < clusterEnd) {
+                currentCluster.push(item);
+                clusterEnd = Math.max(clusterEnd, item.endMinutes);
+            } else {
+                clusters.push(currentCluster);
+                currentCluster = [item];
+                clusterEnd = item.endMinutes;
+            }
+        }
+        if (currentCluster.length > 0) clusters.push(currentCluster);
+
+        const openMinutes = openHour * 60;
+        const layoutItems = [];
+
+        for (const cluster of clusters) {
+            const subColumnEnds = [];
+
+            for (const item of cluster) {
+                let assignedCol = -1;
+                for (let c = 0; c < subColumnEnds.length; c++) {
+                    if (subColumnEnds[c] <= item.startMinutes) {
+                        assignedCol = c;
+                        subColumnEnds[c] = item.endMinutes;
+                        break;
+                    }
+                }
+                if (assignedCol === -1) {
+                    assignedCol = subColumnEnds.length;
+                    subColumnEnds.push(item.endMinutes);
+                }
+                item.colIndex = assignedCol;
+            }
+
+            const totalCols = subColumnEnds.length;
+            const isColliding = totalCols > 1;
+
+            for (const item of cluster) {
+                const offsetMinutes = Math.max(0, item.startMinutes - openMinutes);
+                const topPx = (offsetMinutes / 60) * HOUR_ROW_HEIGHT_PX;
+                const heightPx = Math.max(38, (item.durationMinutes / 60) * HOUR_ROW_HEIGHT_PX);
+                const timeRangeLabel = `${formatMinutesToTimeLabel(item.startMinutes)} – ${formatMinutesToTimeLabel(item.endMinutes)}`;
+
+                let leftStyle;
+                let widthStyle;
+
+                if (isColliding) {
+                    const colWidthPct = 100 / totalCols;
+                    leftStyle = `calc(${item.colIndex * colWidthPct}% + 3px)`;
+                    widthStyle = `calc(${colWidthPct}% - 6px)`;
+                } else {
+                    leftStyle = '6px';
+                    widthStyle = 'calc(100% - 12px)';
+                }
+
+                layoutItems.push({
+                    apt: item.apt,
+                    topPx,
+                    heightPx,
+                    leftStyle,
+                    widthStyle,
+                    timeRangeLabel,
+                    isColliding,
+                    colIndex: item.colIndex,
+                    totalCols
+                });
+            }
+        }
+
+        return layoutItems;
+    }
+
     function AdminDailyTimelineCalendar() {
         const [selectedDate, setSelectedDate] = useState(() => new Date());
         const [staffList, setStaffList] = useState([]);
         const [appointments, setAppointments] = useState([]);
+        const [servicesCatalog, setServicesCatalog] = useState([]);
         const [loading, setLoading] = useState(true);
         const [selectedAppointment, setSelectedAppointment] = useState(null);
         const [now, setNow] = useState(() => new Date());
+
+        const [walkInModal, setWalkInModal] = useState({
+            isOpen: false,
+            techId: null,
+            techName: '',
+            isUnassigned: false,
+            date: '',
+            time: '10:00',
+            customerName: '',
+            customerPhone: '',
+            customerEmail: '',
+            selectedServiceIds: [],
+            notes: '',
+            saving: false,
+            error: null
+        });
 
         // Real-time useEffect timer updating the timeline indicator
         useEffect(() => {
@@ -560,14 +720,18 @@
             };
 
             try {
-                const [staffRes, apptRes] = await Promise.all([
+                const [staffRes, apptRes, srvRes] = await Promise.all([
                     fetch('/api/nail-techs', { headers }),
-                    fetch('/api/appointments', { headers })
+                    fetch('/api/appointments', { headers }),
+                    fetch('/api/services', { headers })
                 ]);
                 const staffData = staffRes.ok ? await staffRes.json() : [];
                 const apptData = apptRes.ok ? await apptRes.json() : [];
+                const srvData = srvRes.ok ? await srvRes.json() : [];
+
                 setStaffList(Array.isArray(staffData) ? staffData : []);
                 setAppointments(Array.isArray(apptData) ? apptData : []);
+                setServicesCatalog(Array.isArray(srvData) ? srvData : []);
             } catch (err) {
                 console.error('Error loading timeline data:', err);
             } finally {
@@ -644,26 +808,6 @@
             };
         }, [now]);
 
-        const computeAppointmentBlockStyle = (apt) => {
-            const dt = new Date(apt.appointmentTime);
-            const startMinutes = dt.getHours() * 60 + dt.getMinutes();
-            const durationMinutes = Number((apt.service && apt.service.durationMinutes) || 45);
-            const openMinutes = DEFAULT_OPEN_HOUR * 60;
-
-            const offsetMinutes = Math.max(0, startMinutes - openMinutes);
-            const topPx = (offsetMinutes / 60) * HOUR_ROW_HEIGHT_PX;
-            const heightPx = Math.max(38, (durationMinutes / 60) * HOUR_ROW_HEIGHT_PX);
-
-            const endMinutes = startMinutes + durationMinutes;
-            const timeRangeLabel = `${formatMinutesToTimeLabel(startMinutes)} – ${formatMinutesToTimeLabel(endMinutes)}`;
-
-            return {
-                top: `${topPx}px`,
-                height: `${heightPx}px`,
-                timeRangeLabel
-            };
-        };
-
         const handleShiftDay = (delta) => {
             setSelectedDate(prev => {
                 const next = new Date(prev);
@@ -683,12 +827,125 @@
                 });
                 if (res.ok) {
                     setSelectedAppointment(null);
-                    fetchScheduleData();
+                    fetchScheduleData(true);
                 } else {
                     alert('Failed to update appointment status.');
                 }
             } catch (err) {
                 console.error('Error updating status:', err);
+            }
+        };
+
+        const handleColumnClick = (e, col) => {
+            if (e.target.closest('.timeline-appt-block')) return;
+            const rect = e.currentTarget.getBoundingClientRect();
+            const clickY = e.clientY - rect.top;
+            const elapsedMins = (clickY / HOUR_ROW_HEIGHT_PX) * 60;
+            const roundedMins = Math.round(elapsedMins / 15) * 15;
+            const targetTotalMins = DEFAULT_OPEN_HOUR * 60 + roundedMins;
+            const clampedTotalMins = Math.max(DEFAULT_OPEN_HOUR * 60, Math.min(DEFAULT_CLOSE_HOUR * 60 - 15, targetTotalMins));
+
+            const hours24 = Math.floor(clampedTotalMins / 60);
+            const mins = clampedTotalMins % 60;
+            const timeStr = `${String(hours24).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+
+            setWalkInModal({
+                isOpen: true,
+                techId: col.isUnassigned ? null : col.techId,
+                techName: col.name,
+                isUnassigned: col.isUnassigned,
+                date: selectedDateKey,
+                time: timeStr,
+                customerName: '',
+                customerPhone: '',
+                customerEmail: '',
+                selectedServiceIds: servicesCatalog.length > 0 ? [servicesCatalog[0].id] : [],
+                notes: '',
+                saving: false,
+                error: null
+            });
+        };
+
+        const handleQuickFillWalkIn = () => {
+            setWalkInModal(prev => ({
+                ...prev,
+                customerName: 'Walk-In Guest',
+                customerPhone: '(555) 000-0000',
+                customerEmail: 'walkin@salon.com',
+                notes: 'Walk-in guest (Front desk entry)'
+            }));
+        };
+
+        const handleToggleService = (srvId) => {
+            setWalkInModal(prev => {
+                const exists = prev.selectedServiceIds.includes(srvId);
+                const next = exists
+                    ? prev.selectedServiceIds.filter(id => id !== srvId)
+                    : [...prev.selectedServiceIds, srvId];
+                return { ...prev, selectedServiceIds: next };
+            });
+        };
+
+        const walkInSelectedServices = useMemo(() => {
+            return servicesCatalog.filter(s => walkInModal.selectedServiceIds.includes(s.id));
+        }, [servicesCatalog, walkInModal.selectedServiceIds]);
+
+        const walkInTotalCost = useMemo(() => {
+            return walkInSelectedServices.reduce((sum, s) => sum + Number(s.price || 0), 0);
+        }, [walkInSelectedServices]);
+
+        const walkInTotalDuration = useMemo(() => {
+            return walkInSelectedServices.reduce((sum, s) => sum + Number(s.durationMinutes || 45), 0);
+        }, [walkInSelectedServices]);
+
+        const handleSubmitWalkIn = async (e) => {
+            if (e) e.preventDefault();
+            if (!walkInModal.selectedServiceIds || walkInModal.selectedServiceIds.length === 0) {
+                setWalkInModal(prev => ({ ...prev, error: 'Please select at least one service.' }));
+                return;
+            }
+
+            setWalkInModal(prev => ({ ...prev, saving: true, error: null }));
+
+            const custName = walkInModal.customerName.trim() || 'Walk-In Guest';
+            const custPhone = walkInModal.customerPhone.trim() || '(555) 000-0000';
+            const custEmail = walkInModal.customerEmail.trim() || 'walkin@salon.com';
+            const appointmentTimeStr = `${walkInModal.date}T${walkInModal.time}:00`;
+
+            const payload = {
+                appointmentTime: appointmentTimeStr,
+                customerName: custName,
+                customerPhone: custPhone,
+                customerEmail: custEmail,
+                notes: walkInModal.notes ? walkInModal.notes.trim() : 'Walk-in manual booking',
+                nailTech: walkInModal.techId ? { id: Number(walkInModal.techId) } : null,
+                serviceIds: walkInModal.selectedServiceIds.map(Number),
+                manualOverride: true
+            };
+
+            const headers = {
+                'Content-Type': 'application/json',
+                'X-Tenant-ID': activeTenant,
+                ...(token ? { 'Authorization': 'Bearer ' + token } : {})
+            };
+
+            try {
+                const res = await fetch('/api/appointments', {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify(payload)
+                });
+
+                if (!res.ok) {
+                    const errData = await res.json().catch(() => ({}));
+                    throw new Error(errData.message || 'Failed to create walk-in appointment.');
+                }
+
+                setWalkInModal(prev => ({ ...prev, isOpen: false, saving: false }));
+                await fetchScheduleData(true);
+            } catch (err) {
+                console.error('Walk-in booking error:', err);
+                setWalkInModal(prev => ({ ...prev, saving: false, error: err.message || 'Error creating walk-in booking.' }));
             }
         };
 
@@ -706,7 +963,7 @@
                             isSelectedDateToday && h('span', { className: 'badge rounded-pill live-today-badge' }, 'Today • Live')
                         ),
                         h('p', { className: 'text-muted small mb-0 mt-1' },
-                            `Daily Staff Timeline • Store Hours: 10:00 AM – 7:00 PM (${dayAppointments.length} booking${dayAppointments.length === 1 ? '' : 's'})`
+                            `Daily Staff Timeline • Store Hours: 10:00 AM – 7:00 PM (${dayAppointments.length} booking${dayAppointments.length === 1 ? '' : 's'}) • Click empty slots to add Walk-In`
                         )
                     )
                 ),
@@ -818,25 +1075,42 @@
                                     h('div', { className: 'live-indicator-line' })
                                 ),
 
-                                /* Staff Columns + Positioned Appointment Blocks */
+                                /* Staff Columns + Side-by-Side Positioned Appointment Blocks */
                                 staffColumns.map(col => {
                                     const colAppts = dayAppointments.filter(apt =>
                                         col.isUnassigned ? (!apt.nailTech || !apt.nailTech.id) : (apt.nailTech && apt.nailTech.id === col.techId)
                                     );
 
-                                    return h('div', { key: col.id, className: 'timeline-staff-column' },
-                                        colAppts.map(apt => {
-                                            const bStyle = computeAppointmentBlockStyle(apt);
+                                    const layoutBlocks = computeStaffColumnLayout(colAppts, DEFAULT_OPEN_HOUR);
+
+                                    return h('div', {
+                                        key: col.id,
+                                        className: 'timeline-staff-column',
+                                        onClick: (e) => handleColumnClick(e, col),
+                                        title: `Click empty slot on ${col.name}'s column to book walk-in`
+                                    },
+                                        layoutBlocks.map(item => {
+                                            const { apt, topPx, heightPx, leftStyle, widthStyle, timeRangeLabel, isColliding } = item;
                                             const statusLower = String(apt.status || 'PENDING').toLowerCase();
 
                                             return h('div', {
                                                 key: apt.id,
-                                                className: `timeline-appt-block status-${statusLower}`,
-                                                style: { top: bStyle.top, height: bStyle.height },
-                                                onClick: () => setSelectedAppointment(apt)
+                                                className: `timeline-appt-block status-${statusLower} ${isColliding ? 'is-colliding' : ''}`,
+                                                style: {
+                                                    top: `${topPx}px`,
+                                                    height: `${heightPx}px`,
+                                                    left: leftStyle,
+                                                    width: widthStyle
+                                                },
+                                                onClick: (e) => {
+                                                    e.stopPropagation();
+                                                    setSelectedAppointment(apt);
+                                                },
+                                                title: `${apt.customerName || 'Walk-In'} - ${(apt.service && apt.service.name) || 'Service'} (${timeRangeLabel})`
                                             },
                                                 h('div', { className: 'd-flex justify-content-between align-items-start gap-1' },
-                                                    h('span', { className: 'appt-time-badge' }, bStyle.timeRangeLabel)
+                                                    h('span', { className: 'appt-time-badge' }, timeRangeLabel),
+                                                    isColliding && h('span', { className: 'collision-badge', title: 'Side-by-side overlapping appointment' }, 'Overlap')
                                                 ),
                                                 h('div', { className: 'appt-customer-name text-truncate' }, apt.customerName || 'Walk-In Guest'),
                                                 h('div', { className: 'appt-service-name text-truncate' }, (apt.service && apt.service.name) || 'Service')
@@ -849,7 +1123,197 @@
                     )
                   ),
 
-            /* 3. Appointment Details Modal */
+            /* 3. Quick Walk-In / Manual Booking Modal */
+            walkInModal.isOpen && h('div', {
+                className: 'modal show d-block',
+                tabIndex: '-1',
+                style: { backgroundColor: 'rgba(15, 23, 42, 0.5)', zIndex: 1070 },
+                onClick: () => setWalkInModal(prev => ({ ...prev, isOpen: false }))
+            },
+                h('div', {
+                    className: 'modal-dialog modal-dialog-centered modal-lg',
+                    onClick: (e) => e.stopPropagation()
+                },
+                    h('div', { className: 'modal-content border-0 shadow-lg rounded-4 overflow-hidden' },
+                        h('div', { className: 'modal-header bg-light border-bottom py-3 px-4' },
+                            h('div', null,
+                                h('h5', { className: 'modal-title fw-bold text-dark mb-0' }, '⚡ Quick Walk-In / Manual Booking'),
+                                h('p', { className: 'text-muted small mb-0 mt-1' },
+                                    `Book directly for `,
+                                    h('strong', null, walkInModal.techName),
+                                    ` • ${walkInModal.date} at ${walkInModal.time}`
+                                )
+                            ),
+                            h('button', {
+                                type: 'button',
+                                className: 'btn-close',
+                                onClick: () => setWalkInModal(prev => ({ ...prev, isOpen: false }))
+                            })
+                        ),
+                        h('div', { className: 'modal-body p-4' },
+                            walkInModal.error && h('div', { className: 'alert alert-danger py-2 px-3 small rounded-3 mb-3' }, walkInModal.error),
+
+                            /* Quick Fill Shortcut */
+                            h('div', { className: 'd-flex justify-content-between align-items-center mb-3 p-2 rounded-3 bg-light border' },
+                                h('span', { className: 'small text-muted fw-semibold' }, 'Need to seat an unannounced walk-in immediately?'),
+                                h('button', {
+                                    type: 'button',
+                                    className: 'btn btn-outline-pink btn-sm fw-semibold',
+                                    onClick: handleQuickFillWalkIn
+                                }, '⚡ Quick Fill: Walk-In Guest')
+                            ),
+
+                            h('div', { className: 'row g-3' },
+                                /* Assigned Tech */
+                                h('div', { className: 'col-md-6' },
+                                    h('label', { className: 'form-label small fw-bold text-secondary' }, 'Assigned Technician'),
+                                    h('select', {
+                                        className: 'form-select form-select-sm',
+                                        value: walkInModal.techId ?? '',
+                                        onChange: (e) => {
+                                            const val = e.target.value ? Number(e.target.value) : null;
+                                            const match = staffList.find(t => t.id === val);
+                                            setWalkInModal(prev => ({
+                                                ...prev,
+                                                techId: val,
+                                                techName: match ? (match.name || match.username) : 'Anyone Available'
+                                            }));
+                                        }
+                                    },
+                                        h('option', { value: '' }, 'Anyone Available (Open Queue)'),
+                                        staffList.map(t =>
+                                            h('option', { key: t.id, value: t.id }, `${t.name || t.username} (${getStaffPronouns(t)})`)
+                                        )
+                                    )
+                                ),
+
+                                /* Date & Time */
+                                h('div', { className: 'col-md-3' },
+                                    h('label', { className: 'form-label small fw-bold text-secondary' }, 'Date'),
+                                    h('input', {
+                                        type: 'date',
+                                        className: 'form-control form-control-sm',
+                                        value: walkInModal.date,
+                                        onChange: (e) => setWalkInModal(prev => ({ ...prev, date: e.target.value }))
+                                    })
+                                ),
+                                h('div', { className: 'col-md-3' },
+                                    h('label', { className: 'form-label small fw-bold text-secondary' }, 'Start Time'),
+                                    h('input', {
+                                        type: 'time',
+                                        className: 'form-control form-control-sm',
+                                        value: walkInModal.time,
+                                        onChange: (e) => setWalkInModal(prev => ({ ...prev, time: e.target.value }))
+                                    })
+                                ),
+
+                                /* Customer Info */
+                                h('div', { className: 'col-md-4' },
+                                    h('label', { className: 'form-label small fw-bold text-secondary' },
+                                        'Customer Name ', h('span', { className: 'text-danger' }, '*')
+                                    ),
+                                    h('input', {
+                                        type: 'text',
+                                        className: 'form-control form-control-sm',
+                                        placeholder: 'e.g. Walk-In Guest or Jane Doe',
+                                        value: walkInModal.customerName,
+                                        onChange: (e) => setWalkInModal(prev => ({ ...prev, customerName: e.target.value }))
+                                    })
+                                ),
+                                h('div', { className: 'col-md-4' },
+                                    h('label', { className: 'form-label small fw-bold text-secondary' }, 'Phone Number'),
+                                    h('input', {
+                                        type: 'tel',
+                                        className: 'form-control form-control-sm',
+                                        placeholder: '(555) 000-0000',
+                                        value: walkInModal.customerPhone,
+                                        onChange: (e) => setWalkInModal(prev => ({ ...prev, customerPhone: e.target.value }))
+                                    })
+                                ),
+                                h('div', { className: 'col-md-4' },
+                                    h('label', { className: 'form-label small fw-bold text-secondary' }, 'Email Address'),
+                                    h('input', {
+                                        type: 'email',
+                                        className: 'form-control form-control-sm',
+                                        placeholder: 'walkin@salon.com',
+                                        value: walkInModal.customerEmail,
+                                        onChange: (e) => setWalkInModal(prev => ({ ...prev, customerEmail: e.target.value }))
+                                    })
+                                ),
+
+                                /* Service Selection */
+                                h('div', { className: 'col-12' },
+                                    h('div', { className: 'd-flex justify-content-between align-items-center mb-2' },
+                                        h('label', { className: 'form-label small fw-bold text-secondary mb-0' },
+                                            'Select Service(s) ', h('span', { className: 'text-danger' }, '*')
+                                        ),
+                                        h('span', { className: 'badge bg-light text-dark border' },
+                                            `${walkInSelectedServices.length} Selected • $${walkInTotalCost.toFixed(2)} • ${walkInTotalDuration} mins`
+                                        )
+                                    ),
+                                    h('div', { className: 'walkin-service-catalog border rounded-3 p-2 bg-light' },
+                                        servicesCatalog.length === 0
+                                            ? h('p', { className: 'text-muted small mb-0 p-2' }, 'Loading service catalog...')
+                                            : h('div', { className: 'row g-2' },
+                                                servicesCatalog.map(srv => {
+                                                    const isChecked = walkInModal.selectedServiceIds.includes(srv.id);
+                                                    return h('div', { key: srv.id, className: 'col-md-6 col-lg-4' },
+                                                        h('div', {
+                                                            className: `service-select-card p-2 rounded-2 border d-flex align-items-center gap-2 ${isChecked ? 'selected bg-white border-pink shadow-sm' : 'bg-white'}`,
+                                                            onClick: () => handleToggleService(srv.id)
+                                                        },
+                                                            h('input', {
+                                                                type: 'checkbox',
+                                                                className: 'form-check-input mt-0',
+                                                                checked: isChecked,
+                                                                onChange: () => handleToggleService(srv.id),
+                                                                onClick: (e) => e.stopPropagation()
+                                                            }),
+                                                            h('div', { className: 'overflow-hidden flex-grow-1' },
+                                                                h('div', { className: 'fw-semibold small text-truncate text-dark' }, srv.name),
+                                                                h('div', { className: 'text-muted extra-small' },
+                                                                    `$${Number(srv.price || 0).toFixed(2)} • ${srv.durationMinutes || 45} mins`
+                                                                )
+                                                            )
+                                                        )
+                                                    );
+                                                })
+                                              )
+                                    )
+                                ),
+
+                                /* Notes */
+                                h('div', { className: 'col-12' },
+                                    h('label', { className: 'form-label small fw-bold text-secondary' }, 'Notes / Station Request'),
+                                    h('input', {
+                                        type: 'text',
+                                        className: 'form-control form-control-sm',
+                                        placeholder: 'e.g. Station 2, prefers quiet technician, color request',
+                                        value: walkInModal.notes,
+                                        onChange: (e) => setWalkInModal(prev => ({ ...prev, notes: e.target.value }))
+                                    })
+                                )
+                            )
+                        ),
+                        h('div', { className: 'modal-footer bg-light border-top d-flex justify-content-between' },
+                            h('button', {
+                                type: 'button',
+                                className: 'btn btn-sm btn-outline-secondary px-3',
+                                onClick: () => setWalkInModal(prev => ({ ...prev, isOpen: false })),
+                                disabled: walkInModal.saving
+                            }, 'Cancel'),
+                            h('button', {
+                                type: 'button',
+                                className: 'btn btn-sm btn-pink text-white fw-semibold px-4',
+                                onClick: handleSubmitWalkIn,
+                                disabled: walkInModal.saving
+                            }, walkInModal.saving ? 'Saving Walk-In...' : '⚡ Confirm & Save Booking')
+                        )
+                    )
+                )
+            ),
+
+            /* 4. Appointment Details Modal */
             selectedAppointment && h('div', {
                 className: 'modal show d-block',
                 tabIndex: '-1',

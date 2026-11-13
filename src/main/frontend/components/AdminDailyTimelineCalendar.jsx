@@ -54,6 +54,120 @@ function formatMinutesToTimeLabel(totalMinutes) {
   return `${hours12}:${String(mins).padStart(2, '0')} ${period}`;
 }
 
+/**
+ * Side-by-Side Collision Stacking Algorithm
+ * Groups overlapping appointments within a technician column into clusters,
+ * assigns sub-columns, and calculates relative left/width offsets so
+ * overlapping bookings render side-by-side without hiding one another.
+ */
+function computeStaffColumnLayout(colAppointments, openHour) {
+  if (!colAppointments || colAppointments.length === 0) return [];
+
+  // 1. Parse start and end minutes
+  const parsed = colAppointments.map((apt) => {
+    const dt = new Date(apt.appointmentTime);
+    const startMinutes = dt.getHours() * 60 + dt.getMinutes();
+    const durationMinutes = Number(apt.service?.durationMinutes || 45);
+    const endMinutes = startMinutes + durationMinutes;
+    return {
+      apt,
+      startMinutes,
+      endMinutes,
+      durationMinutes,
+    };
+  });
+
+  // 2. Sort by startMinutes ascending, then longer duration first
+  parsed.sort((a, b) => {
+    if (a.startMinutes !== b.startMinutes) {
+      return a.startMinutes - b.startMinutes;
+    }
+    return b.durationMinutes - a.durationMinutes;
+  });
+
+  // 3. Cluster mutually overlapping intervals
+  const clusters = [];
+  let currentCluster = [];
+  let clusterEnd = -1;
+
+  for (const item of parsed) {
+    if (currentCluster.length === 0) {
+      currentCluster.push(item);
+      clusterEnd = item.endMinutes;
+    } else if (item.startMinutes < clusterEnd) {
+      currentCluster.push(item);
+      clusterEnd = Math.max(clusterEnd, item.endMinutes);
+    } else {
+      clusters.push(currentCluster);
+      currentCluster = [item];
+      clusterEnd = item.endMinutes;
+    }
+  }
+  if (currentCluster.length > 0) {
+    clusters.push(currentCluster);
+  }
+
+  // 4. Assign sub-columns and calculate position styles
+  const openMinutes = openHour * 60;
+  const layoutItems = [];
+
+  for (const cluster of clusters) {
+    const subColumnEnds = [];
+
+    for (const item of cluster) {
+      let assignedCol = -1;
+      for (let c = 0; c < subColumnEnds.length; c++) {
+        if (subColumnEnds[c] <= item.startMinutes) {
+          assignedCol = c;
+          subColumnEnds[c] = item.endMinutes;
+          break;
+        }
+      }
+      if (assignedCol === -1) {
+        assignedCol = subColumnEnds.length;
+        subColumnEnds.push(item.endMinutes);
+      }
+      item.colIndex = assignedCol;
+    }
+
+    const totalCols = subColumnEnds.length;
+    const isColliding = totalCols > 1;
+
+    for (const item of cluster) {
+      const offsetMinutes = Math.max(0, item.startMinutes - openMinutes);
+      const topPx = (offsetMinutes / 60) * HOUR_ROW_HEIGHT_PX;
+      const heightPx = Math.max(38, (item.durationMinutes / 60) * HOUR_ROW_HEIGHT_PX);
+      const timeRangeLabel = `${formatMinutesToTimeLabel(item.startMinutes)} – ${formatMinutesToTimeLabel(item.endMinutes)}`;
+
+      let leftStyle;
+      let widthStyle;
+
+      if (isColliding) {
+        const colWidthPct = 100 / totalCols;
+        leftStyle = `calc(${item.colIndex * colWidthPct}% + 3px)`;
+        widthStyle = `calc(${colWidthPct}% - 6px)`;
+      } else {
+        leftStyle = '6px';
+        widthStyle = 'calc(100% - 12px)';
+      }
+
+      layoutItems.push({
+        apt: item.apt,
+        topPx,
+        heightPx,
+        leftStyle,
+        widthStyle,
+        timeRangeLabel,
+        isColliding,
+        colIndex: item.colIndex,
+        totalCols,
+      });
+    }
+  }
+
+  return layoutItems;
+}
+
 export default function AdminDailyTimelineCalendar({
   tenantKey = 'default',
   tenantConfig = null,
@@ -62,22 +176,38 @@ export default function AdminDailyTimelineCalendar({
   // 1. Selected Day State (Focused exclusively on Single-Day view)
   const [selectedDate, setSelectedDate] = useState(() => new Date());
 
-  // 2. Staff & Appointments State
+  // 2. Staff, Appointments & Services State
   const [staffList, setStaffList] = useState([]);
   const [appointments, setAppointments] = useState([]);
+  const [servicesCatalog, setServicesCatalog] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedAppointment, setSelectedAppointment] = useState(null);
 
-  // 3. Real-Time Clock State (updates every 15 seconds for smooth progression)
+  // 3. Quick Walk-In / Manual Booking Modal State
+  const [walkInModal, setWalkInModal] = useState({
+    isOpen: false,
+    techId: null,
+    techName: '',
+    isUnassigned: false,
+    date: '',
+    time: '10:00',
+    customerName: '',
+    customerPhone: '',
+    customerEmail: '',
+    selectedServiceIds: [],
+    notes: '',
+    saving: false,
+    error: null,
+  });
+
+  // 4. Real-Time Clock State (updates every 15 seconds for smooth progression)
   const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
-    // Immediate sync + interval timer to advance the horizontal timeline indicator
     setNow(new Date());
     const intervalId = setInterval(() => {
       setNow(new Date());
-    }, 15000); // Updates every 15 seconds (0.25 min resolution)
-
+    }, 15000); // 15s refresh for live indicator
     return () => clearInterval(intervalId);
   }, []);
 
@@ -88,7 +218,7 @@ export default function AdminDailyTimelineCalendar({
   const totalStoreMinutes = totalStoreHours * 60;
   const totalGridHeightPx = totalStoreHours * HOUR_ROW_HEIGHT_PX;
 
-  // Fetch active tenant staff and appointments
+  // Fetch active tenant staff, appointments, and service catalog
   const fetchScheduleData = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     const token = authToken || localStorage.getItem('accessToken') || localStorage.getItem('token');
@@ -98,16 +228,19 @@ export default function AdminDailyTimelineCalendar({
     };
 
     try {
-      const [staffRes, apptRes] = await Promise.all([
+      const [staffRes, apptRes, srvRes] = await Promise.all([
         fetch('/api/nail-techs', { headers }),
         fetch('/api/appointments', { headers }),
+        fetch('/api/services', { headers }),
       ]);
 
       const staffData = staffRes.ok ? await staffRes.json() : [];
       const apptData = apptRes.ok ? await apptRes.json() : [];
+      const srvData = srvRes.ok ? await srvRes.json() : [];
 
       setStaffList(Array.isArray(staffData) ? staffData : []);
       setAppointments(Array.isArray(apptData) ? apptData : []);
+      setServicesCatalog(Array.isArray(srvData) ? srvData : []);
     } catch (err) {
       console.error('Failed to load daily staff timeline data:', err);
     } finally {
@@ -124,7 +257,7 @@ export default function AdminDailyTimelineCalendar({
     return () => clearInterval(pollId);
   }, [fetchScheduleData]);
 
-  // Day navigation handlers (Previous Day, Today, Next Day)
+  // Day navigation handlers
   const handleShiftDay = (deltaDays) => {
     setSelectedDate((prev) => {
       const next = new Date(prev);
@@ -184,7 +317,7 @@ export default function AdminDailyTimelineCalendar({
     return cols;
   }, [staffList, dayAppointments]);
 
-  // Generate hourly time axis ticks (e.g. 10:00 AM, 11:00 AM ... 7:00 PM)
+  // Generate hourly time axis ticks
   const hourAxisTicks = useMemo(() => {
     const ticks = [];
     for (let hr = openHour; hr <= closeHour; hr++) {
@@ -209,42 +342,17 @@ export default function AdminDailyTimelineCalendar({
     const clampedMinutes = Math.max(openMinutes, Math.min(closeMinutes, currentMinutes));
     const elapsedMinutes = clampedMinutes - openMinutes;
 
-    const topPercent = (elapsedMinutes / totalStoreMinutes) * 100;
     const topPx = (elapsedMinutes / 60) * HOUR_ROW_HEIGHT_PX;
 
     return {
-      currentMinutes,
       isWithinStoreHours,
-      topPercent,
       topPx,
       formattedTime: now.toLocaleTimeString('en-US', {
         hour: 'numeric',
         minute: '2-digit',
       }),
     };
-  }, [now, openHour, closeHour, totalStoreMinutes]);
-
-  // Calculate exact top & height for an appointment block
-  const computeAppointmentBlockStyle = (apt) => {
-    const dt = new Date(apt.appointmentTime);
-    const startMinutes = dt.getHours() * 60 + dt.getMinutes();
-    const durationMinutes = Number(apt.service?.durationMinutes || 45);
-    const openMinutes = openHour * 60;
-
-    const offsetMinutes = Math.max(0, startMinutes - openMinutes);
-    const topPx = (offsetMinutes / 60) * HOUR_ROW_HEIGHT_PX;
-    const heightPx = Math.max(36, (durationMinutes / 60) * HOUR_ROW_HEIGHT_PX);
-
-    const endMinutes = startMinutes + durationMinutes;
-    const timeRangeLabel = `${formatMinutesToTimeLabel(startMinutes)} – ${formatMinutesToTimeLabel(endMinutes)}`;
-
-    return {
-      top: `${topPx}px`,
-      height: `${heightPx}px`,
-      timeRangeLabel,
-      durationMinutes,
-    };
-  };
+  }, [now, openHour, closeHour]);
 
   // Status update handler (Confirm / Cancel)
   const handleUpdateStatus = async (appointmentId, newStatus) => {
@@ -262,10 +370,137 @@ export default function AdminDailyTimelineCalendar({
       );
       if (res.ok) {
         setSelectedAppointment(null);
-        fetchScheduleData();
+        fetchScheduleData(true);
       }
     } catch (err) {
       console.error('Error updating appointment status:', err);
+    }
+  };
+
+  // Click handler on empty column slot to open Quick Walk-In Modal
+  const handleColumnClick = (e, col) => {
+    if (e.target.closest('.timeline-appt-block')) {
+      return; // Clicking an appointment block is handled separately
+    }
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clickY = e.clientY - rect.top;
+    const elapsedMins = (clickY / HOUR_ROW_HEIGHT_PX) * 60;
+    // Round to nearest 15-minute slot interval
+    const roundedMins = Math.round(elapsedMins / 15) * 15;
+    const targetTotalMins = openHour * 60 + roundedMins;
+    const clampedTotalMins = Math.max(openHour * 60, Math.min(closeHour * 60 - 15, targetTotalMins));
+
+    const hours24 = Math.floor(clampedTotalMins / 60);
+    const mins = clampedTotalMins % 60;
+    const timeStr = `${String(hours24).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+
+    setWalkInModal({
+      isOpen: true,
+      techId: col.isUnassigned ? null : col.techId,
+      techName: col.name,
+      isUnassigned: col.isUnassigned,
+      date: selectedDateKey,
+      time: timeStr,
+      customerName: '',
+      customerPhone: '',
+      customerEmail: '',
+      selectedServiceIds: servicesCatalog.length > 0 ? [servicesCatalog[0].id] : [],
+      notes: '',
+      saving: false,
+      error: null,
+    });
+  };
+
+  // Quick-fill Walk-In Guest shortcut button
+  const handleQuickFillWalkIn = () => {
+    setWalkInModal((prev) => ({
+      ...prev,
+      customerName: 'Walk-In Guest',
+      customerPhone: '(555) 000-0000',
+      customerEmail: 'walkin@salon.com',
+      notes: 'Walk-in guest (Front desk entry)',
+    }));
+  };
+
+  // Toggle service selection in Walk-In Modal
+  const handleToggleService = (srvId) => {
+    setWalkInModal((prev) => {
+      const exists = prev.selectedServiceIds.includes(srvId);
+      const nextIds = exists
+        ? prev.selectedServiceIds.filter((id) => id !== srvId)
+        : [...prev.selectedServiceIds, srvId];
+      return { ...prev, selectedServiceIds: nextIds };
+    });
+  };
+
+  // Selected services summary in Walk-In Modal
+  const walkInSelectedServices = useMemo(() => {
+    return servicesCatalog.filter((s) => walkInModal.selectedServiceIds.includes(s.id));
+  }, [servicesCatalog, walkInModal.selectedServiceIds]);
+
+  const walkInTotalCost = useMemo(() => {
+    return walkInSelectedServices.reduce((sum, s) => sum + Number(s.price || 0), 0);
+  }, [walkInSelectedServices]);
+
+  const walkInTotalDuration = useMemo(() => {
+    return walkInSelectedServices.reduce((sum, s) => sum + Number(s.durationMinutes || 45), 0);
+  }, [walkInSelectedServices]);
+
+  // Submit Quick Walk-In Booking
+  const handleSubmitWalkIn = async (e) => {
+    if (e) e.preventDefault();
+    if (!walkInModal.selectedServiceIds || walkInModal.selectedServiceIds.length === 0) {
+      setWalkInModal((prev) => ({ ...prev, error: 'Please select at least one service.' }));
+      return;
+    }
+
+    setWalkInModal((prev) => ({ ...prev, saving: true, error: null }));
+
+    const custName = walkInModal.customerName.trim() || 'Walk-In Guest';
+    const custPhone = walkInModal.customerPhone.trim() || '(555) 000-0000';
+    const custEmail = walkInModal.customerEmail.trim() || 'walkin@salon.com';
+    const appointmentTimeStr = `${walkInModal.date}T${walkInModal.time}:00`;
+
+    const payload = {
+      appointmentTime: appointmentTimeStr,
+      customerName: custName,
+      customerPhone: custPhone,
+      customerEmail: custEmail,
+      notes: walkInModal.notes ? walkInModal.notes.trim() : 'Walk-in manual booking',
+      nailTech: walkInModal.techId ? { id: Number(walkInModal.techId) } : null,
+      serviceIds: walkInModal.selectedServiceIds.map(Number),
+      manualOverride: true,
+    };
+
+    const token = authToken || localStorage.getItem('accessToken') || localStorage.getItem('token');
+    const headers = {
+      'Content-Type': 'application/json',
+      'X-Tenant-ID': tenantKey,
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    };
+
+    try {
+      const res = await fetch('/api/appointments', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || 'Failed to create walk-in appointment.');
+      }
+
+      // Close modal and silently refresh timeline without full-page reload
+      setWalkInModal((prev) => ({ ...prev, isOpen: false, saving: false }));
+      await fetchScheduleData(true);
+    } catch (err) {
+      console.error('Walk-in booking error:', err);
+      setWalkInModal((prev) => ({
+        ...prev,
+        saving: false,
+        error: err.message || 'Error creating walk-in booking.',
+      }));
     }
   };
 
@@ -291,7 +526,7 @@ export default function AdminDailyTimelineCalendar({
             </div>
             <p className="text-muted small mb-0 mt-1">
               Daily Staff Timeline • Store Hours: 10:00 AM – 7:00 PM ({dayAppointments.length}{' '}
-              booking{dayAppointments.length === 1 ? '' : 's'})
+              booking{dayAppointments.length === 1 ? '' : 's'}) • Click empty slots to add Walk-In
             </p>
           </div>
         </div>
@@ -412,7 +647,7 @@ export default function AdminDailyTimelineCalendar({
                 ))}
               </div>
 
-              {/* Staff Columns Area */}
+              {/* Staff Columns Canvas */}
               <div className="timeline-columns-Canvas">
                 {/* Horizontal Hour & Half-Hour Grid Lines */}
                 {hourAxisTicks.slice(0, -1).map((tick) => (
@@ -433,7 +668,7 @@ export default function AdminDailyTimelineCalendar({
                   style={{ top: `${totalGridHeightPx}px` }}
                 />
 
-                {/* ==================== 3. REAL-TIME DYNAMIC TIMELINE INDICATOR (ACTIVE ON TODAY) ==================== */}
+                {/* Real-Time Dynamic Timeline Indicator (Active on Today) */}
                 {isSelectedDateToday && (
                   <div
                     className={`timeline-live-indicator ${
@@ -450,7 +685,7 @@ export default function AdminDailyTimelineCalendar({
                   </div>
                 )}
 
-                {/* Individual Staff Member Columns */}
+                {/* Individual Staff Member Columns with Side-by-Side Collision Positioning */}
                 {staffColumns.map((col) => {
                   const colAppts = dayAppointments.filter((apt) =>
                     col.isUnassigned
@@ -458,27 +693,48 @@ export default function AdminDailyTimelineCalendar({
                       : apt.nailTech && apt.nailTech.id === col.techId
                   );
 
+                  // Compute layout with side-by-side collision handling
+                  const layoutBlocks = computeStaffColumnLayout(colAppts, openHour);
+
                   return (
-                    <div key={col.id} className="timeline-staff-column">
-                      {colAppts.map((apt) => {
-                        const blockStyle = computeAppointmentBlockStyle(apt);
+                    <div
+                      key={col.id}
+                      className="timeline-staff-column"
+                      onClick={(e) => handleColumnClick(e, col)}
+                      title={`Click empty slot on ${col.name}'s column to book walk-in`}
+                    >
+                      {layoutBlocks.map((item) => {
+                        const { apt, topPx, heightPx, leftStyle, widthStyle, timeRangeLabel, isColliding } = item;
                         const statusKey = (apt.status || 'PENDING').toUpperCase();
 
                         return (
                           <div
                             key={apt.id}
-                            className={`timeline-appt-block status-${statusKey.toLowerCase()}`}
+                            className={`timeline-appt-block status-${statusKey.toLowerCase()} ${
+                              isColliding ? 'is-colliding' : ''
+                            }`}
                             style={{
-                              top: blockStyle.top,
-                              height: blockStyle.height,
+                              top: `${topPx}px`,
+                              height: `${heightPx}px`,
+                              left: leftStyle,
+                              width: widthStyle,
                             }}
-                            onClick={() => setSelectedAppointment(apt)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedAppointment(apt);
+                            }}
+                            title={`${apt.customerName || 'Walk-In'} - ${apt.service?.name || 'Service'} (${timeRangeLabel})`}
                           >
                             <div className="d-flex justify-content-between align-items-start gap-1">
-                              <span className="appt-time-badge">
-                                {blockStyle.timeRangeLabel}
-                              </span>
-                              <span className="appt-status-dot" title={statusKey} />
+                              <span className="appt-time-badge">{timeRangeLabel}</span>
+                              <div className="d-flex align-items-center gap-1">
+                                {isColliding && (
+                                  <span className="collision-badge" title="Side-by-side overlapping appointment">
+                                    Overlap
+                                  </span>
+                                )}
+                                <span className="appt-status-dot" title={statusKey} />
+                              </div>
                             </div>
                             <div className="appt-customer-name text-truncate">
                               {apt.customerName || 'Walk-In Guest'}
@@ -492,6 +748,248 @@ export default function AdminDailyTimelineCalendar({
                     </div>
                   );
                 })}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==================== 3. DIRECT WALK-IN / MANUAL BOOKING MODAL ==================== */}
+      {walkInModal.isOpen && (
+        <div
+          className="modal show d-block"
+          tabIndex="-1"
+          style={{ backgroundColor: 'rgba(15, 23, 42, 0.5)', zIndex: 1070 }}
+          onClick={() => setWalkInModal((prev) => ({ ...prev, isOpen: false }))}
+        >
+          <div
+            className="modal-dialog modal-dialog-centered modal-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+              <div className="modal-header bg-light border-bottom py-3 px-4">
+                <div>
+                  <h5 className="modal-title fw-bold text-dark mb-0">
+                    ⚡ Quick Walk-In / Manual Booking
+                  </h5>
+                  <p className="text-muted small mb-0 mt-1">
+                    Book directly for <strong>{walkInModal.techName}</strong> • {walkInModal.date} at {walkInModal.time}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setWalkInModal((prev) => ({ ...prev, isOpen: false }))}
+                />
+              </div>
+
+              <div className="modal-body p-4">
+                {walkInModal.error && (
+                  <div className="alert alert-danger py-2 px-3 small rounded-3 mb-3">
+                    {walkInModal.error}
+                  </div>
+                )}
+
+                {/* Quick Fill Shortcut */}
+                <div className="d-flex justify-content-between align-items-center mb-3 p-2 rounded-3 bg-light border">
+                  <span className="small text-muted fw-semibold">
+                    Need to seat an unannounced walk-in immediately?
+                  </span>
+                  <button
+                    type="button"
+                    className="btn btn-outline-pink btn-sm fw-semibold"
+                    onClick={handleQuickFillWalkIn}
+                  >
+                    ⚡ Quick Fill: Walk-In Guest
+                  </button>
+                </div>
+
+                <div className="row g-3">
+                  {/* Assigned Technician */}
+                  <div className="col-md-6">
+                    <label className="form-label small fw-bold text-secondary">
+                      Assigned Technician
+                    </label>
+                    <select
+                      className="form-select form-select-sm"
+                      value={walkInModal.techId ?? ''}
+                      onChange={(e) => {
+                        const val = e.target.value ? Number(e.target.value) : null;
+                        const match = staffList.find((t) => t.id === val);
+                        setWalkInModal((prev) => ({
+                          ...prev,
+                          techId: val,
+                          techName: match ? (match.name || match.username) : 'Anyone Available',
+                        }));
+                      }}
+                    >
+                      <option value="">Anyone Available (Open Queue)</option>
+                      {staffList.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.name || t.username} ({getStaffPronouns(t)})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Date & Start Time */}
+                  <div className="col-md-3">
+                    <label className="form-label small fw-bold text-secondary">Date</label>
+                    <input
+                      type="date"
+                      className="form-control form-control-sm"
+                      value={walkInModal.date}
+                      onChange={(e) =>
+                        setWalkInModal((prev) => ({ ...prev, date: e.target.value }))
+                      }
+                    />
+                  </div>
+                  <div className="col-md-3">
+                    <label className="form-label small fw-bold text-secondary">Start Time</label>
+                    <input
+                      type="time"
+                      className="form-control form-control-sm"
+                      value={walkInModal.time}
+                      onChange={(e) =>
+                        setWalkInModal((prev) => ({ ...prev, time: e.target.value }))
+                      }
+                    />
+                  </div>
+
+                  {/* Customer Information */}
+                  <div className="col-md-4">
+                    <label className="form-label small fw-bold text-secondary">
+                      Customer Name <span className="text-danger">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-control form-control-sm"
+                      placeholder="e.g. Walk-In Guest or Jane Doe"
+                      value={walkInModal.customerName}
+                      onChange={(e) =>
+                        setWalkInModal((prev) => ({ ...prev, customerName: e.target.value }))
+                      }
+                    />
+                  </div>
+                  <div className="col-md-4">
+                    <label className="form-label small fw-bold text-secondary">Phone Number</label>
+                    <input
+                      type="tel"
+                      className="form-control form-control-sm"
+                      placeholder="(555) 000-0000"
+                      value={walkInModal.customerPhone}
+                      onChange={(e) =>
+                        setWalkInModal((prev) => ({ ...prev, customerPhone: e.target.value }))
+                      }
+                    />
+                  </div>
+                  <div className="col-md-4">
+                    <label className="form-label small fw-bold text-secondary">Email Address</label>
+                    <input
+                      type="email"
+                      className="form-control form-control-sm"
+                      placeholder="walkin@salon.com"
+                      value={walkInModal.customerEmail}
+                      onChange={(e) =>
+                        setWalkInModal((prev) => ({ ...prev, customerEmail: e.target.value }))
+                      }
+                    />
+                  </div>
+
+                  {/* Service Selection Catalog */}
+                  <div className="col-12">
+                    <div className="d-flex justify-content-between align-items-center mb-2">
+                      <label className="form-label small fw-bold text-secondary mb-0">
+                        Select Service(s) <span className="text-danger">*</span>
+                      </label>
+                      <span className="badge bg-light text-dark border">
+                        {walkInSelectedServices.length} Selected • ${walkInTotalCost.toFixed(2)} • {walkInTotalDuration} mins
+                      </span>
+                    </div>
+
+                    <div className="walkin-service-catalog border rounded-3 p-2 bg-light">
+                      {servicesCatalog.length === 0 ? (
+                        <p className="text-muted small mb-0 p-2">Loading service catalog...</p>
+                      ) : (
+                        <div className="row g-2">
+                          {servicesCatalog.map((srv) => {
+                            const isChecked = walkInModal.selectedServiceIds.includes(srv.id);
+                            return (
+                              <div key={srv.id} className="col-md-6 col-lg-4">
+                                <div
+                                  className={`service-select-card p-2 rounded-2 border d-flex align-items-center gap-2 ${
+                                    isChecked ? 'selected bg-white border-pink shadow-sm' : 'bg-white'
+                                  }`}
+                                  onClick={() => handleToggleService(srv.id)}
+                                  style={{ cursor: 'pointer' }}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    className="form-check-input mt-0"
+                                    checked={isChecked}
+                                    onChange={() => handleToggleService(srv.id)}
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                  <div className="overflow-hidden flex-grow-1">
+                                    <div className="fw-semibold small text-truncate text-dark">
+                                      {srv.name}
+                                    </div>
+                                    <div className="text-muted extra-small">
+                                      ${Number(srv.price || 0).toFixed(2)} • {srv.durationMinutes || 45} mins
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Notes / Special Instructions */}
+                  <div className="col-12">
+                    <label className="form-label small fw-bold text-secondary">
+                      Notes / Station Request
+                    </label>
+                    <input
+                      type="text"
+                      className="form-control form-control-sm"
+                      placeholder="e.g. Station 2, prefers quiet technician, color request"
+                      value={walkInModal.notes}
+                      onChange={(e) =>
+                        setWalkInModal((prev) => ({ ...prev, notes: e.target.value }))
+                      }
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="modal-footer bg-light border-top d-flex justify-content-between">
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline-secondary px-3"
+                  onClick={() => setWalkInModal((prev) => ({ ...prev, isOpen: false }))}
+                  disabled={walkInModal.saving}
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  className="btn btn-sm btn-pink text-white fw-semibold px-4"
+                  onClick={handleSubmitWalkIn}
+                  disabled={walkInModal.saving}
+                >
+                  {walkInModal.saving ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm me-1" role="status" />
+                      Saving Walk-In...
+                    </>
+                  ) : (
+                    '⚡ Confirm & Save Booking'
+                  )}
+                </button>
               </div>
             </div>
           </div>

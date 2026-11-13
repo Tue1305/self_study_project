@@ -3,18 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title id="pageTitle">Appointment Schedule - Jenny's Nail Studio</title>
+    <title id="pageTitle">Daily Staff Timeline - Jenny's Nail Studio</title>
     <!-- Favicon Tag -->
     <link rel="icon" type="image/x-icon" href="/favicon.ico?=v2">
     <!-- Bootstrap 5.3 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Bootstrap Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
-    <!-- FullCalendar 6 CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css" rel="stylesheet">
     <style>
         :root {
             --bs-primary-pink: #e91e63;
+            --timeline-axis-width: 94px;
+            --timeline-border: #e9ecef;
         }
         .text-pink { color: var(--bs-primary-pink) !important; }
         .btn-outline-pink {
@@ -31,14 +31,295 @@
             color: #fff;
         }
         .btn-pink:hover {
-            filter: brightness(0.9);
+            filter: brightness(0.92);
             color: #fff;
         }
-        #calendar {
-            background: white;
-            padding: 20px;
+
+        /* ==========================================================================
+           Daily Staff Timeline Grid & Real-Time Indicator Styles
+           ========================================================================== */
+        .admin-timeline-wrapper {
+            border-radius: 16px;
+            background: #ffffff;
+            box-shadow: 0 6px 24px rgba(15, 23, 42, 0.06);
+        }
+
+        .calendar-date-badge {
+            width: 56px;
+            height: 56px;
+            background: rgba(233, 30, 99, 0.08);
+            border: 1px solid rgba(233, 30, 99, 0.22);
+            color: var(--bs-primary-pink);
+            line-height: 1.1;
+            flex-shrink: 0;
+        }
+        .calendar-date-badge .month-abbr {
+            font-size: 0.68rem;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+        }
+        .calendar-date-badge .day-num {
+            font-size: 1.3rem;
+            font-weight: 800;
+        }
+
+        .live-today-badge {
+            background-color: rgba(25, 135, 84, 0.12);
+            color: #198754;
+            border: 1px solid rgba(25, 135, 84, 0.25);
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .timeline-date-picker {
+            width: auto;
+            min-width: 148px;
+            font-weight: 600;
+        }
+
+        .timeline-scroll-container {
+            overflow-x: auto;
+            overflow-y: visible;
+            position: relative;
+        }
+
+        /* Sticky Staff Column Header Row */
+        .timeline-staff-header-row {
+            display: flex;
+            background-color: #f8f9fa;
+            border-bottom: 2px solid var(--timeline-border);
+            position: sticky;
+            top: 0;
+            z-index: 20;
+        }
+
+        .timeline-time-gutter-header {
+            width: var(--timeline-axis-width);
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-right: 1px solid var(--timeline-border);
+            padding: 14px 8px;
+            background-color: #f8f9fa;
+        }
+
+        .timeline-staff-col-header {
+            flex: 1 1 0;
+            min-width: 175px;
+            padding: 12px 10px;
+            border-right: 1px solid var(--timeline-border);
+            background: #ffffff;
+        }
+
+        .staff-header-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: rgba(233, 30, 99, 0.12);
+            color: var(--bs-primary-pink);
+            font-weight: 700;
+            font-size: 0.95rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .staff-header-name {
+            font-size: 0.9rem;
+            max-width: 125px;
+        }
+
+        .extra-small {
+            font-size: 0.72rem;
+        }
+
+        /* Main Vertical Time Axis + Staff Columns Canvas */
+        .timeline-body-area {
+            display: flex;
+            position: relative;
+            background-color: #ffffff;
+            margin-bottom: 20px;
+        }
+
+        .timeline-time-axis {
+            width: var(--timeline-axis-width);
+            flex-shrink: 0;
+            position: relative;
+            border-right: 1px solid var(--timeline-border);
+            background-color: #fcfcfd;
+            user-select: none;
+        }
+
+        .timeline-axis-tick {
+            position: absolute;
+            left: 0;
+            right: 0;
+            transform: translateY(-50%);
+            text-align: right;
+            padding-right: 12px;
+        }
+
+        .axis-time-text {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #6c757d;
+        }
+
+        .timeline-columns-canvas {
+            flex: 1;
+            display: flex;
+            position: relative;
+        }
+
+        .timeline-hour-line {
+            position: absolute;
+            left: 0;
+            right: 0;
+            border-top: 1px solid #e9ecef;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .timeline-half-hour-line {
+            position: absolute;
+            left: 0;
+            right: 0;
+            border-top: 1px dashed #f1f3f5;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .timeline-staff-column {
+            flex: 1 1 0;
+            min-width: 175px;
+            position: relative;
+            border-right: 1px solid var(--timeline-border);
+            z-index: 2;
+            transition: background-color 0.15s ease;
+        }
+
+        .timeline-staff-column:hover {
+            background-color: rgba(248, 249, 250, 0.6);
+        }
+
+        /* Appointment Block Cards */
+        .timeline-appt-block {
+            position: absolute;
+            left: 6px;
+            right: 6px;
             border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            padding: 6px 8px;
+            cursor: pointer;
+            overflow: hidden;
+            z-index: 5;
+            box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
+            transition: transform 0.12s ease, box-shadow 0.12s ease;
+            border-left: 4px solid #198754;
+            background-color: #ebfbee;
+            color: #145a32;
+        }
+
+        .timeline-appt-block:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 14px rgba(15, 23, 42, 0.14);
+            z-index: 10;
+        }
+
+        .timeline-appt-block.status-pending {
+            border-left-color: #f59f00;
+            background-color: #fff9db;
+            color: #7c4d00;
+        }
+
+        .timeline-appt-block.status-confirmed {
+            border-left-color: #198754;
+            background-color: #ebfbee;
+            color: #145a32;
+        }
+
+        .timeline-appt-block.status-cancelled {
+            border-left-color: #dc3545;
+            background-color: #fff5f5;
+            color: #842029;
+            opacity: 0.7;
+            text-decoration: line-through;
+        }
+
+        .appt-time-badge {
+            font-size: 0.68rem;
+            font-weight: 700;
+            opacity: 0.88;
+        }
+
+        .appt-customer-name {
+            font-size: 0.8rem;
+            font-weight: 700;
+            margin-top: 2px;
+        }
+
+        .appt-service-name {
+            font-size: 0.72rem;
+            opacity: 0.9;
+        }
+
+        /* Real-Time Horizontal Time Indicator */
+        .timeline-live-indicator {
+            position: absolute;
+            left: 0;
+            right: 0;
+            z-index: 15;
+            pointer-events: none;
+            display: flex;
+            align-items: center;
+            transition: top 0.6s linear;
+        }
+
+        .timeline-live-indicator.outside-hours {
+            opacity: 0.55;
+        }
+
+        .live-indicator-time-pill {
+            position: absolute;
+            left: -88px;
+            background-color: #ff2b56;
+            color: #ffffff;
+            font-size: 0.68rem;
+            font-weight: 700;
+            padding: 2px 7px;
+            border-radius: 999px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            box-shadow: 0 2px 6px rgba(255, 43, 86, 0.35);
+            white-space: nowrap;
+        }
+
+        .live-pulse-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background-color: #ffffff;
+            animation: timelinePulse 1.8s infinite ease-in-out;
+        }
+
+        .live-indicator-line {
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, #ff2b56 0%, rgba(255, 43, 86, 0.75) 100%);
+            box-shadow: 0 0 8px rgba(255, 43, 86, 0.4);
+        }
+
+        @keyframes timelinePulse {
+            0%, 100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+            50% {
+                transform: scale(1.45);
+                opacity: 0.55;
+            }
         }
     </style>
 </head>
@@ -86,42 +367,9 @@
 </header>
 
 <!-- Main Container -->
-<main class="container my-5 flex-grow-1">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="h3 fw-bold text-dark mb-0">
-            <i class="bi bi-calendar-check-fill text-pink me-2"></i><span id="scheduleHeading">Appointment Schedule</span>
-        </h2>
-    </div>
-
-    <!-- Calendar Card Container -->
-    <div class="card border-0 shadow-sm rounded-3 p-3">
-        <div id="calendar"></div>
-    </div>
+<main class="container-fluid px-4 my-4 flex-grow-1">
+    <div id="adminTimelineRoot"></div>
 </main>
-
-<!-- Appointment Details Modal -->
-<div class="modal fade" id="appointmentModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title fw-bold text-dark">
-                    <i class="bi bi-info-circle text-pink me-2"></i>Booking Details
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body" id="modalBody">
-                <!-- Injected via JavaScript -->
-            </div>
-            <div class="modal-footer d-flex justify-content-between">
-                <div>
-                    <button class="btn btn-sm btn-outline-success me-1" onclick="updateAppointmentStatus('CONFIRMED')">Confirm</button>
-                    <button class="btn btn-sm btn-outline-danger" onclick="updateAppointmentStatus('CANCELLED')">Cancel</button>
-                </div>
-                <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Close</button>
-            </div>
-        </div>
-    </div>
-</div>
 
 <!-- Footer with Store Hours -->
 <footer class="bg-white border-top py-4 mt-auto">
@@ -136,14 +384,13 @@
     </div>
 </footer>
 
-<!-- FullCalendar 6 JavaScript Bundle -->
-<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
-<!-- Bootstrap 5.3 JavaScript Bundle -->
+<!-- React 18 UMD & Bootstrap 5.3 JS -->
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
     const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
-    let currentAppointmentId = null;
 
     // --- ADMIN ROUTE GUARD ---
     (function() {
@@ -176,7 +423,6 @@
             }
         }
     })();
-    // --- END ADMIN GUARD ---
 
     function getActiveTenant() {
         const urlParams = new URLSearchParams(window.location.search);
@@ -195,14 +441,13 @@
     const activeTenant = getActiveTenant();
     localStorage.setItem('tenant', activeTenant);
 
-    // Apply links
+    // Apply navigation links
     const tenantQuery = `?tenant=${encodeURIComponent(activeTenant)}`;
     document.getElementById('navDashboardLink').href = `./admin-dashboard.html${tenantQuery}`;
     document.getElementById('navTechsLink').href = `./nail-techs.html${tenantQuery}`;
     document.getElementById('navCustomersLink').href = `./admin-customers.html${tenantQuery}`;
     document.getElementById('navWebsiteLink').href = activeTenant === 'luxe' ? `./booking.html${tenantQuery}` : `./index.html${tenantQuery}`;
 
-    // Apply dynamic branding
     async function loadBranding() {
         try {
             const resp = await fetch(`/api/public/tenant-config?tenant=${encodeURIComponent(activeTenant)}`);
@@ -212,7 +457,7 @@
                 const primaryColor = cfg.primaryColor || (activeTenant === 'luxe' ? '#00b4d8' : '#e91e63');
 
                 document.documentElement.style.setProperty('--bs-primary-pink', primaryColor);
-                document.getElementById('pageTitle').innerText = `Appointment Schedule - ${name}`;
+                document.getElementById('pageTitle').innerText = `Daily Staff Timeline - ${name}`;
                 document.getElementById('portalBrandTitle').innerText = `${name} Portal`;
                 document.getElementById('footerCopyright').innerHTML = `&copy; ${name} — Appointment Management System`;
 
@@ -222,147 +467,9 @@
                     pill.style.backgroundColor = primaryColor;
                     pill.classList.remove('bg-secondary');
                 }
-            } else if (activeTenant === 'luxe') {
-                applyLuxeBrandingFallback();
             }
         } catch (e) {
-            if (activeTenant === 'luxe') applyLuxeBrandingFallback();
-        }
-    }
-
-    function applyLuxeBrandingFallback() {
-        document.documentElement.style.setProperty('--bs-primary-pink', '#00b4d8');
-        document.getElementById('pageTitle').innerText = "Appointment Schedule - Luxe Nail & Spa Sanctuary";
-        document.getElementById('portalBrandTitle').innerText = "Luxe Nail & Spa Portal";
-        document.getElementById('footerCopyright').innerHTML = "&copy; Luxe Nail & Spa Sanctuary — Appointment Management System";
-        const pill = document.getElementById('tenantPill');
-        if (pill) {
-            pill.innerText = "LUXE";
-            pill.style.backgroundColor = '#00b4d8';
-            pill.classList.remove('bg-secondary');
-        }
-    }
-
-    document.addEventListener('DOMContentLoaded', function() {
-        loadBranding();
-        initCalendar();
-    });
-
-    function initCalendar() {
-        const calendarEl = document.getElementById('calendar');
-
-        const calendar = new FullCalendar.Calendar(calendarEl, {
-            initialView: 'timeGridWeek',
-            slotMinTime: '10:00:00',
-            slotMaxTime: '19:30:00',
-            slotDuration: '00:15:00',
-            slotLabelInterval: '00:30:00',
-            allDaySlot: false,
-            expandRows: true,
-            businessHours: {
-                daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
-                startTime: '10:00',
-                endTime: '19:00'
-            },
-            headerToolbar: {
-                left: 'prev,next today',
-                center: 'title',
-                right: 'dayGridMonth,timeGridWeek,timeGridDay'
-            },
-            // Fetch appointments strictly scoped by tenant
-            events: function(fetchInfo, successCallback, failureCallback) {
-                fetch('/api/appointments', {
-                    headers: {
-                        'Authorization': 'Bearer ' + token,
-                        'X-Tenant-ID': activeTenant
-                    }
-                })
-                    .then(response => {
-                        if (!response.ok) throw new Error('Failed to fetch appointments');
-                        return response.json();
-                    })
-                    .then(data => {
-                        const events = data.map(apt => {
-                            let badgeColor = '#ffc107'; // PENDING
-                            if (apt.status === 'CONFIRMED') badgeColor = '#198754'; // GREEN
-                            if (apt.status === 'CANCELLED') badgeColor = '#dc3545'; // RED
-
-                            const serviceName = apt.service ? apt.service.name : 'Service';
-                            const customerName = apt.customerName || 'Customer';
-                            const techName = apt.nailTech ? (apt.nailTech.name || apt.nailTech.username) : 'Anyone Available';
-
-                            return {
-                                id: apt.id,
-                                title: `${customerName} - ${serviceName} (${techName})`,
-                                start: apt.appointmentTime,
-                                backgroundColor: badgeColor,
-                                borderColor: badgeColor,
-                                textColor: '#fff',
-                                extendedProps: {
-                                    customerName: customerName,
-                                    phone: apt.customerPhone,
-                                    email: apt.customerEmail,
-                                    status: apt.status,
-                                    serviceName: serviceName,
-                                    techName: techName,
-                                    stationPreference: apt.stationPreference || '',
-                                    notes: apt.notes || ''
-                                }
-                            };
-                        });
-                        successCallback(events);
-                    })
-                    .catch(error => {
-                        console.error('Error loading calendar events:', error);
-                        failureCallback(error);
-                    });
-            },
-            eventClick: function(info) {
-                currentAppointmentId = info.event.id;
-                const props = info.event.extendedProps;
-                const modalBody = document.getElementById('modalBody');
-                const customerName = props.customerName || info.event.title.split(' - ')[0] || 'Customer';
-
-                modalBody.innerHTML = `
-                    <p class="mb-2"><strong>Customer Name:</strong> ${customerName}</p>
-                    <p class="mb-2"><strong>Phone Number:</strong> <a href="tel:${props.phone}" class="text-decoration-none">${props.phone || 'N/A'}</a></p>
-                    <p class="mb-2"><strong>Email:</strong> <a href="mailto:${props.email}" class="text-decoration-none">${props.email || 'N/A'}</a></p>
-                    <p class="mb-2"><strong>Service:</strong> ${props.serviceName}</p>
-                    <p class="mb-2"><strong>Nail Technician:</strong> ${props.techName || 'Anyone Available'}</p>
-                    ${props.stationPreference ? `<p class="mb-2"><strong>Station / Suite:</strong> ${props.stationPreference}</p>` : ''}
-                    <p class="mb-2"><strong>Time:</strong> ${info.event.start.toLocaleString()}</p>
-                    ${props.notes ? `<p class="mb-2"><strong>Notes:</strong> ${props.notes}</p>` : ''}
-                    <p class="mb-0"><strong>Status:</strong> <span class="badge bg-secondary">${props.status}</span></p>
-                `;
-
-                const modal = new bootstrap.Modal(document.getElementById('appointmentModal'));
-                modal.show();
-            }
-        });
-
-        calendar.render();
-    }
-
-    async function updateAppointmentStatus(newStatus) {
-        if (!currentAppointmentId) return;
-
-        try {
-            const response = await fetch(`/api/appointments/${currentAppointmentId}/status?status=${newStatus}`, {
-                method: 'PATCH',
-                headers: {
-                    'Authorization': 'Bearer ' + token,
-                    'X-Tenant-ID': activeTenant
-                }
-            });
-
-            if (response.ok) {
-                location.reload();
-            } else {
-                alert('Failed to update appointment status.');
-            }
-        } catch (err) {
-            console.error('Error updating status:', err);
-            alert('Server connection error.');
+            console.warn('Branding load fallback:', e);
         }
     }
 
@@ -374,6 +481,420 @@
         localStorage.removeItem('tenant');
         window.location.href = tenant === 'luxe' ? './login.html?tenant=luxe' : './index.html';
     }
+
+    // ==================== REACT DAILY STAFF TIMELINE COMPONENT ====================
+    const { useState, useEffect, useMemo, useCallback } = React;
+    const h = React.createElement;
+
+    const DEFAULT_OPEN_HOUR = 10; // 10:00 AM
+    const DEFAULT_CLOSE_HOUR = 19; // 7:00 PM
+    const HOUR_ROW_HEIGHT_PX = 88; // 88px per hour
+
+    function getStaffPronouns(tech) {
+        if (!tech) return '';
+        const raw = (tech.name || tech.username || '').trim().toLowerCase();
+        const first = raw.split(/[\s@._]/)[0];
+        const maleNames = ['tony', 'michael', 'david', 'john', 'alex', 'kevin', 'brian', 'james', 'robert', 'daniel', 'chris', 'ryan'];
+        return maleNames.includes(first) ? 'he/him' : 'she/her';
+    }
+
+    function formatFullDayHeader(dateObj) {
+        return dateObj.toLocaleDateString('en-US', {
+            weekday: 'long',
+            month: 'long',
+            day: 'numeric',
+            year: 'numeric'
+        });
+    }
+
+    function toDateKey(dateObj) {
+        const year = dateObj.getFullYear();
+        const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const day = String(dateObj.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+
+    function formatMinutesToTimeLabel(totalMinutes) {
+        const clamped = Math.max(0, Math.min(23 * 60 + 59, Math.floor(totalMinutes)));
+        const hours24 = Math.floor(clamped / 60);
+        const mins = clamped % 60;
+        const period = hours24 >= 12 ? 'PM' : 'AM';
+        const hours12 = hours24 % 12 === 0 ? 12 : hours24 % 12;
+        return `${hours12}:${String(mins).padStart(2, '0')} ${period}`;
+    }
+
+    function AdminDailyTimelineCalendar() {
+        const [selectedDate, setSelectedDate] = useState(() => new Date());
+        const [staffList, setStaffList] = useState([]);
+        const [appointments, setAppointments] = useState([]);
+        const [loading, setLoading] = useState(true);
+        const [selectedAppointment, setSelectedAppointment] = useState(null);
+        const [now, setNow] = useState(() => new Date());
+
+        // Real-time useEffect timer updating the timeline indicator
+        useEffect(() => {
+            setNow(new Date());
+            const intervalId = setInterval(() => {
+                setNow(new Date());
+            }, 15000);
+            return () => clearInterval(intervalId);
+        }, []);
+
+        const totalStoreHours = DEFAULT_CLOSE_HOUR - DEFAULT_OPEN_HOUR;
+        const totalStoreMinutes = totalStoreHours * 60;
+        const totalGridHeightPx = totalStoreHours * HOUR_ROW_HEIGHT_PX;
+
+        const fetchScheduleData = useCallback(async () => {
+            setLoading(true);
+            const headers = {
+                'X-Tenant-ID': activeTenant,
+                ...(token ? { 'Authorization': 'Bearer ' + token } : {})
+            };
+
+            try {
+                const [staffRes, apptRes] = await Promise.all([
+                    fetch('/api/nail-techs', { headers }),
+                    fetch('/api/appointments', { headers })
+                ]);
+                const staffData = staffRes.ok ? await staffRes.json() : [];
+                const apptData = apptRes.ok ? await apptRes.json() : [];
+                setStaffList(Array.isArray(staffData) ? staffData : []);
+                setAppointments(Array.isArray(apptData) ? apptData : []);
+            } catch (err) {
+                console.error('Error loading timeline data:', err);
+            } finally {
+                setLoading(false);
+            }
+        }, []);
+
+        useEffect(() => {
+            fetchScheduleData();
+        }, [fetchScheduleData]);
+
+        const selectedDateKey = useMemo(() => toDateKey(selectedDate), [selectedDate]);
+        const isSelectedDateToday = useMemo(() => toDateKey(now) === selectedDateKey, [now, selectedDateKey]);
+
+        const dayAppointments = useMemo(() => {
+            return appointments.filter(apt => {
+                if (!apt.appointmentTime) return false;
+                return String(apt.appointmentTime).split('T')[0] === selectedDateKey;
+            });
+        }, [appointments, selectedDateKey]);
+
+        const staffColumns = useMemo(() => {
+            const cols = staffList.map(tech => ({
+                id: `tech-${tech.id}`,
+                techId: tech.id,
+                name: tech.name || tech.username,
+                pronouns: getStaffPronouns(tech),
+                isUnassigned: false
+            }));
+
+            const hasUnassigned = dayAppointments.some(apt => !apt.nailTech || !apt.nailTech.id);
+            if (hasUnassigned || cols.length === 0) {
+                cols.push({
+                    id: 'tech-unassigned',
+                    techId: null,
+                    name: 'Anyone Available',
+                    pronouns: 'Open Queue',
+                    isUnassigned: true
+                });
+            }
+            return cols;
+        }, [staffList, dayAppointments]);
+
+        const hourAxisTicks = useMemo(() => {
+            const ticks = [];
+            for (let hr = DEFAULT_OPEN_HOUR; hr <= DEFAULT_CLOSE_HOUR; hr++) {
+                ticks.push({
+                    hour24: hr,
+                    label: formatMinutesToTimeLabel(hr * 60),
+                    topPx: (hr - DEFAULT_OPEN_HOUR) * HOUR_ROW_HEIGHT_PX
+                });
+            }
+            return ticks;
+        }, []);
+
+        const liveTimeIndicator = useMemo(() => {
+            const currentMinutes = now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60;
+            const openMinutes = DEFAULT_OPEN_HOUR * 60;
+            const closeMinutes = DEFAULT_CLOSE_HOUR * 60;
+            const isWithinStoreHours = currentMinutes >= openMinutes && currentMinutes <= closeMinutes;
+            const clampedMinutes = Math.max(openMinutes, Math.min(closeMinutes, currentMinutes));
+            const elapsedMinutes = clampedMinutes - openMinutes;
+            const topPx = (elapsedMinutes / 60) * HOUR_ROW_HEIGHT_PX;
+
+            return {
+                isWithinStoreHours,
+                topPx,
+                formattedTime: now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+            };
+        }, [now]);
+
+        const computeAppointmentBlockStyle = (apt) => {
+            const dt = new Date(apt.appointmentTime);
+            const startMinutes = dt.getHours() * 60 + dt.getMinutes();
+            const durationMinutes = Number((apt.service && apt.service.durationMinutes) || 45);
+            const openMinutes = DEFAULT_OPEN_HOUR * 60;
+
+            const offsetMinutes = Math.max(0, startMinutes - openMinutes);
+            const topPx = (offsetMinutes / 60) * HOUR_ROW_HEIGHT_PX;
+            const heightPx = Math.max(38, (durationMinutes / 60) * HOUR_ROW_HEIGHT_PX);
+
+            const endMinutes = startMinutes + durationMinutes;
+            const timeRangeLabel = `${formatMinutesToTimeLabel(startMinutes)} – ${formatMinutesToTimeLabel(endMinutes)}`;
+
+            return {
+                top: `${topPx}px`,
+                height: `${heightPx}px`,
+                timeRangeLabel
+            };
+        };
+
+        const handleShiftDay = (delta) => {
+            setSelectedDate(prev => {
+                const next = new Date(prev);
+                next.setDate(next.getDate() + delta);
+                return next;
+            });
+        };
+
+        const handleUpdateStatus = async (aptId, newStatus) => {
+            try {
+                const res = await fetch(`/api/appointments/${aptId}/status?status=${encodeURIComponent(newStatus)}`, {
+                    method: 'PATCH',
+                    headers: {
+                        'X-Tenant-ID': activeTenant,
+                        'Authorization': 'Bearer ' + token
+                    }
+                });
+                if (res.ok) {
+                    setSelectedAppointment(null);
+                    fetchScheduleData();
+                } else {
+                    alert('Failed to update appointment status.');
+                }
+            } catch (err) {
+                console.error('Error updating status:', err);
+            }
+        };
+
+        return h('div', { className: 'admin-timeline-wrapper border-0 overflow-hidden' },
+            /* 1. Day & Date Header */
+            h('div', { className: 'd-flex flex-wrap justify-content-between align-items-center gap-3 p-4 border-bottom' },
+                h('div', { className: 'd-flex align-items-center gap-3' },
+                    h('div', { className: 'calendar-date-badge d-flex flex-column align-items-center justify-content-center rounded-3' },
+                        h('span', { className: 'month-abbr' }, selectedDate.toLocaleDateString('en-US', { month: 'short' }).toUpperCase()),
+                        h('span', { className: 'day-num' }, selectedDate.getDate())
+                    ),
+                    h('div', null,
+                        h('div', { className: 'd-flex align-items-center gap-2 flex-wrap' },
+                            h('h2', { className: 'fw-bold text-dark mb-0 fs-4' }, formatFullDayHeader(selectedDate)),
+                            isSelectedDateToday && h('span', { className: 'badge rounded-pill live-today-badge' }, 'Today • Live')
+                        ),
+                        h('p', { className: 'text-muted small mb-0 mt-1' },
+                            `Daily Staff Timeline • Store Hours: 10:00 AM – 7:00 PM (${dayAppointments.length} booking${dayAppointments.length === 1 ? '' : 's'})`
+                        )
+                    )
+                ),
+                h('div', { className: 'd-flex align-items-center gap-2 flex-wrap' },
+                    h('div', { className: 'btn-group shadow-sm rounded-3', role: 'group' },
+                        h('button', {
+                            type: 'button',
+                            className: 'btn btn-outline-secondary btn-sm px-3 fw-semibold',
+                            onClick: () => handleShiftDay(-1)
+                        }, '‹ Prev Day'),
+                        h('button', {
+                            type: 'button',
+                            className: `btn btn-sm px-3 fw-semibold ${isSelectedDateToday ? 'btn-pink' : 'btn-outline-secondary'}`,
+                            onClick: () => setSelectedDate(new Date())
+                        }, 'Today'),
+                        h('button', {
+                            type: 'button',
+                            className: 'btn btn-outline-secondary btn-sm px-3 fw-semibold',
+                            onClick: () => handleShiftDay(1)
+                        }, 'Next Day ›')
+                    ),
+                    h('input', {
+                        type: 'date',
+                        className: 'form-control form-control-sm timeline-date-picker',
+                        value: selectedDateKey,
+                        onChange: (e) => {
+                            if (!e.target.value) return;
+                            const [y, m, d] = e.target.value.split('-').map(Number);
+                            if (y && m && d) setSelectedDate(new Date(y, m - 1, d));
+                        }
+                    })
+                )
+            ),
+
+            /* 2. Staff Column Timeline Grid */
+            loading
+                ? h('div', { className: 'text-center py-5' },
+                    h('div', { className: 'spinner-border text-pink', role: 'status' }),
+                    h('p', { className: 'text-muted mt-2 mb-0' }, 'Loading daily staff timeline...')
+                  )
+                : h('div', { className: 'timeline-scroll-container' },
+                    h('div', {
+                        style: { minWidth: `${Math.max(780, 94 + staffColumns.length * 185)}px` }
+                    },
+                        /* Staff Header Row */
+                        h('div', { className: 'timeline-staff-header-row' },
+                            h('div', { className: 'timeline-time-gutter-header' },
+                                h('span', { className: 'small fw-bold text-uppercase text-muted' }, 'Time')
+                            ),
+                            staffColumns.map(col => {
+                                const count = dayAppointments.filter(apt =>
+                                    col.isUnassigned ? (!apt.nailTech || !apt.nailTech.id) : (apt.nailTech && apt.nailTech.id === col.techId)
+                                ).length;
+
+                                return h('div', { key: col.id, className: 'timeline-staff-col-header' },
+                                    h('div', { className: 'd-flex align-items-center justify-content-center gap-2' },
+                                        h('div', { className: 'staff-header-avatar' }, col.name.charAt(0).toUpperCase()),
+                                        h('div', { className: 'text-start overflow-hidden' },
+                                            h('div', { className: 'fw-bold text-dark text-truncate staff-header-name' }, col.name),
+                                            h('div', { className: 'd-flex align-items-center gap-1' },
+                                                h('span', { className: 'text-muted extra-small' }, col.pronouns),
+                                                h('span', { className: 'badge rounded-pill bg-light text-secondary border extra-small' }, count)
+                                            )
+                                        )
+                                    )
+                                );
+                            })
+                        ),
+
+                        /* Timeline Body */
+                        h('div', { className: 'timeline-body-area', style: { height: `${totalGridHeightPx}px` } },
+                            /* Left Time Axis */
+                            h('div', { className: 'timeline-time-axis' },
+                                hourAxisTicks.map(tick =>
+                                    h('div', {
+                                        key: tick.hour24,
+                                        className: 'timeline-axis-tick',
+                                        style: { top: `${tick.topPx}px` }
+                                    }, h('span', { className: 'axis-time-text' }, tick.label))
+                                )
+                            ),
+
+                            /* Columns Canvas */
+                            h('div', { className: 'timeline-columns-canvas' },
+                                hourAxisTicks.slice(0, -1).map(tick =>
+                                    h(React.Fragment, { key: `grid-${tick.hour24}` },
+                                        h('div', { className: 'timeline-hour-line', style: { top: `${tick.topPx}px` } }),
+                                        h('div', { className: 'timeline-half-hour-line', style: { top: `${tick.topPx + HOUR_ROW_HEIGHT_PX / 2}px` } })
+                                    )
+                                ),
+                                h('div', { className: 'timeline-hour-line', style: { top: `${totalGridHeightPx}px` } }),
+
+                                /* Real-Time Dynamic Timeline Indicator */
+                                h('div', {
+                                    className: `timeline-live-indicator ${!liveTimeIndicator.isWithinStoreHours ? 'outside-hours' : ''}`,
+                                    style: { top: `${liveTimeIndicator.topPx}px` },
+                                    title: `Current Time: ${liveTimeIndicator.formattedTime}`
+                                },
+                                    h('span', { className: 'live-indicator-time-pill' },
+                                        h('span', { className: 'live-pulse-dot' }),
+                                        liveTimeIndicator.formattedTime
+                                    ),
+                                    h('div', { className: 'live-indicator-line' })
+                                ),
+
+                                /* Staff Columns + Positioned Appointment Blocks */
+                                staffColumns.map(col => {
+                                    const colAppts = dayAppointments.filter(apt =>
+                                        col.isUnassigned ? (!apt.nailTech || !apt.nailTech.id) : (apt.nailTech && apt.nailTech.id === col.techId)
+                                    );
+
+                                    return h('div', { key: col.id, className: 'timeline-staff-column' },
+                                        colAppts.map(apt => {
+                                            const bStyle = computeAppointmentBlockStyle(apt);
+                                            const statusLower = String(apt.status || 'PENDING').toLowerCase();
+
+                                            return h('div', {
+                                                key: apt.id,
+                                                className: `timeline-appt-block status-${statusLower}`,
+                                                style: { top: bStyle.top, height: bStyle.height },
+                                                onClick: () => setSelectedAppointment(apt)
+                                            },
+                                                h('div', { className: 'd-flex justify-content-between align-items-start gap-1' },
+                                                    h('span', { className: 'appt-time-badge' }, bStyle.timeRangeLabel)
+                                                ),
+                                                h('div', { className: 'appt-customer-name text-truncate' }, apt.customerName || 'Walk-In Guest'),
+                                                h('div', { className: 'appt-service-name text-truncate' }, (apt.service && apt.service.name) || 'Service')
+                                            );
+                                        })
+                                    );
+                                })
+                            )
+                        )
+                    )
+                  ),
+
+            /* 3. Appointment Details Modal */
+            selectedAppointment && h('div', {
+                className: 'modal show d-block',
+                tabIndex: '-1',
+                style: { backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 1060 },
+                onClick: () => setSelectedAppointment(null)
+            },
+                h('div', {
+                    className: 'modal-dialog modal-dialog-centered',
+                    onClick: (e) => e.stopPropagation()
+                },
+                    h('div', { className: 'modal-content border-0 shadow-lg rounded-4' },
+                        h('div', { className: 'modal-header border-bottom' },
+                            h('h5', { className: 'modal-title fw-bold text-dark' },
+                                h('i', { className: 'bi bi-info-circle text-pink me-2' }),
+                                'Booking Details'
+                            ),
+                            h('button', {
+                                type: 'button',
+                                className: 'btn-close',
+                                onClick: () => setSelectedAppointment(null)
+                            })
+                        ),
+                        h('div', { className: 'modal-body p-4' },
+                            h('p', { className: 'mb-2' }, h('strong', null, 'Customer Name: '), selectedAppointment.customerName || 'N/A'),
+                            h('p', { className: 'mb-2' }, h('strong', null, 'Phone Number: '), selectedAppointment.customerPhone || 'N/A'),
+                            h('p', { className: 'mb-2' }, h('strong', null, 'Email: '), selectedAppointment.customerEmail || 'N/A'),
+                            h('p', { className: 'mb-2' }, h('strong', null, 'Service: '), (selectedAppointment.service && selectedAppointment.service.name) || 'Service'),
+                            h('p', { className: 'mb-2' }, h('strong', null, 'Nail Technician: '), (selectedAppointment.nailTech && (selectedAppointment.nailTech.name || selectedAppointment.nailTech.username)) || 'Anyone Available'),
+                            selectedAppointment.stationPreference && h('p', { className: 'mb-2' }, h('strong', null, 'Station / Suite: '), selectedAppointment.stationPreference),
+                            h('p', { className: 'mb-2' }, h('strong', null, 'Time: '), new Date(selectedAppointment.appointmentTime).toLocaleString()),
+                            selectedAppointment.notes && h('p', { className: 'mb-2' }, h('strong', null, 'Notes: '), selectedAppointment.notes),
+                            h('p', { className: 'mb-0' }, h('strong', null, 'Status: '), h('span', { className: 'badge bg-secondary' }, selectedAppointment.status || 'PENDING'))
+                        ),
+                        h('div', { className: 'modal-footer d-flex justify-content-between' },
+                            h('div', null,
+                                h('button', {
+                                    className: 'btn btn-sm btn-outline-success me-1 fw-semibold',
+                                    onClick: () => handleUpdateStatus(selectedAppointment.id, 'CONFIRMED')
+                                }, 'Confirm'),
+                                h('button', {
+                                    className: 'btn btn-sm btn-outline-danger fw-semibold',
+                                    onClick: () => handleUpdateStatus(selectedAppointment.id, 'CANCELLED')
+                                }, 'Cancel')
+                            ),
+                            h('button', {
+                                type: 'button',
+                                className: 'btn btn-sm btn-secondary',
+                                onClick: () => setSelectedAppointment(null)
+                            }, 'Close')
+                        )
+                    )
+                )
+            )
+        );
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        loadBranding();
+        const rootEl = document.getElementById('adminTimelineRoot');
+        if (rootEl && window.ReactDOM) {
+            const root = ReactDOM.createRoot(rootEl);
+            root.render(React.createElement(AdminDailyTimelineCalendar));
+        }
+    });
 </script>
 </body>
 </html>

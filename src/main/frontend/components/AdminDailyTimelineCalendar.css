@@ -1,0 +1,290 @@
+/* ==========================================================================
+   Admin Daily Staff Timeline Calendar Styling
+   ========================================================================== */
+
+.admin-timeline-wrapper {
+  --timeline-accent: var(--bs-primary-pink, #e91e63);
+  --timeline-axis-width: 92px;
+  --timeline-border: #e9ecef;
+}
+
+.calendar-date-badge {
+  width: 54px;
+  height: 54px;
+  background: rgba(233, 30, 99, 0.08);
+  border: 1px solid rgba(233, 30, 99, 0.2);
+  color: var(--timeline-accent);
+  line-height: 1.1;
+}
+
+.calendar-date-badge .month-abbr {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.calendar-date-badge .day-num {
+  font-size: 1.25rem;
+  font-weight: 800;
+}
+
+.live-today-badge {
+  background-color: rgba(25, 135, 84, 0.12);
+  color: #198754;
+  border: 1px solid rgba(25, 135, 84, 0.25);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.timeline-date-picker {
+  width: auto;
+  min-width: 145px;
+  font-weight: 600;
+}
+
+/* Horizontal scroll wrapper for wide staff rosters */
+.timeline-scroll-container {
+  overflow-x: auto;
+  overflow-y: visible;
+  position: relative;
+}
+
+/* Staff Header Row */
+.timeline-staff-header-row {
+  display: flex;
+  background-color: #f8f9fa;
+  border-bottom: 2px solid var(--timeline-border);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.timeline-time-gutter-header {
+  width: var(--timeline-axis-width);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-right: 1px solid var(--timeline-border);
+  padding: 14px 8px;
+}
+
+.timeline-staff-col-header {
+  flex: 1 1 0;
+  min-width: 175px;
+  padding: 12px 10px;
+  border-right: 1px solid var(--timeline-border);
+  text-align: center;
+  background: #fff;
+}
+
+.staff-header-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(233, 30, 99, 0.1);
+  color: var(--timeline-accent);
+  font-weight: 700;
+  font-size: 0.95rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.staff-header-name {
+  font-size: 0.9rem;
+  max-width: 125px;
+}
+
+.extra-small {
+  font-size: 0.72rem;
+}
+
+/* Main Timeline Grid Area */
+.timeline-body-area {
+  display: flex;
+  position: relative;
+  background-color: #ffffff;
+  margin-bottom: 24px;
+}
+
+.timeline-time-axis {
+  width: var(--timeline-axis-width);
+  flex-shrink: 0;
+  position: relative;
+  border-right: 1px solid var(--timeline-border);
+  background-color: #fcfcfd;
+  user-select: none;
+}
+
+.timeline-axis-tick {
+  position: absolute;
+  left: 0;
+  right: 0;
+  transform: translateY(-50%);
+  text-align: right;
+  padding-right: 12px;
+}
+
+.axis-time-text {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #6c757d;
+}
+
+/* Columns Canvas */
+.timeline-columns-Canvas {
+  flex: 1;
+  display: flex;
+  position: relative;
+}
+
+.timeline-hour-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px solid #e9ecef;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.timeline-half-hour-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px dashed #f1f3f5;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.timeline-staff-column {
+  flex: 1 1 0;
+  min-width: 175px;
+  position: relative;
+  border-right: 1px solid var(--timeline-border);
+  z-index: 2;
+  transition: background-color 0.15s ease;
+}
+
+.timeline-staff-column:hover {
+  background-color: rgba(248, 249, 250, 0.55);
+}
+
+/* Booked Appointment Blocks */
+.timeline-appt-block {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  border-radius: 8px;
+  padding: 6px 8px;
+  cursor: pointer;
+  overflow: hidden;
+  z-index: 5;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+  border-left: 4px solid #198754;
+  background-color: #eafaf1;
+  color: #145a32;
+}
+
+.timeline-appt-block:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.14);
+  z-index: 10;
+}
+
+.timeline-appt-block.status-pending {
+  border-left-color: #f59f00;
+  background-color: #fff9db;
+  color: #7c4d00;
+}
+
+.timeline-appt-block.status-confirmed {
+  border-left-color: #198754;
+  background-color: #ebfbee;
+  color: #145a32;
+}
+
+.timeline-appt-block.status-cancelled {
+  border-left-color: #dc3545;
+  background-color: #fff5f5;
+  color: #842029;
+  opacity: 0.7;
+  text-decoration: line-through;
+}
+
+.appt-time-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  opacity: 0.85;
+}
+
+.appt-customer-name {
+  font-size: 0.8rem;
+  font-weight: 700;
+  margin-top: 2px;
+}
+
+.appt-service-name {
+  font-size: 0.72rem;
+  opacity: 0.9;
+}
+
+/* Real-Time Horizontal Time Indicator */
+.timeline-live-indicator {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 15;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  transition: top 0.6s linear;
+}
+
+.timeline-live-indicator.outside-hours {
+  opacity: 0.55;
+}
+
+.live-indicator-time-pill {
+  position: absolute;
+  left: -86px;
+  background-color: #ff2b56;
+  color: #ffffff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  box-shadow: 0 2px 6px rgba(255, 43, 86, 0.35);
+  white-space: nowrap;
+}
+
+.live-pulse-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #ffffff;
+  animation: timelinePulse 1.8s infinite ease-in-out;
+}
+
+.live-indicator-line {
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, #ff2b56 0%, rgba(255, 43, 86, 0.75) 100%);
+  box-shadow: 0 0 8px rgba(255, 43, 86, 0.4);
+}
+
+@keyframes timelinePulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.45);
+    opacity: 0.55;
+  }
+}

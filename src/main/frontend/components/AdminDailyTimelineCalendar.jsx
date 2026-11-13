@@ -182,6 +182,7 @@ export default function AdminDailyTimelineCalendar({
   const [servicesCatalog, setServicesCatalog] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedAppointment, setSelectedAppointment] = useState(null);
+  const [statusReason, setStatusReason] = useState('');
 
   // 3. Quick Walk-In / Manual Booking Modal State
   const [walkInModal, setWalkInModal] = useState({
@@ -354,22 +355,23 @@ export default function AdminDailyTimelineCalendar({
     };
   }, [now, openHour, closeHour]);
 
-  // Status update handler (Confirm / Cancel)
-  const handleUpdateStatus = async (appointmentId, newStatus) => {
+  // Status update handler (Confirm / Cancel / No-Show with optional audit reason)
+  const handleUpdateStatus = async (appointmentId, newStatus, reason = '') => {
     const token = authToken || localStorage.getItem('accessToken') || localStorage.getItem('token');
+    const url = `/api/appointments/${appointmentId}/status?status=${encodeURIComponent(newStatus)}${
+      reason ? `&reason=${encodeURIComponent(reason)}` : ''
+    }`;
     try {
-      const res = await fetch(
-        `/api/appointments/${appointmentId}/status?status=${encodeURIComponent(newStatus)}`,
-        {
-          method: 'PATCH',
-          headers: {
-            'X-Tenant-ID': tenantKey,
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-        }
-      );
+      const res = await fetch(url, {
+        method: 'PATCH',
+        headers: {
+          'X-Tenant-ID': tenantKey,
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
       if (res.ok) {
         setSelectedAppointment(null);
+        setStatusReason('');
         fetchScheduleData(true);
       }
     } catch (err) {
@@ -1047,13 +1049,40 @@ export default function AdminDailyTimelineCalendar({
                     <strong>Notes:</strong> {selectedAppointment.notes}
                   </p>
                 )}
-                <p className="mb-0">
+                <p className="mb-3">
                   <strong>Status:</strong>{' '}
                   <span className="badge bg-secondary">{selectedAppointment.status}</span>
                 </p>
+
+                {/* Optional Reason for Cancellation or No-Show */}
+                <div className="p-3 bg-light rounded-3 border">
+                  <label className="form-label small fw-bold text-secondary mb-1">
+                    Cancellation / No-Show Reason (Audit Log Note):
+                  </label>
+                  <input
+                    type="text"
+                    className="form-control form-control-sm"
+                    placeholder="e.g. Client unwell, Late cancellation, No call no show"
+                    value={statusReason}
+                    onChange={(e) => setStatusReason(e.target.value)}
+                  />
+                  <div className="d-flex gap-1 mt-2">
+                    {['Late Cancel', 'Sick / Emergency', 'No Call / No Show'].map((preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        className="btn btn-outline-secondary btn-sm py-0 px-2"
+                        style={{ fontSize: '0.72rem' }}
+                        onClick={() => setStatusReason(preset)}
+                      >
+                        {preset}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
               <div className="modal-footer d-flex justify-content-between">
-                <div className="d-flex gap-2">
+                <div className="d-flex gap-2 flex-wrap">
                   <button
                     type="button"
                     className="btn btn-sm btn-success fw-semibold"
@@ -1064,15 +1093,25 @@ export default function AdminDailyTimelineCalendar({
                   <button
                     type="button"
                     className="btn btn-sm btn-outline-danger fw-semibold"
-                    onClick={() => handleUpdateStatus(selectedAppointment.id, 'CANCELLED')}
+                    onClick={() => handleUpdateStatus(selectedAppointment.id, 'CANCELLED', statusReason)}
                   >
                     Cancel Booking
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline-warning text-dark fw-semibold"
+                    onClick={() => handleUpdateStatus(selectedAppointment.id, 'NO_SHOW', statusReason)}
+                  >
+                    Mark No-Show
                   </button>
                 </div>
                 <button
                   type="button"
                   className="btn btn-sm btn-secondary"
-                  onClick={() => setSelectedAppointment(null)}
+                  onClick={() => {
+                    setSelectedAppointment(null);
+                    setStatusReason('');
+                  }}
                 >
                   Close
                 </button>

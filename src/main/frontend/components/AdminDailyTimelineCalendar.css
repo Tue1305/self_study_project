@@ -258,6 +258,14 @@
   text-decoration: line-through;
 }
 
+.timeline-appt-block.status-no_show {
+  border-left-color: #fd7e14;
+  background-color: #fff4e6;
+  color: #d9480f;
+  opacity: 0.85;
+  border-style: dashed;
+}
+
 .appt-time-badge {
   font-size: 0.68rem;
   font-weight: 700;

@@ -17,6 +17,59 @@
         .btn-outline-pink:hover { background-color: var(--bs-primary-pink); color: #fff; }
         .btn-pink { background-color: var(--bs-primary-pink); border-color: var(--bs-primary-pink); color: #fff; }
         .btn-pink:hover { filter: brightness(0.9); color: #fff; }
+
+        /* Timeline and Audit Log Styles */
+        .timeline-container {
+            position: relative;
+            padding-left: 8px;
+        }
+        .timeline-card {
+            position: relative;
+            padding-left: 28px;
+            margin-bottom: 22px;
+        }
+        .timeline-card::before {
+            content: '';
+            position: absolute;
+            left: 9px;
+            top: 24px;
+            bottom: -22px;
+            width: 2px;
+            background-color: #dee2e6;
+        }
+        .timeline-card:last-child::before {
+            display: none;
+        }
+        .timeline-dot {
+            position: absolute;
+            left: 0;
+            top: 3px;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #fff;
+            border: 3px solid #6c757d;
+            box-shadow: 0 0 0 2px rgba(108, 117, 125, 0.2);
+        }
+        .timeline-dot.dot-booked { border-color: #0d6efd; box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.25); }
+        .timeline-dot.dot-confirmed { border-color: #198754; box-shadow: 0 0 0 2px rgba(25, 135, 84, 0.25); }
+        .timeline-dot.dot-completed { border-color: #0dcaf0; box-shadow: 0 0 0 2px rgba(13, 202, 240, 0.25); }
+        .timeline-dot.dot-cancelled { border-color: #dc3545; box-shadow: 0 0 0 2px rgba(220, 53, 69, 0.25); }
+        .timeline-dot.dot-no_show { border-color: #fd7e14; box-shadow: 0 0 0 2px rgba(253, 126, 20, 0.35); }
+        .badge-no-show {
+            background-color: #212529;
+            color: #ffc107;
+            border: 1px solid #ffc107;
+        }
+        .customer-row-clickable {
+            cursor: pointer;
+        }
+        .customer-row-clickable:hover {
+            color: var(--bs-primary-pink);
+        }
     </style>
 </head>
 <body class="bg-light d-flex flex-column min-vh-100">
@@ -130,6 +183,23 @@
     </div>
 </div>
 
+<!-- Customer History & Audit Log Offcanvas Drawer -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="customerHistoryDrawer" style="width: 600px;" aria-labelledby="drawerCustomerName">
+    <div class="offcanvas-header bg-light border-bottom py-3 px-4">
+        <div>
+            <h5 class="offcanvas-title fw-bold text-dark d-flex align-items-center gap-2 mb-1" id="drawerCustomerName">
+                <i class="bi bi-person-badge-fill text-pink"></i>
+                <span>Customer History</span>
+            </h5>
+            <div id="drawerCustomerMeta" class="text-muted small">Loading customer details...</div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+    <div class="offcanvas-body p-4" id="drawerBody">
+        <!-- Dynamically rendered via JavaScript -->
+    </div>
+</div>
+
 <!-- Footer with Store Hours -->
 <footer class="bg-white border-top py-4 mt-auto">
     <div class="container text-center">
@@ -149,6 +219,7 @@
 <script>
     const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
     let customerModalInstance = null;
+    let customerHistoryDrawerInstance = null;
 
     // --- ADMIN ROUTE GUARD ---
     (function() {
@@ -250,6 +321,10 @@
 
     document.addEventListener('DOMContentLoaded', () => {
         customerModalInstance = new bootstrap.Modal(document.getElementById('customerModal'));
+        const drawerEl = document.getElementById('customerHistoryDrawer');
+        if (drawerEl && window.bootstrap) {
+            customerHistoryDrawerInstance = new bootstrap.Offcanvas(drawerEl);
+        }
         loadBranding();
         loadCustomers();
     });
@@ -281,14 +356,19 @@
                 tbody.innerHTML += `
                     <tr>
                         <td>#${index + 1}</td>
-                        <td class="fw-semibold">${customer.name || 'N/A'}</td>
+                        <td class="fw-semibold customer-row-clickable" onclick="openCustomerHistory(${customer.id}, '${safeName}', '${safeEmail}', '${safePhone}')" title="Click to view history and audit log">
+                            <i class="bi bi-person-fill text-pink me-1"></i>${customer.name || 'N/A'}
+                        </td>
                         <td><a href="mailto:${customer.email || ''}" class="text-decoration-none">${customer.email || 'N/A'}</a></td>
                         <td><a href="tel:${customer.phone || ''}" class="text-decoration-none">${customer.phone || 'N/A'}</a></td>
                         <td class="text-end">
-                            <button class="btn btn-outline-secondary btn-sm me-1" onclick="openEditModal(${customer.id}, '${safeName}', '${safeEmail}', '${safePhone}')">
+                            <button class="btn btn-outline-info btn-sm me-1 fw-semibold" onclick="openCustomerHistory(${customer.id}, '${safeName}', '${safeEmail}', '${safePhone}')" title="View Appointment History & Audit Log">
+                                <i class="bi bi-clock-history me-1"></i> History
+                            </button>
+                            <button class="btn btn-outline-secondary btn-sm me-1" onclick="openEditModal(${customer.id}, '${safeName}', '${safeEmail}', '${safePhone}')" title="Edit Customer">
                                 <i class="bi bi-pencil"></i>
                             </button>
-                            <button class="btn btn-outline-danger btn-sm" onclick="deleteCustomer(${customer.id})">
+                            <button class="btn btn-outline-danger btn-sm" onclick="deleteCustomer(${customer.id})" title="Delete Customer">
                                 <i class="bi bi-trash"></i>
                             </button>
                         </td>
@@ -388,6 +468,186 @@
             console.error('Error deleting customer:', error);
             alert('Server connection error.');
         }
+    }
+
+    async function openCustomerHistory(customerId, customerName, customerEmail, customerPhone) {
+        document.getElementById('drawerCustomerName').innerHTML = `
+            <i class="bi bi-person-badge-fill text-pink me-2"></i>${customerName || 'Customer History'}
+        `;
+        document.getElementById('drawerCustomerMeta').innerHTML = `
+            <span>${customerEmail || 'No Email'}</span> • <span>${customerPhone || 'No Phone'}</span>
+            <span class="badge bg-secondary ms-2">${activeTenant.toUpperCase()}</span>
+        `;
+
+        const body = document.getElementById('drawerBody');
+        body.innerHTML = `
+            <div class="text-center py-5">
+                <div class="spinner-border text-pink" role="status"></div>
+                <p class="text-muted mt-2 mb-0">Loading appointment history & audit logs...</p>
+            </div>
+        `;
+
+        if (customerHistoryDrawerInstance) {
+            customerHistoryDrawerInstance.show();
+        }
+
+        try {
+            const res = await fetch(`/api/admin/customers/${customerId}/history`, {
+                headers: {
+                    'Authorization': 'Bearer ' + token,
+                    'X-Tenant-ID': activeTenant
+                }
+            });
+
+            if (!res.ok) {
+                throw new Error('Failed to fetch customer history.');
+            }
+
+            const data = await res.json();
+            renderCustomerHistory(data);
+        } catch (err) {
+            console.error('Error fetching history:', err);
+            body.innerHTML = `
+                <div class="alert alert-danger py-3">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                    Failed to load customer history. Please ensure administrator privileges.
+                </div>
+            `;
+        }
+    }
+
+    function renderCustomerHistory(data) {
+        const body = document.getElementById('drawerBody');
+        const customer = data.customer || {};
+        const rel = data.reliability || {};
+        const logs = data.activityLogs || [];
+
+        const totalBooked = rel.totalBooked || 0;
+        const totalConfirmed = rel.totalConfirmed || 0;
+        const totalCompleted = rel.totalCompleted || 0;
+        const totalCancelled = rel.totalCancelled || 0;
+        const totalNoShows = rel.totalNoShows || 0;
+        const hasRisk = rel.hasHighNoShowRisk || totalNoShows >= 2;
+
+        let riskBannerHtml = '';
+        if (hasRisk) {
+            riskBannerHtml = `
+                <div class="alert alert-danger d-flex align-items-center gap-2 py-2 px-3 small fw-bold mb-3 rounded-3 shadow-sm">
+                    <i class="bi bi-exclamation-octagon-fill fs-5 flex-shrink-0 text-danger"></i>
+                    <div>
+                        ⚠️ High No-Show Risk (${totalNoShows} No-Shows Recorded)
+                        <div class="fw-normal extra-small">Customer has repeated unexcused missed appointments. Require confirmation or pre-deposit before booking.</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        const reliabilityPillsHtml = `
+            <div class="p-3 bg-light rounded-4 border mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="small fw-bold text-secondary text-uppercase" style="letter-spacing: 0.05em;">Client Reliability Summary</span>
+                    ${hasRisk ? '<span class="badge bg-danger">HIGH RISK</span>' : '<span class="badge bg-success">GOOD STANDING</span>'}
+                </div>
+                <div class="d-flex flex-wrap gap-2">
+                    <span class="badge bg-white text-dark border px-3 py-2 fs-6 shadow-sm">Booked: <strong>${totalBooked}</strong></span>
+                    <span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-2 fs-6">Confirmed: <strong>${totalConfirmed}</strong></span>
+                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-2 fs-6">Completed: <strong>${totalCompleted}</strong></span>
+                    <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-3 py-2 fs-6">Cancelled: <strong>${totalCancelled}</strong></span>
+                    <span class="badge ${totalNoShows >= 2 ? 'bg-danger text-white' : 'badge-no-show'} px-3 py-2 fs-6 shadow-sm">
+                        No-Show: <strong>${totalNoShows}</strong>
+                    </span>
+                </div>
+            </div>
+        `;
+
+        let timelineHtml = '';
+        if (logs.length === 0) {
+            timelineHtml = `
+                <div class="text-center py-4 bg-light rounded-3 border">
+                    <i class="bi bi-calendar-x text-muted fs-3 mb-2 d-block"></i>
+                    <p class="text-muted small mb-0">No appointment activity logs recorded for this customer yet.</p>
+                </div>
+            `;
+        } else {
+            timelineHtml = `
+                <div class="timeline-container mt-3">
+                    ${logs.map(log => {
+                        const action = (log.actionType || 'UPDATED').toUpperCase();
+                        let dotClass = 'dot-booked';
+                        let badgeClass = 'bg-primary';
+
+                        if (action === 'CONFIRMED') {
+                            dotClass = 'dot-confirmed';
+                            badgeClass = 'bg-success';
+                        } else if (action === 'COMPLETED') {
+                            dotClass = 'dot-completed';
+                            badgeClass = 'bg-info text-dark';
+                        } else if (action === 'CANCELLED') {
+                            dotClass = 'dot-cancelled';
+                            badgeClass = 'bg-danger';
+                        } else if (action === 'NO_SHOW') {
+                            dotClass = 'dot-no_show';
+                            badgeClass = 'badge-no-show';
+                        }
+
+                        const eventTimeStr = log.createdAt ? new Date(log.createdAt).toLocaleString('en-US', {
+                            month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit'
+                        }) : 'N/A';
+
+                        const apptTimeStr = log.appointmentTime ? new Date(log.appointmentTime).toLocaleString('en-US', {
+                            weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
+                        }) : null;
+
+                        return `
+                            <div class="timeline-card">
+                                <span class="timeline-dot ${dotClass}"></span>
+                                <div class="card border-0 shadow-sm rounded-3 p-3 bg-white">
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <span class="badge ${badgeClass} px-2 py-1 fw-bold">${action}</span>
+                                        <span class="text-muted extra-small">${eventTimeStr}</span>
+                                    </div>
+                                    ${log.serviceName ? `
+                                        <div class="fw-bold text-dark mt-1">
+                                            <i class="bi bi-scissors text-pink me-1"></i>${log.serviceName}
+                                        </div>
+                                    ` : ''}
+                                    ${apptTimeStr ? `
+                                        <div class="text-muted small mt-1">
+                                            <i class="bi bi-clock me-1"></i>Appointment: ${apptTimeStr}
+                                        </div>
+                                    ` : ''}
+                                    ${log.technicianName ? `
+                                        <div class="text-muted small">
+                                            <i class="bi bi-person me-1"></i>Technician: ${log.technicianName}
+                                        </div>
+                                    ` : ''}
+                                    ${log.notes ? `
+                                        <div class="mt-2 p-2 bg-light rounded small border">
+                                            <strong>Reason / Notes:</strong> ${log.notes}
+                                        </div>
+                                    ` : ''}
+                                    <div class="text-muted extra-small mt-2 pt-1 border-top">
+                                        <i class="bi bi-shield-check me-1"></i>Performed by: <strong>${log.performedBy || 'SYSTEM'}</strong>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            `;
+        }
+
+        body.innerHTML = `
+            ${riskBannerHtml}
+            ${reliabilityPillsHtml}
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="fw-bold text-dark mb-0">
+                    <i class="bi bi-clock-history text-pink me-1"></i>Chronological Audit Log (${logs.length})
+                </h6>
+                <span class="text-muted extra-small">Ordered by newest event</span>
+            </div>
+            ${timelineHtml}
+        `;
     }
 
     function handleLogout() {

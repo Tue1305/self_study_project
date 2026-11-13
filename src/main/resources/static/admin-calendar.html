@@ -292,6 +292,14 @@
             text-decoration: line-through;
         }
 
+        .timeline-appt-block.status-no_show {
+            border-left-color: #fd7e14;
+            background-color: #fff4e6;
+            color: #d9480f;
+            opacity: 0.85;
+            border-style: dashed;
+        }
+
         .appt-time-badge {
             font-size: 0.68rem;
             font-weight: 700;
@@ -681,6 +689,7 @@
         const [servicesCatalog, setServicesCatalog] = useState([]);
         const [loading, setLoading] = useState(true);
         const [selectedAppointment, setSelectedAppointment] = useState(null);
+        const [statusReason, setStatusReason] = useState('');
         const [now, setNow] = useState(() => new Date());
 
         const [walkInModal, setWalkInModal] = useState({
@@ -816,9 +825,12 @@
             });
         };
 
-        const handleUpdateStatus = async (aptId, newStatus) => {
+        const handleUpdateStatus = async (aptId, newStatus, reason = '') => {
+            const url = `/api/appointments/${aptId}/status?status=${encodeURIComponent(newStatus)}${
+                reason ? `&reason=${encodeURIComponent(reason)}` : ''
+            }`;
             try {
-                const res = await fetch(`/api/appointments/${aptId}/status?status=${encodeURIComponent(newStatus)}`, {
+                const res = await fetch(url, {
                     method: 'PATCH',
                     headers: {
                         'X-Tenant-ID': activeTenant,
@@ -827,6 +839,7 @@
                 });
                 if (res.ok) {
                     setSelectedAppointment(null);
+                    setStatusReason('');
                     fetchScheduleData(true);
                 } else {
                     alert('Failed to update appointment status.');
@@ -1345,23 +1358,53 @@
                             selectedAppointment.stationPreference && h('p', { className: 'mb-2' }, h('strong', null, 'Station / Suite: '), selectedAppointment.stationPreference),
                             h('p', { className: 'mb-2' }, h('strong', null, 'Time: '), new Date(selectedAppointment.appointmentTime).toLocaleString()),
                             selectedAppointment.notes && h('p', { className: 'mb-2' }, h('strong', null, 'Notes: '), selectedAppointment.notes),
-                            h('p', { className: 'mb-0' }, h('strong', null, 'Status: '), h('span', { className: 'badge bg-secondary' }, selectedAppointment.status || 'PENDING'))
+                            h('p', { className: 'mb-3' }, h('strong', null, 'Status: '), h('span', { className: 'badge bg-secondary' }, selectedAppointment.status || 'PENDING')),
+
+                            /* Audit note / Reason input */
+                            h('div', { className: 'p-3 bg-light rounded-3 border' },
+                                h('label', { className: 'form-label small fw-bold text-secondary mb-1' }, 'Cancellation / No-Show Reason (Audit Log Note):'),
+                                h('input', {
+                                    type: 'text',
+                                    className: 'form-control form-control-sm',
+                                    placeholder: 'e.g. Client unwell, Late cancellation, No call no show',
+                                    value: statusReason,
+                                    onChange: (e) => setStatusReason(e.target.value)
+                                }),
+                                h('div', { className: 'd-flex gap-1 mt-2' },
+                                    ['Late Cancel', 'Sick / Emergency', 'No Call / No Show'].map(preset =>
+                                        h('button', {
+                                            key: preset,
+                                            type: 'button',
+                                            className: 'btn btn-outline-secondary btn-sm py-0 px-2',
+                                            style: { fontSize: '0.72rem' },
+                                            onClick: () => setStatusReason(preset)
+                                        }, preset)
+                                    )
+                                )
+                            )
                         ),
                         h('div', { className: 'modal-footer d-flex justify-content-between' },
-                            h('div', null,
+                            h('div', { className: 'd-flex gap-2 flex-wrap' },
                                 h('button', {
-                                    className: 'btn btn-sm btn-outline-success me-1 fw-semibold',
+                                    className: 'btn btn-sm btn-outline-success fw-semibold',
                                     onClick: () => handleUpdateStatus(selectedAppointment.id, 'CONFIRMED')
                                 }, 'Confirm'),
                                 h('button', {
                                     className: 'btn btn-sm btn-outline-danger fw-semibold',
-                                    onClick: () => handleUpdateStatus(selectedAppointment.id, 'CANCELLED')
-                                }, 'Cancel')
+                                    onClick: () => handleUpdateStatus(selectedAppointment.id, 'CANCELLED', statusReason)
+                                }, 'Cancel'),
+                                h('button', {
+                                    className: 'btn btn-sm btn-outline-warning text-dark fw-semibold',
+                                    onClick: () => handleUpdateStatus(selectedAppointment.id, 'NO_SHOW', statusReason)
+                                }, 'Mark No-Show')
                             ),
                             h('button', {
                                 type: 'button',
                                 className: 'btn btn-sm btn-secondary',
-                                onClick: () => setSelectedAppointment(null)
+                                onClick: () => {
+                                    setSelectedAppointment(null);
+                                    setStatusReason('');
+                                }
                             }, 'Close')
                         )
                     )

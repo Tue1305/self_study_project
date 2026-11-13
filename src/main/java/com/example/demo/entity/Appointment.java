@@ -44,7 +44,7 @@ public class Appointment {
     private AppointmentStatus status = AppointmentStatus.PENDING;
 
     public enum AppointmentStatus {
-        PENDING, CONFIRMED, COMPLETED, CANCELLED
+        PENDING, CONFIRMED, COMPLETED, CANCELLED, NO_SHOW, RESCHEDULED
     }
 
     // Constructors

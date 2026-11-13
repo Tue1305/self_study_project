@@ -16,6 +16,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import com.example.demo.entity.Customer;
+import com.example.demo.service.AppointmentAuditService;
+import org.springframework.beans.factory.annotation.Autowired;
+
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -33,6 +37,24 @@ public class AppointmentController {
     private final ServiceRepository serviceRepository;
     private final UserRepository userRepository;
     private final TenantContextResolver tenantContextResolver;
+    private final AppointmentAuditService auditService;
+
+    @Autowired
+    public AppointmentController(
+            AppointmentRepository appointmentRepository,
+            CustomerRepository customerRepository,
+            ServiceRepository serviceRepository,
+            UserRepository userRepository,
+            TenantContextResolver tenantContextResolver,
+            @Autowired(required = false) AppointmentAuditService auditService
+    ) {
+        this.appointmentRepository = appointmentRepository;
+        this.customerRepository = customerRepository;
+        this.serviceRepository = serviceRepository;
+        this.userRepository = userRepository;
+        this.tenantContextResolver = tenantContextResolver;
+        this.auditService = auditService;
+    }
 
     public AppointmentController(
             AppointmentRepository appointmentRepository,
@@ -41,11 +63,7 @@ public class AppointmentController {
             UserRepository userRepository,
             TenantContextResolver tenantContextResolver
     ) {
-        this.appointmentRepository = appointmentRepository;
-        this.customerRepository = customerRepository;
-        this.serviceRepository = serviceRepository;
-        this.userRepository = userRepository;
-        this.tenantContextResolver = tenantContextResolver;
+        this(appointmentRepository, customerRepository, serviceRepository, userRepository, tenantContextResolver, null);
     }
 
     @GetMapping
@@ -331,7 +349,12 @@ public class AppointmentController {
                     guestDuration += (srv.getDurationMinutes() != null ? srv.getDurationMinutes() : 45);
                 }
 
-                syncCustomerRecord(guest.getCustomerName(), guest.getCustomerEmail(), guest.getCustomerPhone());
+                Customer guestCustomer = syncCustomerRecord(
+                        guest.getCustomerName(),
+                        guest.getCustomerEmail(),
+                        guest.getCustomerPhone(),
+                        tenantId
+                );
 
                 for (ServiceEntity srv : guestServices) {
                     Appointment appt = new Appointment();
@@ -373,6 +396,23 @@ public class AppointmentController {
 
                     Appointment saved = appointmentRepository.save(appt);
                     savedAppointments.add(saved);
+
+                    if (auditService != null) {
+                        String performedBy = Boolean.TRUE.equals(bookingRequest.getManualOverride())
+                                ? auditService.resolvePerformedBy("ADMIN")
+                                : auditService.resolvePerformedBy("CUSTOMER");
+                        auditService.logActivity(
+                                tenantId,
+                                guestCustomer != null ? guestCustomer.getId() : null,
+                                saved.getId(),
+                                saved.getCustomerName(),
+                                saved.getCustomerEmail(),
+                                saved.getCustomerPhone(),
+                                "BOOKED",
+                                performedBy,
+                                saved.getNotes()
+                        );
+                    }
                 }
 
                 grandTotal = grandTotal.add(guestSubtotal);
@@ -432,10 +472,11 @@ public class AppointmentController {
             return ResponseEntity.badRequest().body(Map.of("message", "Selected service does not belong to this salon."));
         }
 
-        syncCustomerRecord(
+        Customer customer = syncCustomerRecord(
                 bookingRequest.getCustomerName(),
                 bookingRequest.getCustomerEmail(),
-                bookingRequest.getCustomerPhone()
+                bookingRequest.getCustomerPhone(),
+                tenantId
         );
 
         Appointment appointment = new Appointment();
@@ -450,6 +491,24 @@ public class AppointmentController {
         appointment.setNailTech(resolvedTech);
 
         Appointment saved = appointmentRepository.save(appointment);
+
+        if (auditService != null) {
+            String performedBy = Boolean.TRUE.equals(bookingRequest.getManualOverride())
+                    ? auditService.resolvePerformedBy("ADMIN")
+                    : auditService.resolvePerformedBy("CUSTOMER");
+            auditService.logActivity(
+                    tenantId,
+                    customer != null ? customer.getId() : null,
+                    saved.getId(),
+                    saved.getCustomerName(),
+                    saved.getCustomerEmail(),
+                    saved.getCustomerPhone(),
+                    "BOOKED",
+                    performedBy,
+                    saved.getNotes()
+            );
+        }
+
         return ResponseEntity.ok(saved);
     }
 
@@ -472,9 +531,13 @@ public class AppointmentController {
         return ids;
     }
 
-    private void syncCustomerRecord(String name, String email, String phone) {
+    private Customer syncCustomerRecord(String name, String email, String phone) {
+        return syncCustomerRecord(name, email, phone, "default");
+    }
+
+    private Customer syncCustomerRecord(String name, String email, String phone, String tenantId) {
         if (email == null || email.isBlank()) {
-            return;
+            return null;
         }
         try {
             Customer customer = customerRepository.findByEmail(email.trim())
@@ -482,26 +545,83 @@ public class AppointmentController {
             customer.setName(name != null ? name.trim() : "");
             customer.setEmail(email.trim());
             customer.setPhone(phone != null ? phone.trim() : "");
-            customerRepository.save(customer);
+            if (customer.getTenantId() == null || customer.getTenantId().isBlank()) {
+                customer.setTenantId(tenantId != null ? tenantId : "default");
+            }
+            return customerRepository.save(customer);
         } catch (Exception ignored) {
+            return null;
         }
     }
 
     @PatchMapping("/{id}/status")
     public ResponseEntity<?> updateAppointmentStatus(
             @PathVariable Long id,
-            @RequestParam String status,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String reason,
+            @RequestParam(required = false) String notes,
+            @RequestBody(required = false) Map<String, Object> body,
             HttpServletRequest request
     ) {
+        String effectiveStatus = status;
+        String effectiveReason = reason != null ? reason : notes;
+        if (body != null) {
+            if (effectiveStatus == null && body.containsKey("status")) {
+                effectiveStatus = String.valueOf(body.get("status"));
+            }
+            if (effectiveReason == null) {
+                if (body.containsKey("reason")) effectiveReason = String.valueOf(body.get("reason"));
+                else if (body.containsKey("notes")) effectiveReason = String.valueOf(body.get("notes"));
+            }
+        }
+        if (effectiveStatus == null || effectiveStatus.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Status parameter is required."));
+        }
+
         String tenantId = tenantContextResolver.resolveTenantId(request);
+        final String finalStatus = effectiveStatus.trim();
+        final String finalReason = effectiveReason != null ? effectiveReason.trim() : null;
+
         return appointmentRepository.findByTenantIdAndId(tenantId, id)
                 .map(appointment -> {
                     try {
-                        appointment.setStatus(Appointment.AppointmentStatus.valueOf(status.toUpperCase()));
-                        appointmentRepository.save(appointment);
-                        return ResponseEntity.ok(Map.of("message", "Appointment status updated successfully"));
+                        Appointment.AppointmentStatus newStatus = Appointment.AppointmentStatus.valueOf(finalStatus.toUpperCase());
+                        appointment.setStatus(newStatus);
+                        if (finalReason != null && !finalReason.isBlank()) {
+                            String existingNotes = appointment.getNotes() != null ? appointment.getNotes().trim() : "";
+                            String reasonTag = "[" + newStatus.name() + " Reason: " + finalReason + "]";
+                            appointment.setNotes(existingNotes.isEmpty() ? reasonTag : existingNotes + " | " + reasonTag);
+                        }
+                        Appointment updated = appointmentRepository.save(appointment);
+
+                        // Look up customer record to link customer_id
+                        Customer customer = null;
+                        if (appointment.getCustomerEmail() != null && !appointment.getCustomerEmail().isBlank()) {
+                            customer = customerRepository.findByEmail(appointment.getCustomerEmail().trim()).orElse(null);
+                        }
+
+                        if (auditService != null) {
+                            String performedBy = auditService.resolvePerformedBy("ADMIN");
+                            auditService.logActivity(
+                                    tenantId,
+                                    customer != null ? customer.getId() : null,
+                                    updated.getId(),
+                                    updated.getCustomerName(),
+                                    updated.getCustomerEmail(),
+                                    updated.getCustomerPhone(),
+                                    newStatus.name(),
+                                    performedBy,
+                                    finalReason != null ? finalReason : ("Status changed to " + newStatus.name())
+                            );
+                        }
+
+                        return ResponseEntity.ok(Map.of(
+                                "message", "Appointment status updated successfully",
+                                "status", newStatus.name(),
+                                "appointment", updated
+                        ));
                     } catch (IllegalArgumentException e) {
-                        return ResponseEntity.badRequest().body(Map.of("message", "Invalid status value provided"));
+                        return ResponseEntity.badRequest().body(Map.of("message", "Invalid status value provided: " + finalStatus));
                     }
                 })
                 .orElse(ResponseEntity.status(HttpStatus.NOT_FOUND)

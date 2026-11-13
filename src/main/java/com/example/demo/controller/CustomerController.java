@@ -25,9 +25,29 @@ public class CustomerController {
     @Autowired
     private CustomerRepository customerRepository;
 
+    @Autowired
+    private com.example.demo.service.AppointmentAuditService auditService;
+
+    @Autowired
+    private com.example.demo.service.TenantContextResolver tenantContextResolver;
+
     @GetMapping
     public List<Customer> getAllCustomers() {
         return customerService.getAllCustomers();
+    }
+
+    @GetMapping("/{customerId}/history")
+    public ResponseEntity<?> getCustomerHistory(
+            @PathVariable Long customerId,
+            jakarta.servlet.http.HttpServletRequest request
+    ) {
+        String tenantId = tenantContextResolver.resolveTenantId(request);
+        Map<String, Object> history = auditService.getCustomerHistory(tenantId, customerId);
+        if (history == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("message", "Customer not found."));
+        }
+        return ResponseEntity.ok(history);
     }
 
     @PostMapping

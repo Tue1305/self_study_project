@@ -146,6 +146,60 @@ class NotificationServiceTest {
     }
 
     @Test
+    @DisplayName("Cancellation Notice: Dispatches branded cancellation notification with reason")
+    void testSendCancellationNotice() {
+        ServiceEntity service = new ServiceEntity();
+        service.setName("Royal Lavender Spa Pedicure");
+        service.setPrice(new BigDecimal("72.00"));
+
+        Appointment appt = new Appointment();
+        appt.setId(301L);
+        appt.setTenantId("luxe");
+        appt.setCustomerName("Marcus Aurelius");
+        appt.setCustomerEmail("marcus@example.com");
+        appt.setCustomerPhone("(555) 777-8888");
+        appt.setAppointmentTime(LocalDateTime.of(2026, 11, 25, 15, 30));
+        appt.setService(service);
+        appt.setCancellationToken("token-cancel-301");
+
+        NotificationService.NotificationResult result = notificationService.sendCancellationNotice(appt, "Flight delayed");
+        assertNotNull(result);
+        assertTrue(result.success());
+        assertTrue(result.simulated());
+        assertTrue(result.details().contains("marcus@example.com"));
+    }
+
+    @Test
+    @DisplayName("Reschedule Notice: Dispatches branded reschedule notification with old and new time")
+    void testSendRescheduleNotice() {
+        ServiceEntity service = new ServiceEntity();
+        service.setName("Luxe Signature Gel Manicure");
+        service.setPrice(new BigDecimal("48.00"));
+
+        UserEntity tech = new UserEntity();
+        tech.setName("Sophia Laurent");
+
+        Appointment appt = new Appointment();
+        appt.setId(401L);
+        appt.setTenantId("luxe");
+        appt.setCustomerName("Elena Rostova");
+        appt.setCustomerEmail("elena@example.com");
+        appt.setCustomerPhone("(555) 999-0000");
+        appt.setAppointmentTime(LocalDateTime.of(2026, 11, 26, 16, 0)); // New time
+        appt.setService(service);
+        appt.setNailTech(tech);
+        appt.setCancellationToken("token-resched-401");
+
+        LocalDateTime oldTime = LocalDateTime.of(2026, 11, 24, 11, 0);
+
+        NotificationService.NotificationResult result = notificationService.sendRescheduleNotice(appt, oldTime);
+        assertNotNull(result);
+        assertTrue(result.success());
+        assertTrue(result.simulated());
+        assertTrue(result.details().contains("elena@example.com"));
+    }
+
+    @Test
     @DisplayName("Fault Tolerance: Null appointment returns safe error result without exception")
     void testResilience_NullAppointment() {
         NotificationService.NotificationResult result = notificationService.sendBookingConfirmation(null);

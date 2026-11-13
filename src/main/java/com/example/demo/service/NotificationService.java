@@ -126,6 +126,185 @@ public class NotificationService {
     }
 
     /**
+     * Dispatches cancellation notice email and SMS for an appointment.
+     */
+    public NotificationResult sendCancellationNotice(Appointment appointment, String reason) {
+        if (appointment == null) {
+            return new NotificationResult(false, true, null, "Appointment was null");
+        }
+        try {
+            TenantConfig config = resolveTenantConfig(appointment.getTenantId());
+            String salonName = config.getSalonName() != null ? config.getSalonName() : "Jenny's Nail Studio";
+            String primaryColor = config.getPrimaryColor() != null ? config.getPrimaryColor() : "#e83e8c";
+            String salonAddress = resolveSalonAddress(config.getTenantKey());
+            String supportPhone = resolveSupportPhone(config.getTenantKey());
+
+            String customerName = appointment.getCustomerName() != null ? appointment.getCustomerName().trim() : "Valued Guest";
+            String customerEmail = appointment.getCustomerEmail() != null ? appointment.getCustomerEmail().trim() : "";
+            String customerPhone = appointment.getCustomerPhone() != null ? appointment.getCustomerPhone().trim() : "";
+            String formattedTime = appointment.getAppointmentTime() != null
+                    ? appointment.getAppointmentTime().format(DISPLAY_DATE_TIME_FORMATTER)
+                    : "Scheduled Date & Time";
+
+            String serviceName = (appointment.getService() != null && appointment.getService().getName() != null)
+                    ? appointment.getService().getName()
+                    : "Salon Service";
+
+            String effectiveReason = (reason != null && !reason.isBlank()) ? reason.trim() : "Customer / Salon Request";
+            String subject = "Appointment Cancelled: " + serviceName + " at " + salonName;
+
+            String rebookUrl = buildSelfServiceLink(config, null).replace("action=manage", "action=book");
+
+            String htmlBody = String.format("""
+                    <!DOCTYPE html>
+                    <html>
+                    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f7fafc; margin: 0; padding: 20px; color: #2d3748;">
+                        <div style="max-width: 600px; margin: 20px auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
+                            <div style="background-color: #e53e3e; padding: 28px 24px; text-align: center; color: #ffffff;">
+                                <h1 style="margin: 0; font-size: 24px; font-weight: 700;">%s</h1>
+                                <p style="margin: 6px 0 0 0; font-size: 15px; opacity: 0.95;">Appointment Cancellation Notice</p>
+                            </div>
+                            <div style="padding: 28px;">
+                                <p style="font-size: 16px; margin: 0 0 16px 0;">Hi <strong>%s</strong>,</p>
+                                <p style="color: #4a5568; line-height: 1.6; margin: 0 0 20px 0;">
+                                    Your reservation for <strong>%s</strong> on <strong>%s</strong> has been cancelled.
+                                </p>
+                                <div style="background-color: #fff5f5; border: 1px solid #fed7d7; border-left: 4px solid #e53e3e; border-radius: 6px; padding: 14px; margin-bottom: 24px; font-size: 14px; color: #9b2c2c;">
+                                    <strong>Cancellation Reason:</strong> %s
+                                </div>
+                                <div style="text-align: center; margin: 28px 0;">
+                                    <a href="%s" style="background-color: %s; color: #ffffff; padding: 12px 26px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block;">
+                                        Book a New Appointment
+                                    </a>
+                                </div>
+                            </div>
+                            <div style="background-color: #edf2f7; padding: 18px 24px; font-size: 12px; color: #718096; text-align: center; border-top: 1px solid #e2e8f0;">
+                                <p style="margin: 0 0 4px 0; font-weight: 600; color: #4a5568;">%s</p>
+                                <p style="margin: 0 0 4px 0;">%s | Questions? Call %s</p>
+                            </div>
+                        </div>
+                    </body>
+                    </html>
+                    """,
+                    salonName,
+                    customerName,
+                    serviceName,
+                    formattedTime,
+                    effectiveReason,
+                    rebookUrl,
+                    primaryColor,
+                    salonName,
+                    salonAddress,
+                    supportPhone
+            );
+
+            String smsBody = String.format("%s: Your appointment for %s on %s has been cancelled. Reason: %s. Re-book anytime: %s Questions? Call %s",
+                    salonName, serviceName, formattedTime, effectiveReason, rebookUrl, supportPhone);
+
+            return dispatchNotification(customerEmail, customerPhone, subject, htmlBody, smsBody, config);
+        } catch (Exception e) {
+            logger.warn("[NotificationService] Error preparing cancellation notice: {}", e.getMessage(), e);
+            return new NotificationResult(false, true, null, "Error: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Dispatches reschedule notice email and SMS for an appointment.
+     */
+    public NotificationResult sendRescheduleNotice(Appointment appointment, LocalDateTime previousTime) {
+        if (appointment == null) {
+            return new NotificationResult(false, true, null, "Appointment was null");
+        }
+        try {
+            TenantConfig config = resolveTenantConfig(appointment.getTenantId());
+            String salonName = config.getSalonName() != null ? config.getSalonName() : "Jenny's Nail Studio";
+            String primaryColor = config.getPrimaryColor() != null ? config.getPrimaryColor() : "#e83e8c";
+            String salonAddress = resolveSalonAddress(config.getTenantKey());
+            String supportPhone = resolveSupportPhone(config.getTenantKey());
+
+            String customerName = appointment.getCustomerName() != null ? appointment.getCustomerName().trim() : "Valued Guest";
+            String customerEmail = appointment.getCustomerEmail() != null ? appointment.getCustomerEmail().trim() : "";
+            String customerPhone = appointment.getCustomerPhone() != null ? appointment.getCustomerPhone().trim() : "";
+            String newFormattedTime = appointment.getAppointmentTime() != null
+                    ? appointment.getAppointmentTime().format(DISPLAY_DATE_TIME_FORMATTER)
+                    : "New Date & Time";
+            String oldFormattedTime = previousTime != null
+                    ? previousTime.format(DISPLAY_DATE_TIME_FORMATTER)
+                    : "Previous Date & Time";
+
+            String serviceName = (appointment.getService() != null && appointment.getService().getName() != null)
+                    ? appointment.getService().getName()
+                    : "Salon Service";
+
+            String techName = (appointment.getNailTech() != null && appointment.getNailTech().getName() != null)
+                    ? appointment.getNailTech().getName()
+                    : "First Available Specialist";
+
+            String cancellationUrl = buildSelfServiceLink(config, appointment.getCancellationToken());
+            String subject = "Appointment Rescheduled: " + serviceName + " at " + salonName;
+
+            String htmlBody = String.format("""
+                    <!DOCTYPE html>
+                    <html>
+                    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f7fafc; margin: 0; padding: 20px; color: #2d3748;">
+                        <div style="max-width: 600px; margin: 20px auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
+                            <div style="background-color: %s; padding: 28px 24px; text-align: center; color: #ffffff;">
+                                <h1 style="margin: 0; font-size: 24px; font-weight: 700;">%s</h1>
+                                <p style="margin: 6px 0 0 0; font-size: 15px; opacity: 0.95;">Appointment Rescheduled</p>
+                            </div>
+                            <div style="padding: 28px;">
+                                <p style="font-size: 16px; margin: 0 0 16px 0;">Hi <strong>%s</strong>,</p>
+                                <p style="color: #4a5568; line-height: 1.6; margin: 0 0 20px 0;">
+                                    Your appointment has been successfully rescheduled. Please review your updated details below:
+                                </p>
+                                <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 18px; margin-bottom: 24px;">
+                                    <div style="font-size: 12px; text-transform: uppercase; color: #a0aec0; font-weight: 600;">Previous Time</div>
+                                    <div style="font-size: 14px; color: #718096; text-decoration: line-through; margin-bottom: 12px;">%s</div>
+                                    <div style="font-size: 12px; text-transform: uppercase; color: #38a169; font-weight: 700;">New Confirmed Time</div>
+                                    <div style="font-size: 16px; font-weight: 700; color: #2d3748; margin-bottom: 12px;">%s</div>
+                                    <div style="font-size: 12px; text-transform: uppercase; color: #a0aec0; font-weight: 600;">Service & Specialist</div>
+                                    <div style="font-size: 15px; font-weight: 600; color: %s;">%s with %s</div>
+                                </div>
+                                <div style="text-align: center; margin: 28px 0;">
+                                    <a href="%s" style="background-color: %s; color: #ffffff; padding: 12px 26px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block;">
+                                        Manage Appointment
+                                    </a>
+                                </div>
+                            </div>
+                            <div style="background-color: #edf2f7; padding: 18px 24px; font-size: 12px; color: #718096; text-align: center; border-top: 1px solid #e2e8f0;">
+                                <p style="margin: 0 0 4px 0; font-weight: 600; color: #4a5568;">%s</p>
+                                <p style="margin: 0 0 4px 0;">%s | Questions? Call %s</p>
+                            </div>
+                        </div>
+                    </body>
+                    </html>
+                    """,
+                    primaryColor,
+                    salonName,
+                    customerName,
+                    oldFormattedTime,
+                    newFormattedTime,
+                    primaryColor,
+                    serviceName,
+                    techName,
+                    cancellationUrl,
+                    primaryColor,
+                    salonName,
+                    salonAddress,
+                    supportPhone
+            );
+
+            String smsBody = String.format("%s: Your appointment for %s is rescheduled to %s with %s. Manage/Cancel: %s Questions? Call %s",
+                    salonName, serviceName, newFormattedTime, techName, cancellationUrl, supportPhone);
+
+            return dispatchNotification(customerEmail, customerPhone, subject, htmlBody, smsBody, config);
+        } catch (Exception e) {
+            logger.warn("[NotificationService] Error preparing reschedule notice: {}", e.getMessage(), e);
+            return new NotificationResult(false, true, null, "Error: " + e.getMessage());
+        }
+    }
+
+    /**
      * Handles notifications for multi-service or multi-guest bookings.
      * Dispatches individual confirmations to each guest's contact info,
      * plus an aggregated booking confirmation receipt to the primary booker.

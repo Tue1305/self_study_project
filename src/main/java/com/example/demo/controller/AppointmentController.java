@@ -4,6 +4,7 @@ import com.example.demo.dto.BookingRequestDto;
 import com.example.demo.entity.Appointment;
 import com.example.demo.entity.Customer;
 import com.example.demo.entity.ServiceEntity;
+import com.example.demo.entity.TenantConfig;
 import com.example.demo.entity.UserEntity;
 import com.example.demo.repository.AppointmentRepository;
 import com.example.demo.repository.CustomerRepository;
@@ -41,6 +42,13 @@ public class AppointmentController {
     private final TenantContextResolver tenantContextResolver;
     private final AppointmentAuditService auditService;
     private final NotificationService notificationService;
+
+    private static final java.util.regex.Pattern STRICT_EMAIL_PATTERN =
+            java.util.regex.Pattern.compile("^[a-zA-Z0-9_+&*-]+(?:\\.[a-zA-Z0-9_+&*-]+)*@(?:[a-zA-Z0-9-]+\\.)+[a-zA-Z]{2,}$");
+
+    private boolean isValidEmail(String email) {
+        return email != null && STRICT_EMAIL_PATTERN.matcher(email.trim()).matches();
+    }
 
     @Autowired
     public AppointmentController(
@@ -325,8 +333,8 @@ public class AppointmentController {
                 if (guest.getCustomerName() == null || guest.getCustomerName().isBlank()) {
                     return ResponseEntity.badRequest().body(Map.of("message", label + " name is required."));
                 }
-                if (guest.getCustomerEmail() == null || guest.getCustomerEmail().isBlank()) {
-                    return ResponseEntity.badRequest().body(Map.of("message", label + " email is required."));
+                if (guest.getCustomerEmail() == null || guest.getCustomerEmail().isBlank() || !isValidEmail(guest.getCustomerEmail())) {
+                    return ResponseEntity.badRequest().body(Map.of("message", "Please enter a valid email address for " + label + " (e.g. name@example.com)."));
                 }
                 if (guest.getCustomerPhone() == null || guest.getCustomerPhone().isBlank()) {
                     return ResponseEntity.badRequest().body(Map.of("message", label + " phone number is required."));
@@ -467,8 +475,8 @@ public class AppointmentController {
         if (bookingRequest.getCustomerName() == null || bookingRequest.getCustomerName().isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("message", "Customer name is required."));
         }
-        if (bookingRequest.getCustomerEmail() == null || bookingRequest.getCustomerEmail().isBlank()) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Customer email is required."));
+        if (bookingRequest.getCustomerEmail() == null || bookingRequest.getCustomerEmail().isBlank() || !isValidEmail(bookingRequest.getCustomerEmail())) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Please enter a valid email address (e.g. name@example.com)."));
         }
         if (bookingRequest.getCustomerPhone() == null || bookingRequest.getCustomerPhone().isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("message", "Customer phone number is required."));
@@ -641,6 +649,15 @@ public class AppointmentController {
                             );
                         }
 
+                        if (notificationService != null) {
+                            try {
+                                if (newStatus == Appointment.AppointmentStatus.CANCELLED) {
+                                    notificationService.sendCancellationNotice(updated, finalReason);
+                                }
+                            } catch (Exception ignored) {
+                            }
+                        }
+
                         return ResponseEntity.ok(Map.of(
                                 "message", "Appointment status updated successfully",
                                 "status", newStatus.name(),
@@ -674,6 +691,17 @@ public class AppointmentController {
                     details.put("status", appt.getStatus());
                     details.put("notes", appt.getNotes());
                     details.put("cancellationToken", appt.getCancellationToken());
+
+                    if (notificationService != null) {
+                        TenantConfig config = notificationService.resolveTenantConfig(appt.getTenantId());
+                        if (config != null) {
+                            details.put("salonName", config.getSalonName());
+                            details.put("primaryColor", config.getPrimaryColor());
+                            details.put("salonAddress", notificationService.resolveSalonAddress(config.getTenantKey()));
+                            details.put("supportPhone", notificationService.resolveSupportPhone(config.getTenantKey()));
+                        }
+                    }
+
                     return ResponseEntity.ok(details);
                 })
                 .orElse(ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", "Appointment not found for provided token")));
@@ -721,6 +749,13 @@ public class AppointmentController {
                         );
                     }
 
+                    if (notificationService != null) {
+                        try {
+                            notificationService.sendCancellationNotice(updated, finalReason);
+                        } catch (Exception ignored) {
+                        }
+                    }
+
                     return ResponseEntity.ok(Map.of(
                             "message", "Appointment cancelled successfully",
                             "status", "CANCELLED",
@@ -728,5 +763,133 @@ public class AppointmentController {
                     ));
                 })
                 .orElse(ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", "Appointment not found for provided token")));
+    }
+
+    @PostMapping("/by-token/{token}/reschedule")
+    public ResponseEntity<?> rescheduleAppointmentByToken(
+            @PathVariable String token,
+            @RequestBody Map<String, Object> body
+    ) {
+        if (token == null || token.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Token is required"));
+        }
+        if (body == null || (!body.containsKey("appointmentTime") && !body.containsKey("date"))) {
+            return ResponseEntity.badRequest().body(Map.of("message", "New appointment date/time is required."));
+        }
+
+        Optional<Appointment> existingOpt = appointmentRepository.findByCancellationToken(token.trim());
+        if (existingOpt.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", "Appointment not found for provided token"));
+        }
+
+        Appointment appt = existingOpt.get();
+        if (appt.getStatus() == Appointment.AppointmentStatus.CANCELLED) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Cancelled appointments cannot be rescheduled. Please book a new appointment."));
+        }
+        if (appt.getStatus() == Appointment.AppointmentStatus.COMPLETED) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Completed appointments cannot be rescheduled."));
+        }
+
+        LocalDateTime newTime;
+        try {
+            if (body.containsKey("appointmentTime") && body.get("appointmentTime") != null && !String.valueOf(body.get("appointmentTime")).isBlank()) {
+                newTime = LocalDateTime.parse(String.valueOf(body.get("appointmentTime")));
+            } else {
+                String dateStr = String.valueOf(body.get("date")).trim();
+                String timeStr = String.valueOf(body.get("startTime") != null ? body.get("startTime") : body.get("time")).trim();
+                if (!timeStr.contains(":")) {
+                    timeStr = timeStr + ":00";
+                }
+                if (timeStr.length() == 5) {
+                    timeStr = timeStr + ":00";
+                }
+                newTime = LocalDateTime.parse(dateStr + "T" + timeStr);
+            }
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Invalid date/time format. Please select an available slot."));
+        }
+
+        // Sunday validation
+        if (newTime.getDayOfWeek() == java.time.DayOfWeek.SUNDAY) {
+            return ResponseEntity.badRequest().body(Map.of("message", "We are closed on Sundays. Please choose Monday through Saturday."));
+        }
+
+        // Past-time check: must be at least 15 minutes in the future
+        LocalDateTime now = LocalDateTime.now();
+        if (newTime.isBefore(now.plusMinutes(15))) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Appointment time must be at least 15 minutes in the future."));
+        }
+
+        // Business hours check (10:00 to 19:00)
+        int hour = newTime.getHour();
+        if (hour < 10 || hour > 19 || (hour == 19 && newTime.getMinute() > 0)) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Appointment time must be between 10:00 AM and 7:00 PM."));
+        }
+
+        // Conflict check for assigned technician
+        if (appt.getNailTech() != null && appt.getNailTech().getId() != null) {
+            int duration = (appt.getService() != null && appt.getService().getDurationMinutes() != null)
+                    ? appt.getService().getDurationMinutes() : 45;
+            LocalDateTime newSlotEnd = newTime.plusMinutes(duration);
+
+            List<Appointment> dayAppts = appointmentRepository.findByTenantIdAndAppointmentTimeBetween(
+                    appt.getTenantId(),
+                    newTime.toLocalDate().atStartOfDay(),
+                    newTime.toLocalDate().plusDays(1).atStartOfDay()
+            );
+
+            boolean conflict = dayAppts.stream()
+                    .filter(a -> !a.getId().equals(appt.getId()))
+                    .filter(a -> a.getStatus() != Appointment.AppointmentStatus.CANCELLED)
+                    .filter(a -> a.getNailTech() != null && a.getNailTech().getId().equals(appt.getNailTech().getId()))
+                    .anyMatch(a -> hasOverlap(a, newTime, newSlotEnd));
+
+            if (conflict) {
+                return ResponseEntity.status(HttpStatus.CONFLICT)
+                        .body(Map.of("message", "The assigned technician is not available at this time. Please choose another time slot."));
+            }
+        }
+
+        LocalDateTime oldTime = appt.getAppointmentTime();
+        appt.setAppointmentTime(newTime);
+        appt.setStatus(Appointment.AppointmentStatus.CONFIRMED);
+        String reason = body.containsKey("reason") ? String.valueOf(body.get("reason")) : "Rescheduled by customer via self-service portal";
+        String existingNotes = appt.getNotes() != null ? appt.getNotes().trim() : "";
+        String reschedTag = "[RESCHEDULED: " + oldTime + " -> " + newTime + "]";
+        appt.setNotes(existingNotes.isEmpty() ? reschedTag : existingNotes + " | " + reschedTag);
+
+        Appointment updated = appointmentRepository.save(appt);
+
+        if (auditService != null) {
+            Customer customer = null;
+            if (appt.getCustomerEmail() != null && !appt.getCustomerEmail().isBlank()) {
+                customer = customerRepository.findByEmail(appt.getCustomerEmail().trim()).orElse(null);
+            }
+            auditService.logActivity(
+                    appt.getTenantId(),
+                    customer != null ? customer.getId() : null,
+                    updated.getId(),
+                    updated.getCustomerName(),
+                    updated.getCustomerEmail(),
+                    updated.getCustomerPhone(),
+                    "RESCHEDULED",
+                    "CUSTOMER",
+                    reason + " (New time: " + newTime + ")"
+            );
+        }
+
+        if (notificationService != null) {
+            try {
+                notificationService.sendRescheduleNotice(updated, oldTime);
+            } catch (Exception ignored) {
+            }
+        }
+
+        return ResponseEntity.ok(Map.of(
+                "message", "Appointment rescheduled successfully",
+                "status", "CONFIRMED",
+                "appointmentTime", newTime,
+                "appointment", updated
+        ));
     }
 }

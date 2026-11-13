@@ -366,6 +366,107 @@
                         <span id="wizardAlertText"></span>
                     </div>
 
+                    <!-- ==================== SELF-SERVICE MANAGE RESERVATION PORTAL ==================== -->
+                    <div id="selfServicePortalContainer" class="d-none">
+                        <!-- Alert Banner for cancellations or reschedules -->
+                        <div id="portalAlertBanner" class="alert d-none align-items-center" role="alert">
+                            <i id="portalAlertIcon" class="bi me-2 fs-5"></i>
+                            <span id="portalAlertText"></span>
+                        </div>
+
+                        <!-- Reservation Details Card -->
+                        <div class="card border rounded-4 p-4 shadow-sm bg-white mb-4">
+                            <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 border-bottom pb-3 mb-3">
+                                <div>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <h4 class="fw-bold mb-0 text-dark" id="portalCustomerName">Valued Guest</h4>
+                                        <span class="badge bg-success" id="portalStatusBadge">CONFIRMED</span>
+                                    </div>
+                                    <small class="text-muted" id="portalCustomerContact">email &bull; phone</small>
+                                </div>
+                                <div class="text-md-end">
+                                    <div class="fw-bold text-pink fs-5" id="portalSalonName">Salon Sanctuary</div>
+                                    <small class="text-muted" id="portalSalonPhone">(555) 000-0000</small>
+                                </div>
+                            </div>
+
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-6">
+                                    <div class="p-3 bg-light rounded-3 border">
+                                        <div class="small text-muted fw-semibold text-uppercase">Scheduled Date &amp; Time</div>
+                                        <div class="fw-bold fs-5 text-dark mt-1" id="portalDateTime">Loading...</div>
+                                        <div class="small text-muted mt-1" id="portalSalonAddress">Salon Address</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="p-3 bg-light rounded-3 border">
+                                        <div class="small text-muted fw-semibold text-uppercase">Reserved Treatment &amp; Specialist</div>
+                                        <div class="fw-bold fs-5 text-pink mt-1" id="portalServiceName">Service Name</div>
+                                        <div class="small text-dark mt-1">
+                                            Specialist: <strong id="portalTechName">Anyone Available</strong>
+                                            <span id="portalStationWrap" class="d-none"> &bull; Station: <strong id="portalStationName">Suite A</strong></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div id="portalNotesBox" class="p-3 bg-light rounded-3 border mb-3 d-none">
+                                <div class="small text-muted fw-semibold text-uppercase">Special Notes / Requests</div>
+                                <div class="small text-dark mt-1" id="portalNotesText"></div>
+                            </div>
+
+                            <!-- Actions Row -->
+                            <div id="portalActionButtons" class="d-flex flex-wrap gap-2 justify-content-between align-items-center pt-2">
+                                <div class="d-flex gap-2 flex-wrap">
+                                    <button type="button" class="btn btn-outline-danger px-3 py-2 fw-semibold rounded-3" id="portalCancelBtn" onclick="openPortalCancelPrompt()">
+                                        <i class="bi bi-x-circle me-1"></i> Cancel Reservation
+                                    </button>
+                                    <button type="button" class="btn btn-pink px-3 py-2 fw-semibold rounded-3" id="portalRescheduleToggleBtn" onclick="togglePortalRescheduleView()">
+                                        <i class="bi bi-calendar-event me-1"></i> Reschedule Reservation
+                                    </button>
+                                </div>
+                                <a href="booking.html" class="btn btn-outline-secondary px-3 py-2 fw-semibold rounded-3">
+                                    <i class="bi bi-plus-lg me-1"></i> Book Another Appointment
+                                </a>
+                            </div>
+
+                            <!-- Inline Reschedule Picker (Hidden by default) -->
+                            <div id="portalRescheduleBox" class="mt-4 p-4 border rounded-4 bg-light d-none">
+                                <h5 class="fw-bold text-dark mb-2"><i class="bi bi-calendar2-range text-pink me-2"></i>Select a New Date &amp; Time</h5>
+                                <p class="small text-muted mb-3">Choose a new available slot. Sunday is closed and past slots are disabled.</p>
+
+                                <div class="row g-3 mb-3">
+                                    <div class="col-md-6">
+                                        <label for="portalRescheduleDate" class="form-label fw-semibold small">New Date</label>
+                                        <input type="date" class="form-control" id="portalRescheduleDate" onchange="handlePortalRescheduleDateChange(this.value)">
+                                        <div id="portalDateClosedAlert" class="small text-danger fw-semibold mt-1 d-none">
+                                            <i class="bi bi-exclamation-triangle-fill me-1"></i>Closed on Sundays. Please choose Mon &ndash; Sat.
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="portalRescheduleSlot" class="form-label fw-semibold small">Available Time Slot</label>
+                                        <select class="form-select" id="portalRescheduleSlot">
+                                            <option value="">-- Choose an Available Slot --</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-12">
+                                        <label for="portalRescheduleReason" class="form-label fw-semibold small">Reason for Rescheduling (Optional)</label>
+                                        <input type="text" class="form-control" id="portalRescheduleReason" placeholder="e.g., Schedule change, personal conflict">
+                                    </div>
+                                </div>
+
+                                <div class="d-flex justify-content-end gap-2">
+                                    <button type="button" class="btn btn-outline-secondary px-3 py-2 fw-semibold rounded-3" onclick="togglePortalRescheduleView()">
+                                        Close
+                                    </button>
+                                    <button type="button" class="btn btn-pink px-4 py-2 fw-bold rounded-3" id="portalConfirmRescheduleBtn" onclick="submitPortalReschedule()">
+                                        <i class="bi bi-check2-circle me-1"></i> Confirm Reschedule
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- ==================== STEP 1: SELECT SERVICE (MULTI-SELECT + SOLO/GROUP PROMPT) ==================== -->
                     <section id="step1Panel">
                         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
@@ -577,7 +678,10 @@
 
                             <div class="mb-3">
                                 <label for="customerEmail" class="form-label fw-semibold"><span id="guestEmailLabel">Guest 1 Email Address</span> <span class="text-danger">*</span></label>
-                                <input type="email" class="form-control" id="customerEmail" required placeholder="jane@example.com">
+                                <input type="email" class="form-control" id="customerEmail" required placeholder="jane@example.com" oninput="validateEmailField(this)">
+                                <div id="emailValidationError" class="text-danger small mt-1 d-none">
+                                    <i class="bi bi-exclamation-circle me-1"></i>Please enter a valid email address with a proper domain (e.g. name@example.com).
+                                </div>
                             </div>
 
                             <div class="row g-3 mb-3">
@@ -800,8 +904,18 @@
 
     // ==================== INITIALIZATION & TENANT CONFIG ====================
     window.addEventListener('DOMContentLoaded', async () => {
-        // Detect if user navigated from a global "Book Now" button (no query param)
+        setupHeaderNav();
+        await loadTenantConfig();
+
+        // Check for ?token={cancellationToken} in URL query params for self-service portal
         const urlParams = new URLSearchParams(window.location.search);
+        const token = urlParams.get('token');
+        if (token) {
+            await initSelfServicePortal(token);
+            return;
+        }
+
+        // Detect if user navigated from a global "Book Now" button (no query param)
         const hasServiceParam = urlParams.has('serviceId') || urlParams.has('service_id') || urlParams.has('service');
 
         if (!hasServiceParam) {
@@ -809,12 +923,274 @@
             localStorage.removeItem('selectedDesign');
         }
 
-        setupHeaderNav();
-        await loadTenantConfig();
         populateStoreTimeSlots();
         await loadServicesStep1();
         updateWizardUI(1);
     });
+
+    // ==================== SELF-SERVICE MANAGE RESERVATION PORTAL LOGIC ====================
+    let currentPortalAppointment = null;
+    let currentPortalToken = null;
+
+    async function initSelfServicePortal(token) {
+        currentPortalToken = token;
+
+        // Hide normal booking wizard elements
+        const stepper = document.getElementById('wizardStepper');
+        if (stepper) stepper.classList.add('d-none');
+        const mainTitle = document.querySelector('.wizard-card-body h2');
+        if (mainTitle) mainTitle.textContent = 'Manage Your Reservation';
+        const subBanner = document.getElementById('selectedDesignBanner');
+        if (subBanner) subBanner.textContent = 'View, reschedule, or cancel your appointment';
+
+        ['step1Panel', 'step2Panel', 'stepStationPanel', 'step3Panel', 'stepSuccessPanel', 'liveSubtotalCard', 'tenantBannerBox'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.classList.add('d-none');
+        });
+
+        const portalContainer = document.getElementById('selfServicePortalContainer');
+        if (portalContainer) portalContainer.classList.remove('d-none');
+
+        try {
+            const res = await fetch(`/api/appointments/by-token/${encodeURIComponent(token)}`);
+            if (!res.ok) {
+                showPortalAlert('We could not find an appointment for this link. It may have expired or been removed.', 'danger');
+                document.getElementById('portalActionButtons').classList.add('d-none');
+                return;
+            }
+            const appt = await res.json();
+            currentPortalAppointment = appt;
+            renderPortalAppointment(appt);
+        } catch (err) {
+            console.error('Error fetching appointment by token:', err);
+            showPortalAlert('Unable to load appointment details. Please check your connection.', 'danger');
+        }
+    }
+
+    function renderPortalAppointment(appt) {
+        document.getElementById('portalCustomerName').textContent = appt.customerName || 'Valued Guest';
+        document.getElementById('portalCustomerContact').textContent = `${appt.customerEmail || ''} • ${appt.customerPhone || ''}`;
+
+        const badge = document.getElementById('portalStatusBadge');
+        const status = (appt.status || 'CONFIRMED').toUpperCase();
+        badge.textContent = status;
+        badge.className = 'badge';
+        if (status === 'CONFIRMED') badge.classList.add('bg-success');
+        else if (status === 'CANCELLED') badge.classList.add('bg-danger');
+        else if (status === 'NO_SHOW') badge.classList.add('bg-warning', 'text-dark');
+        else if (status === 'COMPLETED') badge.classList.add('bg-secondary');
+        else badge.classList.add('bg-primary');
+
+        if (appt.salonName) document.getElementById('portalSalonName').textContent = appt.salonName;
+        if (appt.supportPhone) document.getElementById('portalSalonPhone').textContent = appt.supportPhone;
+        if (appt.salonAddress) document.getElementById('portalSalonAddress').textContent = appt.salonAddress;
+
+        if (appt.appointmentTime) {
+            const d = new Date(appt.appointmentTime);
+            document.getElementById('portalDateTime').textContent = d.toLocaleString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true
+            });
+        }
+
+        const srv = appt.service;
+        document.getElementById('portalServiceName').textContent = srv ? `${srv.name} ($${Number(srv.price || 0).toFixed(2)})` : 'Salon Service';
+
+        const tech = appt.nailTech;
+        document.getElementById('portalTechName').textContent = tech ? (tech.name || tech.username) : 'Anyone Available';
+
+        if (appt.stationPreference) {
+            document.getElementById('portalStationWrap').classList.remove('d-none');
+            document.getElementById('portalStationName').textContent = appt.stationPreference;
+        }
+
+        if (appt.notes && appt.notes.trim()) {
+            document.getElementById('portalNotesBox').classList.remove('d-none');
+            document.getElementById('portalNotesText').textContent = appt.notes;
+        }
+
+        const isTerminal = (status === 'CANCELLED' || status === 'COMPLETED');
+        const actionRow = document.getElementById('portalActionButtons');
+        if (actionRow) {
+            const cancelBtn = document.getElementById('portalCancelBtn');
+            const reschedBtn = document.getElementById('portalRescheduleToggleBtn');
+            if (cancelBtn) cancelBtn.classList.toggle('d-none', isTerminal);
+            if (reschedBtn) reschedBtn.classList.toggle('d-none', isTerminal);
+        }
+    }
+
+    function showPortalAlert(msg, type = 'success') {
+        const banner = document.getElementById('portalAlertBanner');
+        const text = document.getElementById('portalAlertText');
+        const icon = document.getElementById('portalAlertIcon');
+        if (!banner || !text) return;
+        banner.className = `alert alert-${type} d-flex align-items-center mb-4`;
+        text.textContent = msg;
+        if (icon) {
+            icon.className = (type === 'danger') ? 'bi bi-x-circle-fill me-2 fs-5' : 'bi bi-check-circle-fill me-2 fs-5';
+        }
+        banner.classList.remove('d-none');
+        banner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    async function openPortalCancelPrompt() {
+        if (!confirm('Are you sure you want to cancel this appointment?')) {
+            return;
+        }
+        const reason = prompt('Optional reason for cancellation:', 'Schedule conflict') || 'Cancelled by customer';
+        try {
+            const res = await fetch(`/api/appointments/by-token/${encodeURIComponent(currentPortalToken)}/cancel`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ reason: reason })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                showPortalAlert('Your appointment has been cancelled successfully. A confirmation notice has been sent to your email and phone.', 'warning');
+                if (data.appointment) {
+                    renderPortalAppointment(data.appointment);
+                } else {
+                    document.getElementById('portalStatusBadge').textContent = 'CANCELLED';
+                    document.getElementById('portalStatusBadge').className = 'badge bg-danger';
+                }
+                const cancelBtn = document.getElementById('portalCancelBtn');
+                const reschedBtn = document.getElementById('portalRescheduleToggleBtn');
+                if (cancelBtn) cancelBtn.classList.add('d-none');
+                if (reschedBtn) reschedBtn.classList.add('d-none');
+                const reschedBox = document.getElementById('portalRescheduleBox');
+                if (reschedBox) reschedBox.classList.add('d-none');
+            } else {
+                showPortalAlert(data.message || 'Unable to cancel appointment.', 'danger');
+            }
+        } catch (err) {
+            console.error('Error cancelling appointment:', err);
+            showPortalAlert('Network error while cancelling. Please try again.', 'danger');
+        }
+    }
+
+    function togglePortalRescheduleView() {
+        const box = document.getElementById('portalRescheduleBox');
+        if (!box) return;
+        const isClosed = box.classList.contains('d-none');
+        box.classList.toggle('d-none');
+
+        if (isClosed) {
+            const dateInput = document.getElementById('portalRescheduleDate');
+            const today = new Date().toISOString().split('T')[0];
+            dateInput.min = today;
+            if (!dateInput.value) {
+                dateInput.value = today;
+                handlePortalRescheduleDateChange(today);
+            }
+            box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+    }
+
+    async function handlePortalRescheduleDateChange(dateStr) {
+        const slotSelect = document.getElementById('portalRescheduleSlot');
+        const closedAlert = document.getElementById('portalDateClosedAlert');
+        if (!dateStr || !slotSelect) return;
+
+        const dayOfWeek = new Date(dateStr + 'T00:00:00').getDay();
+        if (dayOfWeek === 0) { // Sunday
+            if (closedAlert) closedAlert.classList.remove('d-none');
+            slotSelect.innerHTML = '<option value="">-- Closed on Sundays --</option>';
+            slotSelect.disabled = true;
+            return;
+        }
+        if (closedAlert) closedAlert.classList.add('d-none');
+        slotSelect.disabled = false;
+        slotSelect.innerHTML = '<option value="">Loading available slots...</option>';
+
+        try {
+            const techId = currentPortalAppointment && currentPortalAppointment.nailTech ? currentPortalAppointment.nailTech.id : '';
+            const duration = currentPortalAppointment && currentPortalAppointment.service ? (currentPortalAppointment.service.durationMinutes || 45) : 45;
+            const res = await fetch(`/api/appointments/availability?date=${encodeURIComponent(dateStr)}&durationMinutes=${duration}&techId=${techId}`);
+            if (!res.ok) throw new Error('Availability check failed');
+            const data = await res.json();
+
+            slotSelect.innerHTML = '<option value="">-- Choose an Available Slot --</option>';
+            const slots = data.availableSlots || [];
+            let availCount = 0;
+            slots.forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s.value;
+                if (!s.available || s.isPast) {
+                    opt.disabled = true;
+                    opt.textContent = `${s.label} (${s.isPast ? 'Past' : (s.reason || 'Booked')})`;
+                } else {
+                    opt.textContent = s.label;
+                    availCount++;
+                }
+                slotSelect.appendChild(opt);
+            });
+
+            if (availCount === 0) {
+                const opt = document.createElement('option');
+                opt.disabled = true;
+                opt.textContent = 'No slots available on this date';
+                slotSelect.appendChild(opt);
+            }
+        } catch (err) {
+            console.error('Error loading reschedule slots:', err);
+            slotSelect.innerHTML = '<option value="">Unable to load time slots</option>';
+        }
+    }
+
+    async function submitPortalReschedule() {
+        const dateStr = document.getElementById('portalRescheduleDate').value;
+        const timeStr = document.getElementById('portalRescheduleSlot').value;
+        const reason = document.getElementById('portalRescheduleReason').value.trim();
+
+        if (!dateStr || !timeStr) {
+            alert('Please choose both an appointment date and an available time slot.');
+            return;
+        }
+
+        const confirmBtn = document.getElementById('portalConfirmRescheduleBtn');
+        if (confirmBtn) {
+            confirmBtn.disabled = true;
+            confirmBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Rescheduling...';
+        }
+
+        try {
+            const payload = {
+                date: dateStr,
+                startTime: timeStr,
+                reason: reason || 'Customer self-service reschedule'
+            };
+            const res = await fetch(`/api/appointments/by-token/${encodeURIComponent(currentPortalToken)}/reschedule`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+
+            if (res.ok) {
+                showPortalAlert(`Appointment rescheduled successfully to ${dateStr} at ${timeStr}! Updated details sent to your email.`, 'success');
+                if (data.appointment) {
+                    currentPortalAppointment = data.appointment;
+                    renderPortalAppointment(data.appointment);
+                }
+                document.getElementById('portalRescheduleBox').classList.add('d-none');
+            } else {
+                showPortalAlert(data.message || 'Unable to reschedule appointment. Please pick another time slot.', 'danger');
+            }
+        } catch (err) {
+            console.error('Error submitting reschedule:', err);
+            showPortalAlert('Network error while rescheduling. Please try again.', 'danger');
+        } finally {
+            if (confirmBtn) {
+                confirmBtn.disabled = false;
+                confirmBtn.innerHTML = '<i class="bi bi-check2-circle me-1"></i> Confirm Reschedule';
+            }
+        }
+    }
 
     async function loadTenantConfig() {
         const params = new URLSearchParams(window.location.search);
@@ -1722,34 +2098,36 @@
                 nextBtn.disabled = true;
             }
         } else {
-            // ==================== 2+ SERVICES SELECTION ====================
-            // Pop out big cards for each selected service category.
-            // Under each category card: (Anyone Available) + staff cards that can do those services.
+            // ==================== 2+ SERVICES SELECTION (DYNAMIC N-SERVICES) ====================
+            // Iterates dynamically over every single selected service (guestServices.map)
+            // Displays qualified technicians per service + "Anyone Available" option
             singleContainer.classList.add('d-none');
             multiContainer.classList.remove('d-none');
             categoryCardsContainer.innerHTML = '';
 
-            const groups = getGuestServiceCategoryGroups(guestServices);
-            const groupKeys = Object.keys(groups);
+            guestServices.forEach((srv, srvIdx) => {
+                const catId = getCategoryForService(srv);
+                const backendCat = mapCategoryToBackend(catId);
+                const catCfg = serviceCategoryConfigs.find(c => c.id === catId);
+                const catTitle = catCfg ? catCfg.title : 'Treatment';
+                const qualifiedTechs = bookingState.staffList.filter(t => isTechQualifiedForBackend(t, backendCat));
 
-            groupKeys.forEach(catId => {
-                const grp = groups[catId];
-                const qualifiedTechs = bookingState.staffList.filter(t => isTechQualifiedForBackend(t, grp.backendCat));
+                const assignedVal = currentGuest.serviceStaffAssignments ? currentGuest.serviceStaffAssignments[srv.id] : undefined;
+                const isAnyoneAssigned = (assignedVal === null);
 
-                // Big card for this category
-                const bigCard = document.createElement('div');
-                bigCard.className = 'card border rounded-4 p-4 shadow-sm bg-white mb-3';
-                bigCard.id = `catBigCard-${catId}`;
+                // Service card
+                const serviceCard = document.createElement('div');
+                serviceCard.className = 'card border rounded-4 p-4 shadow-sm bg-white mb-3';
+                serviceCard.id = `srvBigCard-${srv.id}`;
 
                 let staffCardsHtml = '';
 
-                // Anyone Available card for this category
-                const isAnyoneAssigned = grp.services.every(s => currentGuest.serviceStaffAssignments[s.id] === null);
+                // 1. Anyone Available card for this specific service
                 staffCardsHtml += `
                     <div class="col-md-6">
                         <div class="staff-card d-flex align-items-center justify-content-between ${isAnyoneAssigned ? 'selected' : ''}"
-                             id="catCard-${catId}-anyone"
-                             onclick="selectCategoryStaff('${catId}', 'anyone')">
+                             id="srvCard-${srv.id}-anyone"
+                             onclick="selectServiceStaff(${srv.id}, 'anyone')">
                             <div class="d-flex align-items-center gap-3">
                                 <div class="staff-avatar"><i class="bi bi-lightning-charge-fill"></i></div>
                                 <div>
@@ -1762,14 +2140,14 @@
                     </div>
                 `;
 
-                // Qualified staff cards for this category
+                // 2. Qualified staff cards for this specific service
                 qualifiedTechs.forEach(tech => {
-                    const isTechAssigned = grp.services.every(s => currentGuest.serviceStaffAssignments[s.id] === tech.id);
+                    const isTechAssigned = (assignedVal === tech.id);
                     staffCardsHtml += `
                         <div class="col-md-6">
                             <div class="staff-card d-flex align-items-center justify-content-between ${isTechAssigned ? 'selected' : ''}"
-                                 id="catCard-${catId}-${tech.id}"
-                                 onclick="selectCategoryStaff('${catId}', ${tech.id})">
+                                 id="srvCard-${srv.id}-${tech.id}"
+                                 onclick="selectServiceStaff(${srv.id}, ${tech.id})">
                                 <div class="d-flex align-items-center gap-3">
                                     <div class="staff-avatar"><i class="bi bi-person-fill"></i></div>
                                     <div>
@@ -1783,25 +2161,28 @@
                     `;
                 });
 
-                bigCard.innerHTML = `
+                serviceCard.innerHTML = `
                     <div class="d-flex flex-wrap justify-content-between align-items-center border-bottom pb-3 mb-3">
                         <div>
-                            <h5 class="fw-bold text-dark mb-1"><i class="bi bi-stars text-pink me-2"></i>${grp.title}</h5>
-                            <div class="small text-muted">${grp.services.map(s => `${s.name} ($${Number(s.price || 0).toFixed(2)})`).join(', ')}</div>
+                            <span class="badge bg-danger-subtle text-pink border border-danger-subtle px-2 py-1 rounded-pill small mb-1">
+                                Service ${srvIdx + 1} of ${guestServices.length} &bull; ${catTitle}
+                            </span>
+                            <h5 class="fw-bold text-dark mb-1 mt-1"><i class="bi bi-stars text-pink me-2"></i>${srv.name}</h5>
+                            <div class="small text-muted">$${Number(srv.price || 0).toFixed(2)} &bull; ${srv.durationMinutes || 45} mins</div>
                         </div>
                         <span class="badge bg-light text-secondary border px-3 py-2 rounded-pill small">
-                            ${grp.services.length} Treatment${grp.services.length === 1 ? '' : 's'}
+                            ${qualifiedTechs.length} Specialists Available
                         </span>
                     </div>
-                    <div class="row g-3" id="catStaffGrid-${catId}">
+                    <div class="row g-3" id="srvStaffGrid-${srv.id}">
                         ${staffCardsHtml}
                     </div>
                 `;
 
-                categoryCardsContainer.appendChild(bigCard);
+                categoryCardsContainer.appendChild(serviceCard);
             });
 
-            checkMultiServiceStaffCompletion(currentGuest, groups);
+            checkMultiServiceStaffCompletion(currentGuest);
         }
     }
 
@@ -1857,83 +2238,64 @@
         return groups;
     }
 
-    function selectCategoryStaff(catId, identifier) {
+    function selectServiceStaff(serviceId, identifier) {
         hideAlert();
         const currentGuest = bookingState.guests[bookingState.staffGuestIndex] || bookingState.guests[0];
-        const groups = getGuestServiceCategoryGroups(currentGuest.services || []);
-        const grp = groups[catId];
-        if (!grp) return;
-
-        if (identifier === 'anyone') {
-            // Assign Anyone Available to this category
-            grp.services.forEach(s => {
-                currentGuest.serviceStaffAssignments[s.id] = null;
-            });
-            // Update visual selection in this category
-            document.querySelectorAll(`#catStaffGrid-${catId} .staff-card`).forEach(c => c.classList.remove('selected'));
-            const card = document.getElementById(`catCard-${catId}-anyone`);
-            if (card) card.classList.add('selected');
-
-            checkMultiServiceStaffCompletion(currentGuest, groups);
-            return;
+        if (!currentGuest.serviceStaffAssignments) {
+            currentGuest.serviceStaffAssignments = {};
         }
 
-        // Specific staff member chosen - directly assign to this category without prompting
-        const tech = bookingState.staffList.find(t => t.id === identifier);
-        if (!tech) return;
+        if (identifier === 'anyone') {
+            currentGuest.serviceStaffAssignments[serviceId] = null;
+            document.querySelectorAll(`#srvStaffGrid-${serviceId} .staff-card`).forEach(c => c.classList.remove('selected'));
+            const card = document.getElementById(`srvCard-${serviceId}-anyone`);
+            if (card) card.classList.add('selected');
+        } else {
+            const tech = bookingState.staffList.find(t => t.id === identifier);
+            if (!tech) return;
+            currentGuest.serviceStaffAssignments[serviceId] = tech.id;
+            document.querySelectorAll(`#srvStaffGrid-${serviceId} .staff-card`).forEach(c => c.classList.remove('selected'));
+            const card = document.getElementById(`srvCard-${serviceId}-${tech.id}`);
+            if (card) card.classList.add('selected');
+        }
 
-        assignTechToCategory(currentGuest, grp, tech.id);
-        checkMultiServiceStaffCompletion(currentGuest, groups);
+        checkMultiServiceStaffCompletion(currentGuest);
     }
 
-    function assignTechToCategory(currentGuest, grp, techId) {
-        grp.services.forEach(s => {
-            currentGuest.serviceStaffAssignments[s.id] = techId;
-        });
-        document.querySelectorAll(`#catStaffGrid-${grp.catId} .staff-card`).forEach(c => c.classList.remove('selected'));
-        const card = document.getElementById(`catCard-${grp.catId}-${techId}`);
-        if (card) card.classList.add('selected');
-    }
-
-    function checkMultiServiceStaffCompletion(currentGuest, groups, overrideName) {
+    function checkMultiServiceStaffCompletion(currentGuest) {
         const allServices = currentGuest.services || [];
-        const allAssigned = allServices.every(s => currentGuest.serviceStaffAssignments.hasOwnProperty(s.id));
+        const allAssigned = allServices.every(s =>
+            currentGuest.serviceStaffAssignments &&
+            currentGuest.serviceStaffAssignments.hasOwnProperty(s.id) &&
+            currentGuest.serviceStaffAssignments[s.id] !== undefined
+        );
         const nextBtn = document.getElementById('step2NextBtn');
 
         if (allAssigned && allServices.length > 0) {
             nextBtn.disabled = false;
+            const assignedValues = allServices.map(s => currentGuest.serviceStaffAssignments[s.id]);
+            const allNull = assignedValues.every(v => v === null);
+            const uniqueTechIds = [...new Set(assignedValues.filter(v => v !== null))];
 
-            if (overrideName) {
+            if (allNull) {
                 currentGuest.selectedStaff = {
                     id: null,
-                    name: overrideName,
+                    name: 'Anyone Available',
+                    isAnyoneAvailable: true
+                };
+            } else if (uniqueTechIds.length === 1 && assignedValues.every(v => v === uniqueTechIds[0])) {
+                const tech = bookingState.staffList.find(t => t.id === uniqueTechIds[0]);
+                currentGuest.selectedStaff = {
+                    id: uniqueTechIds[0],
+                    name: tech ? (tech.name || tech.username) : 'Assigned Technician',
                     isAnyoneAvailable: false
                 };
             } else {
-                const assignedValues = allServices.map(s => currentGuest.serviceStaffAssignments[s.id]);
-                const allNull = assignedValues.every(v => v === null);
-                const uniqueTechIds = [...new Set(assignedValues.filter(v => v !== null))];
-
-                if (allNull) {
-                    currentGuest.selectedStaff = {
-                        id: null,
-                        name: 'Anyone Available',
-                        isAnyoneAvailable: true
-                    };
-                } else if (uniqueTechIds.length === 1 && assignedValues.every(v => v === uniqueTechIds[0])) {
-                    const tech = bookingState.staffList.find(t => t.id === uniqueTechIds[0]);
-                    currentGuest.selectedStaff = {
-                        id: uniqueTechIds[0],
-                        name: tech ? (tech.name || tech.username) : 'Assigned Technician',
-                        isAnyoneAvailable: false
-                    };
-                } else {
-                    currentGuest.selectedStaff = {
-                        id: null,
-                        name: 'Selected Staff Per Service',
-                        isAnyoneAvailable: false
-                    };
-                }
+                currentGuest.selectedStaff = {
+                    id: null,
+                    name: 'Specific Staff Per Service (' + allServices.length + ' services)',
+                    isAnyoneAvailable: false
+                };
             }
 
             if (bookingState.staffGuestIndex === 0) {
@@ -1943,6 +2305,20 @@
             triggerStaffFloatingActionBar(currentGuest.selectedStaff.name);
         } else {
             nextBtn.disabled = true;
+            const assignedCount = allServices.filter(s =>
+                currentGuest.serviceStaffAssignments &&
+                currentGuest.serviceStaffAssignments.hasOwnProperty(s.id) &&
+                currentGuest.serviceStaffAssignments[s.id] !== undefined
+            ).length;
+            const floatingBar = document.getElementById('floatingStaffActionBar');
+            const nameEl = document.getElementById('floatingStaffName');
+            const guestEl = document.getElementById('floatingStaffGuestLabel');
+            if (floatingBar && nameEl) {
+                nameEl.textContent = `${assignedCount} of ${allServices.length} Services Assigned`;
+                if (guestEl) guestEl.textContent = `Please assign a technician for each service to proceed`;
+                floatingBar.classList.add('visible');
+            }
+        }
         }
     }
 
@@ -2234,6 +2610,22 @@
         goPrevStep();
     }
 
+    const STRICT_EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/;
+
+    function validateEmailField(input) {
+        const val = (input ? input.value : document.getElementById('customerEmail').value).trim();
+        const errEl = document.getElementById('emailValidationError');
+        const isValid = STRICT_EMAIL_REGEX.test(val);
+        if (val.length > 0 && !isValid) {
+            document.getElementById('customerEmail').classList.add('is-invalid');
+            if (errEl) errEl.classList.remove('d-none');
+        } else {
+            document.getElementById('customerEmail').classList.remove('is-invalid');
+            if (errEl) errEl.classList.add('d-none');
+        }
+        return isValid;
+    }
+
     // ==================== STEP 3: SEQUENTIAL GUEST SUBMIT & BOOKING ====================
     document.getElementById('bookingForm').addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -2247,6 +2639,13 @@
 
         if (!currentGuest.customerName || !currentGuest.customerPhone || !currentGuest.customerEmail) {
             showAlert(`Please fill in Full Name, Phone Number, and Email Address for Guest ${activeIdx + 1}.`);
+            return;
+        }
+
+        if (!STRICT_EMAIL_REGEX.test(currentGuest.customerEmail)) {
+            showAlert(`Please enter a valid email address for Guest ${activeIdx + 1} (e.g. name@example.com).`);
+            validateEmailField(document.getElementById('customerEmail'));
+            document.getElementById('customerEmail').focus();
             return;
         }
 

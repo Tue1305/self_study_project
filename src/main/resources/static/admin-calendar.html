@@ -690,6 +690,10 @@
         const [loading, setLoading] = useState(true);
         const [selectedAppointment, setSelectedAppointment] = useState(null);
         const [statusReason, setStatusReason] = useState('');
+        const [notifyCustomer, setNotifyCustomer] = useState(true);
+        const [customerHistoryModal, setCustomerHistoryModal] = useState({ isOpen: false, loading: false, data: null, error: null, title: '' });
+        const [rescheduleBoxOpen, setRescheduleBoxOpen] = useState(false);
+        const [rescheduleData, setRescheduleData] = useState({ date: '', time: '10:00', techId: '', saving: false, error: null });
         const [now, setNow] = useState(() => new Date());
 
         const [walkInModal, setWalkInModal] = useState({
@@ -828,7 +832,7 @@
         const handleUpdateStatus = async (aptId, newStatus, reason = '') => {
             const url = `/api/appointments/${aptId}/status?status=${encodeURIComponent(newStatus)}${
                 reason ? `&reason=${encodeURIComponent(reason)}` : ''
-            }`;
+            }&notifyCustomer=${notifyCustomer}`;
             try {
                 const res = await fetch(url, {
                     method: 'PATCH',
@@ -840,12 +844,94 @@
                 if (res.ok) {
                     setSelectedAppointment(null);
                     setStatusReason('');
+                    setRescheduleBoxOpen(false);
                     fetchScheduleData(true);
                 } else {
                     alert('Failed to update appointment status.');
                 }
             } catch (err) {
                 console.error('Error updating status:', err);
+            }
+        };
+
+        const handleOpenCustomerHistory = async (apt) => {
+            if (!apt || !apt.customerEmail) {
+                alert('No customer email associated with this booking.');
+                return;
+            }
+            setCustomerHistoryModal({
+                isOpen: true,
+                loading: true,
+                data: null,
+                error: null,
+                title: apt.customerName || apt.customerEmail
+            });
+            try {
+                const url = `/api/admin/customers/by-email/history?email=${encodeURIComponent(apt.customerEmail.trim())}`;
+                const res = await fetch(url, {
+                    headers: {
+                        'X-Tenant-ID': activeTenant,
+                        'Authorization': 'Bearer ' + token
+                    }
+                });
+                if (!res.ok) {
+                    throw new Error('No audit history found');
+                }
+                const data = await res.json();
+                setCustomerHistoryModal({
+                    isOpen: true,
+                    loading: false,
+                    data: data,
+                    error: null,
+                    title: apt.customerName || apt.customerEmail
+                });
+            } catch (err) {
+                setCustomerHistoryModal({
+                    isOpen: true,
+                    loading: false,
+                    data: null,
+                    error: 'No past activity history found for this customer.',
+                    title: apt.customerName || apt.customerEmail
+                });
+            }
+        };
+
+        const handleAdminReschedule = async () => {
+            if (!selectedAppointment) return;
+            if (!rescheduleData.date || !rescheduleData.time) {
+                alert('Please select both a new date and a time slot.');
+                return;
+            }
+            setRescheduleData(prev => ({ ...prev, saving: true, error: null }));
+            try {
+                const payload = {
+                    date: rescheduleData.date,
+                    startTime: rescheduleData.time,
+                    techId: rescheduleData.techId ? Number(rescheduleData.techId) : (selectedAppointment.nailTech ? selectedAppointment.nailTech.id : null),
+                    notifyCustomer: notifyCustomer,
+                    reason: statusReason || 'Rescheduled by administrator'
+                };
+                const res = await fetch(`/api/appointments/${selectedAppointment.id}/reschedule`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Tenant-ID': activeTenant,
+                        'Authorization': 'Bearer ' + token
+                    },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    setSelectedAppointment(null);
+                    setRescheduleBoxOpen(false);
+                    setStatusReason('');
+                    fetchScheduleData(true);
+                } else {
+                    setRescheduleData(prev => ({ ...prev, saving: false, error: data.message || 'Reschedule failed' }));
+                }
+            } catch (err) {
+                console.error('Error rescheduling appointment:', err);
+                setRescheduleData(prev => ({ ...prev, saving: false, error: 'Network error while rescheduling' }));
             }
         };
 
@@ -1350,7 +1436,16 @@
                             })
                         ),
                         h('div', { className: 'modal-body p-4' },
-                            h('p', { className: 'mb-2' }, h('strong', null, 'Customer Name: '), selectedAppointment.customerName || 'N/A'),
+                            h('div', { className: 'mb-2 d-flex align-items-center flex-wrap' },
+                                h('strong', null, 'Customer Name: '),
+                                h('span', { className: 'ms-1 fw-semibold' }, selectedAppointment.customerName || 'N/A'),
+                                selectedAppointment.customerEmail && h('button', {
+                                    type: 'button',
+                                    className: 'btn btn-outline-info btn-sm py-0 px-2 ms-2 fw-semibold rounded-pill',
+                                    style: { fontSize: '0.72rem' },
+                                    onClick: () => handleOpenCustomerHistory(selectedAppointment)
+                                }, h('i', { className: 'bi bi-clock-history me-1' }), 'View History & Reliability')
+                            ),
                             h('p', { className: 'mb-2' }, h('strong', null, 'Phone Number: '), selectedAppointment.customerPhone || 'N/A'),
                             h('p', { className: 'mb-2' }, h('strong', null, 'Email: '), selectedAppointment.customerEmail || 'N/A'),
                             h('p', { className: 'mb-2' }, h('strong', null, 'Service: '), (selectedAppointment.service && selectedAppointment.service.name) || 'Service'),
@@ -1359,6 +1454,75 @@
                             h('p', { className: 'mb-2' }, h('strong', null, 'Time: '), new Date(selectedAppointment.appointmentTime).toLocaleString()),
                             selectedAppointment.notes && h('p', { className: 'mb-2' }, h('strong', null, 'Notes: '), selectedAppointment.notes),
                             h('p', { className: 'mb-3' }, h('strong', null, 'Status: '), h('span', { className: 'badge bg-secondary' }, selectedAppointment.status || 'PENDING')),
+
+                            /* Reschedule / Move Slot Accordion */
+                            h('div', { className: 'mb-3' },
+                                h('button', {
+                                    type: 'button',
+                                    className: 'btn btn-sm btn-outline-primary w-100 fw-semibold d-flex align-items-center justify-content-center gap-2',
+                                    onClick: () => {
+                                        setRescheduleBoxOpen(prev => !prev);
+                                        if (!rescheduleBoxOpen && selectedAppointment) {
+                                            const d = selectedAppointment.appointmentTime ? String(selectedAppointment.appointmentTime).split('T')[0] : toDateKey(new Date());
+                                            const t = selectedAppointment.appointmentTime ? String(selectedAppointment.appointmentTime).split('T')[1].substring(0, 5) : '10:00';
+                                            setRescheduleData({
+                                                date: d,
+                                                time: t,
+                                                techId: selectedAppointment.nailTech ? selectedAppointment.nailTech.id : '',
+                                                saving: false,
+                                                error: null
+                                            });
+                                        }
+                                    }
+                                },
+                                    h('i', { className: 'bi bi-calendar2-range' }),
+                                    rescheduleBoxOpen ? 'Hide Reschedule Options' : 'Reschedule / Move Appointment Slot'
+                                ),
+                                rescheduleBoxOpen && h('div', { className: 'p-3 bg-light rounded-3 border mt-2' },
+                                    rescheduleData.error && h('div', { className: 'alert alert-danger py-1 px-2 small mb-2' }, rescheduleData.error),
+                                    h('div', { className: 'row g-2' },
+                                        h('div', { className: 'col-md-4' },
+                                            h('label', { className: 'form-label small fw-bold text-secondary mb-1' }, 'New Date:'),
+                                            h('input', {
+                                                type: 'date',
+                                                className: 'form-control form-control-sm',
+                                                value: rescheduleData.date,
+                                                min: toDateKey(new Date()),
+                                                onChange: (e) => setRescheduleData(prev => ({ ...prev, date: e.target.value }))
+                                            })
+                                        ),
+                                        h('div', { className: 'col-md-4' },
+                                            h('label', { className: 'form-label small fw-bold text-secondary mb-1' }, 'Time Slot:'),
+                                            h('select', {
+                                                className: 'form-select form-select-sm',
+                                                value: rescheduleData.time,
+                                                onChange: (e) => setRescheduleData(prev => ({ ...prev, time: e.target.value }))
+                                            },
+                                                timeTicks.map(t => h('option', { key: t.value24, value: t.value24 }, t.label12))
+                                            )
+                                        ),
+                                        h('div', { className: 'col-md-4' },
+                                            h('label', { className: 'form-label small fw-bold text-secondary mb-1' }, 'Staff:'),
+                                            h('select', {
+                                                className: 'form-select form-select-sm',
+                                                value: rescheduleData.techId,
+                                                onChange: (e) => setRescheduleData(prev => ({ ...prev, techId: e.target.value }))
+                                            },
+                                                h('option', { value: '' }, 'Current / Anyone'),
+                                                staffList.map(st => h('option', { key: st.id, value: st.id }, st.name || st.username))
+                                            )
+                                        ),
+                                        h('div', { className: 'col-12 mt-2 text-end' },
+                                            h('button', {
+                                                type: 'button',
+                                                className: 'btn btn-primary btn-sm px-3 fw-bold',
+                                                disabled: rescheduleData.saving,
+                                                onClick: handleAdminReschedule
+                                            }, rescheduleData.saving ? 'Saving...' : 'Confirm Reschedule')
+                                        )
+                                    )
+                                )
+                            ),
 
                             /* Audit note / Reason input */
                             h('div', { className: 'p-3 bg-light rounded-3 border' },
@@ -1379,6 +1543,18 @@
                                             style: { fontSize: '0.72rem' },
                                             onClick: () => setStatusReason(preset)
                                         }, preset)
+                                    )
+                                ),
+                                h('div', { className: 'form-check mt-3 pt-2 border-top' },
+                                    h('input', {
+                                        className: 'form-check-input',
+                                        type: 'checkbox',
+                                        id: 'modalNotifyCustomer',
+                                        checked: notifyCustomer,
+                                        onChange: (e) => setNotifyCustomer(e.target.checked)
+                                    }),
+                                    h('label', { className: 'form-check-label small fw-semibold text-secondary', htmlFor: 'modalNotifyCustomer' },
+                                        'Notify customer via Email / SMS'
                                     )
                                 )
                             )
@@ -1404,7 +1580,88 @@
                                 onClick: () => {
                                     setSelectedAppointment(null);
                                     setStatusReason('');
+                                    setRescheduleBoxOpen(false);
                                 }
+                            }, 'Close')
+                        )
+                    )
+                )
+            ),
+
+            /* Customer History & Audit Log Modal */
+            customerHistoryModal.isOpen && h('div', {
+                className: 'modal fade show d-block',
+                style: { backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1060 },
+                tabIndex: -1
+            },
+                h('div', { className: 'modal-dialog modal-dialog-centered modal-lg' },
+                    h('div', { className: 'modal-content border-0 shadow-lg rounded-4' },
+                        h('div', { className: 'modal-header border-bottom' },
+                            h('h5', { className: 'modal-title fw-bold text-dark d-flex align-items-center gap-2' },
+                                h('i', { className: 'bi bi-person-lines-fill text-pink' }),
+                                `Customer History: ${customerHistoryModal.title}`
+                            ),
+                            h('button', {
+                                type: 'button',
+                                className: 'btn-close',
+                                onClick: () => setCustomerHistoryModal({ isOpen: false, loading: false, data: null, error: null, title: '' })
+                            })
+                        ),
+                        h('div', { className: 'modal-body p-4' },
+                            customerHistoryModal.loading && h('div', { className: 'text-center py-4' },
+                                h('div', { className: 'spinner-border text-pink', role: 'status' }),
+                                h('p', { className: 'text-muted small mt-2' }, 'Loading customer audit history...')
+                            ),
+                            customerHistoryModal.error && h('div', { className: 'alert alert-warning' }, customerHistoryModal.error),
+                            customerHistoryModal.data && h('div', null,
+                                h('div', { className: 'row g-2 mb-4 text-center' },
+                                    h('div', { className: 'col' },
+                                        h('div', { className: 'p-2 bg-light rounded-3 border' },
+                                            h('div', { className: 'fs-5 fw-bold text-primary' }, customerHistoryModal.data.reliability?.totalBooked || 0),
+                                            h('div', { className: 'small text-muted text-uppercase', style: { fontSize: '0.7rem' } }, 'Total Booked')
+                                        )
+                                    ),
+                                    h('div', { className: 'col' },
+                                        h('div', { className: 'p-2 bg-light rounded-3 border' },
+                                            h('div', { className: 'fs-5 fw-bold text-success' }, customerHistoryModal.data.reliability?.totalCompleted || 0),
+                                            h('div', { className: 'small text-muted text-uppercase', style: { fontSize: '0.7rem' } }, 'Completed')
+                                        )
+                                    ),
+                                    h('div', { className: 'col' },
+                                        h('div', { className: 'p-2 bg-light rounded-3 border' },
+                                            h('div', { className: 'fs-5 fw-bold text-danger' }, customerHistoryModal.data.reliability?.totalCancelled || 0),
+                                            h('div', { className: 'small text-muted text-uppercase', style: { fontSize: '0.7rem' } }, 'Cancelled')
+                                        )
+                                    ),
+                                    h('div', { className: 'col' },
+                                        h('div', { className: 'p-2 bg-light rounded-3 border' },
+                                            h('div', { className: 'fs-5 fw-bold text-warning' }, customerHistoryModal.data.reliability?.totalNoShows || 0),
+                                            h('div', { className: 'small text-muted text-uppercase', style: { fontSize: '0.7rem' } }, 'No-Shows')
+                                        )
+                                    )
+                                ),
+                                h('h6', { className: 'fw-bold text-dark mb-2' }, 'Chronological Audit History'),
+                                h('div', { style: { maxHeight: '280px', overflowY: 'auto' }, className: 'border rounded-3 p-2 bg-white' },
+                                    (customerHistoryModal.data.activityLogs || []).length === 0
+                                        ? h('p', { className: 'text-muted small p-2 mb-0' }, 'No activity events recorded.')
+                                        : (customerHistoryModal.data.activityLogs || []).map(log =>
+                                            h('div', { key: log.id, className: 'p-2 border-bottom small' },
+                                                h('div', { className: 'd-flex justify-content-between align-items-center' },
+                                                    h('span', { className: `badge ${log.actionType === 'BOOKED' ? 'bg-primary' : log.actionType === 'CONFIRMED' ? 'bg-success' : log.actionType === 'CANCELLED' ? 'bg-danger' : log.actionType === 'NO_SHOW' ? 'bg-warning text-dark' : 'bg-info text-dark'}` }, log.actionType),
+                                                    h('span', { className: 'text-muted' }, new Date(log.createdAt).toLocaleString())
+                                                ),
+                                                h('div', { className: 'mt-1 text-dark' }, log.notes || 'Status changed'),
+                                                h('div', { className: 'text-muted', style: { fontSize: '0.75rem' } }, `Performed by: ${log.performedBy || 'SYSTEM'}`)
+                                            )
+                                        )
+                                )
+                            )
+                        ),
+                        h('div', { className: 'modal-footer' },
+                            h('button', {
+                                type: 'button',
+                                className: 'btn btn-sm btn-secondary',
+                                onClick: () => setCustomerHistoryModal({ isOpen: false, loading: false, data: null, error: null, title: '' })
                             }, 'Close')
                         )
                     )

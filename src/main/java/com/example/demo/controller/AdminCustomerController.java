@@ -44,4 +44,18 @@ public class AdminCustomerController {
         }
         return ResponseEntity.ok(history);
     }
+
+    @GetMapping("/by-email/history")
+    public ResponseEntity<?> getCustomerHistoryByEmail(
+            @RequestParam String email,
+            HttpServletRequest request
+    ) {
+        String tenantId = tenantContextResolver.resolveTenantId(request);
+        Map<String, Object> history = auditService.getCustomerHistoryByEmail(tenantId, email);
+        if (history == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("message", "No customer history found for email."));
+        }
+        return ResponseEntity.ok(history);
+    }
 }

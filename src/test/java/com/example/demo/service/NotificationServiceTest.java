@@ -200,6 +200,30 @@ class NotificationServiceTest {
     }
 
     @Test
+    @DisplayName("Appointment Reminder: Dispatches branded 24-hour reminder email and SMS")
+    void testSendAppointmentReminder() {
+        ServiceEntity service = new ServiceEntity();
+        service.setName("Signature Gel Manicure");
+        service.setPrice(new BigDecimal("45.00"));
+
+        Appointment appt = new Appointment();
+        appt.setId(501L);
+        appt.setTenantId("luxe");
+        appt.setCustomerName("Lucas Vance");
+        appt.setCustomerEmail("lucas@example.com");
+        appt.setCustomerPhone("(555) 333-2211");
+        appt.setAppointmentTime(LocalDateTime.of(2026, 11, 28, 14, 0));
+        appt.setService(service);
+        appt.setCancellationToken("token-reminder-501");
+
+        NotificationService.NotificationResult result = notificationService.sendAppointmentReminder(appt);
+        assertNotNull(result);
+        assertTrue(result.success());
+        assertTrue(result.simulated());
+        assertTrue(result.details().contains("lucas@example.com"));
+    }
+
+    @Test
     @DisplayName("Fault Tolerance: Null appointment returns safe error result without exception")
     void testResilience_NullAppointment() {
         NotificationService.NotificationResult result = notificationService.sendBookingConfirmation(null);

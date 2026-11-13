@@ -35,6 +35,9 @@ public class Appointment {
     @Column(name = "cancellation_token", length = 64)
     private String cancellationToken;
 
+    @Column(name = "reminder_sent_at")
+    private LocalDateTime reminderSentAt;
+
     @ManyToOne
     @JoinColumn(name = "service_id", nullable = false)
     private ServiceEntity service;
@@ -77,6 +80,9 @@ public class Appointment {
 
     public String getCancellationToken() { return cancellationToken; }
     public void setCancellationToken(String cancellationToken) { this.cancellationToken = cancellationToken; }
+
+    public LocalDateTime getReminderSentAt() { return reminderSentAt; }
+    public void setReminderSentAt(LocalDateTime reminderSentAt) { this.reminderSentAt = reminderSentAt; }
 
     public ServiceEntity getService() { return service; }
     public void setService(ServiceEntity service) { this.service = service; }

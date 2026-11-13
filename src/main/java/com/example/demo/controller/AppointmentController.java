@@ -594,11 +594,13 @@ public class AppointmentController {
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String reason,
             @RequestParam(required = false) String notes,
+            @RequestParam(required = false, defaultValue = "true") Boolean notifyCustomer,
             @RequestBody(required = false) Map<String, Object> body,
             HttpServletRequest request
     ) {
         String effectiveStatus = status;
         String effectiveReason = reason != null ? reason : notes;
+        boolean shouldNotify = (notifyCustomer != null) ? notifyCustomer : true;
         if (body != null) {
             if (effectiveStatus == null && body.containsKey("status")) {
                 effectiveStatus = String.valueOf(body.get("status"));
@@ -606,6 +608,9 @@ public class AppointmentController {
             if (effectiveReason == null) {
                 if (body.containsKey("reason")) effectiveReason = String.valueOf(body.get("reason"));
                 else if (body.containsKey("notes")) effectiveReason = String.valueOf(body.get("notes"));
+            }
+            if (body.containsKey("notifyCustomer")) {
+                shouldNotify = Boolean.parseBoolean(String.valueOf(body.get("notifyCustomer")));
             }
         }
         if (effectiveStatus == null || effectiveStatus.isBlank()) {
@@ -615,6 +620,7 @@ public class AppointmentController {
         String tenantId = tenantContextResolver.resolveTenantId(request);
         final String finalStatus = effectiveStatus.trim();
         final String finalReason = effectiveReason != null ? effectiveReason.trim() : null;
+        final boolean finalShouldNotify = shouldNotify;
 
         return appointmentRepository.findByTenantIdAndId(tenantId, id)
                 .map(appointment -> {
@@ -649,7 +655,7 @@ public class AppointmentController {
                             );
                         }
 
-                        if (notificationService != null) {
+                        if (finalShouldNotify && notificationService != null) {
                             try {
                                 if (newStatus == Appointment.AppointmentStatus.CANCELLED) {
                                     notificationService.sendCancellationNotice(updated, finalReason);
@@ -853,6 +859,9 @@ public class AppointmentController {
         LocalDateTime oldTime = appt.getAppointmentTime();
         appt.setAppointmentTime(newTime);
         appt.setStatus(Appointment.AppointmentStatus.CONFIRMED);
+        if (newTime.isAfter(LocalDateTime.now().plusHours(24))) {
+            appt.setReminderSentAt(null);
+        }
         String reason = body.containsKey("reason") ? String.valueOf(body.get("reason")) : "Rescheduled by customer via self-service portal";
         String existingNotes = appt.getNotes() != null ? appt.getNotes().trim() : "";
         String reschedTag = "[RESCHEDULED: " + oldTime + " -> " + newTime + "]";
@@ -889,6 +898,128 @@ public class AppointmentController {
                 "message", "Appointment rescheduled successfully",
                 "status", "CONFIRMED",
                 "appointmentTime", newTime,
+                "appointment", updated
+        ));
+    }
+
+    @PatchMapping("/{id}/reschedule")
+    public ResponseEntity<?> adminRescheduleAppointment(
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> body,
+            HttpServletRequest request
+    ) {
+        String tenantId = tenantContextResolver.resolveTenantId(request);
+        Optional<Appointment> existingOpt = appointmentRepository.findByTenantIdAndId(tenantId, id);
+        if (existingOpt.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", "Appointment not found"));
+        }
+
+        Appointment appt = existingOpt.get();
+        if (body == null || (!body.containsKey("appointmentTime") && !body.containsKey("date"))) {
+            return ResponseEntity.badRequest().body(Map.of("message", "New appointment date/time is required."));
+        }
+
+        LocalDateTime newTime;
+        try {
+            if (body.containsKey("appointmentTime") && body.get("appointmentTime") != null && !String.valueOf(body.get("appointmentTime")).isBlank()) {
+                newTime = LocalDateTime.parse(String.valueOf(body.get("appointmentTime")));
+            } else {
+                String dateStr = String.valueOf(body.get("date")).trim();
+                String timeStr = String.valueOf(body.get("startTime") != null ? body.get("startTime") : body.get("time")).trim();
+                if (!timeStr.contains(":")) timeStr += ":00";
+                if (timeStr.length() == 5) timeStr += ":00";
+                newTime = LocalDateTime.parse(dateStr + "T" + timeStr);
+            }
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Invalid date/time format."));
+        }
+
+        // Optional technician reassignment
+        if (body.containsKey("techId") && body.get("techId") != null && !String.valueOf(body.get("techId")).isBlank()) {
+            try {
+                Long techId = Long.parseLong(String.valueOf(body.get("techId")));
+                userRepository.findByTenantIdAndId(tenantId, techId).ifPresent(appt::setNailTech);
+            } catch (Exception ignored) {
+            }
+        }
+
+        // Sunday validation
+        if (newTime.getDayOfWeek() == java.time.DayOfWeek.SUNDAY) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Sundays are closed."));
+        }
+
+        // Conflict check
+        if (appt.getNailTech() != null && appt.getNailTech().getId() != null) {
+            int duration = (appt.getService() != null && appt.getService().getDurationMinutes() != null)
+                    ? appt.getService().getDurationMinutes() : 45;
+            LocalDateTime newSlotEnd = newTime.plusMinutes(duration);
+
+            List<Appointment> dayAppts = appointmentRepository.findByTenantIdAndAppointmentTimeBetween(
+                    tenantId,
+                    newTime.toLocalDate().atStartOfDay(),
+                    newTime.toLocalDate().plusDays(1).atStartOfDay()
+            );
+
+            boolean conflict = dayAppts.stream()
+                    .filter(a -> !a.getId().equals(appt.getId()))
+                    .filter(a -> a.getStatus() != Appointment.AppointmentStatus.CANCELLED)
+                    .filter(a -> a.getNailTech() != null && a.getNailTech().getId().equals(appt.getNailTech().getId()))
+                    .anyMatch(a -> hasOverlap(a, newTime, newSlotEnd));
+
+            if (conflict) {
+                return ResponseEntity.status(HttpStatus.CONFLICT)
+                        .body(Map.of("message", "The technician is already booked at this time slot."));
+            }
+        }
+
+        LocalDateTime oldTime = appt.getAppointmentTime();
+        appt.setAppointmentTime(newTime);
+        appt.setStatus(Appointment.AppointmentStatus.CONFIRMED);
+        if (newTime.isAfter(LocalDateTime.now().plusHours(24))) {
+            appt.setReminderSentAt(null);
+        }
+
+        String reason = body.containsKey("reason") ? String.valueOf(body.get("reason")) : "Rescheduled by admin";
+        String existingNotes = appt.getNotes() != null ? appt.getNotes().trim() : "";
+        String reschedTag = "[RESCHEDULED: " + oldTime + " -> " + newTime + "]";
+        appt.setNotes(existingNotes.isEmpty() ? reschedTag : existingNotes + " | " + reschedTag);
+
+        Appointment updated = appointmentRepository.save(appt);
+
+        if (auditService != null) {
+            Customer customer = null;
+            if (appt.getCustomerEmail() != null && !appt.getCustomerEmail().isBlank()) {
+                customer = customerRepository.findByEmail(appt.getCustomerEmail().trim()).orElse(null);
+            }
+            String performedBy = auditService.resolvePerformedBy("ADMIN");
+            auditService.logActivity(
+                    tenantId,
+                    customer != null ? customer.getId() : null,
+                    updated.getId(),
+                    updated.getCustomerName(),
+                    updated.getCustomerEmail(),
+                    updated.getCustomerPhone(),
+                    "RESCHEDULED",
+                    performedBy,
+                    reason + " (New time: " + newTime + ")"
+            );
+        }
+
+        boolean notifyCustomer = true;
+        if (body.containsKey("notifyCustomer")) {
+            notifyCustomer = Boolean.parseBoolean(String.valueOf(body.get("notifyCustomer")));
+        }
+
+        if (notifyCustomer && notificationService != null) {
+            try {
+                notificationService.sendRescheduleNotice(updated, oldTime);
+            } catch (Exception ignored) {
+            }
+        }
+
+        return ResponseEntity.ok(Map.of(
+                "message", "Appointment rescheduled successfully",
+                "status", "CONFIRMED",
                 "appointment", updated
         ));
     }

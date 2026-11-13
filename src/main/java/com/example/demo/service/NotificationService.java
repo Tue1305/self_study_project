@@ -305,6 +305,99 @@ public class NotificationService {
     }
 
     /**
+     * Dispatches an upcoming 24-hour reminder email and SMS for an appointment.
+     */
+    public NotificationResult sendAppointmentReminder(Appointment appointment) {
+        if (appointment == null) {
+            return new NotificationResult(false, true, null, "Appointment was null");
+        }
+        try {
+            TenantConfig config = resolveTenantConfig(appointment.getTenantId());
+            String salonName = config.getSalonName() != null ? config.getSalonName() : "Jenny's Nail Studio";
+            String primaryColor = config.getPrimaryColor() != null ? config.getPrimaryColor() : "#e83e8c";
+            String salonAddress = resolveSalonAddress(config.getTenantKey());
+            String supportPhone = resolveSupportPhone(config.getTenantKey());
+
+            String customerName = appointment.getCustomerName() != null ? appointment.getCustomerName().trim() : "Valued Guest";
+            String customerEmail = appointment.getCustomerEmail() != null ? appointment.getCustomerEmail().trim() : "";
+            String customerPhone = appointment.getCustomerPhone() != null ? appointment.getCustomerPhone().trim() : "";
+            String formattedTime = appointment.getAppointmentTime() != null
+                    ? appointment.getAppointmentTime().format(DISPLAY_DATE_TIME_FORMATTER)
+                    : "Tomorrow";
+
+            String serviceName = (appointment.getService() != null && appointment.getService().getName() != null)
+                    ? appointment.getService().getName()
+                    : "Salon Service";
+
+            String techName = (appointment.getNailTech() != null && appointment.getNailTech().getName() != null)
+                    ? appointment.getNailTech().getName()
+                    : "First Available Specialist";
+
+            String cancellationUrl = buildSelfServiceLink(config, appointment.getCancellationToken());
+            String subject = "Upcoming Appointment Reminder: " + serviceName + " at " + salonName;
+
+            String htmlBody = String.format("""
+                    <!DOCTYPE html>
+                    <html>
+                    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f7fafc; margin: 0; padding: 20px; color: #2d3748;">
+                        <div style="max-width: 600px; margin: 20px auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
+                            <div style="background-color: %s; padding: 28px 24px; text-align: center; color: #ffffff;">
+                                <h1 style="margin: 0; font-size: 24px; font-weight: 700;">%s</h1>
+                                <p style="margin: 6px 0 0 0; font-size: 15px; opacity: 0.95;">Appointment Reminder</p>
+                            </div>
+                            <div style="padding: 28px;">
+                                <p style="font-size: 16px; margin: 0 0 16px 0;">Hi <strong>%s</strong>,</p>
+                                <p style="color: #4a5568; line-height: 1.6; margin: 0 0 20px 0;">
+                                    This is a friendly reminder for your upcoming appointment. We are excited to see you soon!
+                                </p>
+                                <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 18px; margin-bottom: 24px;">
+                                    <div style="font-size: 12px; text-transform: uppercase; color: #a0aec0; font-weight: 600;">Date & Time</div>
+                                    <div style="font-size: 16px; font-weight: 700; color: #2d3748; margin-bottom: 12px;">%s</div>
+                                    <div style="font-size: 12px; text-transform: uppercase; color: #a0aec0; font-weight: 600;">Service & Specialist</div>
+                                    <div style="font-size: 15px; font-weight: 600; color: %s; margin-bottom: 12px;">%s with %s</div>
+                                    <div style="font-size: 12px; text-transform: uppercase; color: #a0aec0; font-weight: 600;">Location</div>
+                                    <div style="font-size: 14px; color: #4a5568;">%s</div>
+                                </div>
+                                <div style="text-align: center; margin: 28px 0;">
+                                    <a href="%s" style="background-color: %s; color: #ffffff; padding: 12px 26px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block;">
+                                        Manage or Reschedule
+                                    </a>
+                                </div>
+                            </div>
+                            <div style="background-color: #edf2f7; padding: 18px 24px; font-size: 12px; color: #718096; text-align: center; border-top: 1px solid #e2e8f0;">
+                                <p style="margin: 0 0 4px 0; font-weight: 600; color: #4a5568;">%s</p>
+                                <p style="margin: 0 0 4px 0;">%s | Questions? Call %s</p>
+                            </div>
+                        </div>
+                    </body>
+                    </html>
+                    """,
+                    primaryColor,
+                    salonName,
+                    customerName,
+                    formattedTime,
+                    primaryColor,
+                    serviceName,
+                    techName,
+                    salonAddress,
+                    cancellationUrl,
+                    primaryColor,
+                    salonName,
+                    salonAddress,
+                    supportPhone
+            );
+
+            String smsBody = String.format("%s: Reminder: Your appointment for %s is scheduled for %s with %s. Need to adjust? %s Questions? Call %s",
+                    salonName, serviceName, formattedTime, techName, cancellationUrl, supportPhone);
+
+            return dispatchNotification(customerEmail, customerPhone, subject, htmlBody, smsBody, config);
+        } catch (Exception e) {
+            logger.warn("[NotificationService] Error preparing appointment reminder: {}", e.getMessage(), e);
+            return new NotificationResult(false, true, null, "Error: " + e.getMessage());
+        }
+    }
+
+    /**
      * Handles notifications for multi-service or multi-guest bookings.
      * Dispatches individual confirmations to each guest's contact info,
      * plus an aggregated booking confirmation receipt to the primary booker.

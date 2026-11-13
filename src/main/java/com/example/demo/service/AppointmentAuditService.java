@@ -194,4 +194,56 @@ public class AppointmentAuditService {
 
         return response;
     }
+
+    /**
+     * Looks up customer history directly by email address.
+     */
+    public Map<String, Object> getCustomerHistoryByEmail(String tenantId, String email) {
+        if (email == null || email.isBlank()) {
+            return null;
+        }
+        Optional<Customer> customerOpt = customerRepository.findByEmail(email.trim());
+        if (customerOpt.isPresent()) {
+            return getCustomerHistory(tenantId, customerOpt.get().getId());
+        }
+
+        List<Appointment> allTenantAppointments = appointmentRepository.findAllByTenantId(tenantId);
+        List<Appointment> customerAppointments = allTenantAppointments.stream()
+                .filter(apt -> email.trim().equalsIgnoreCase(apt.getCustomerEmail()))
+                .sorted(Comparator.comparing(Appointment::getAppointmentTime, Comparator.nullsLast(Comparator.reverseOrder())))
+                .toList();
+
+        if (customerAppointments.isEmpty()) {
+            return null;
+        }
+
+        Appointment sample = customerAppointments.get(0);
+        Customer virtualCustomer = new Customer();
+        virtualCustomer.setName(sample.getCustomerName());
+        virtualCustomer.setEmail(sample.getCustomerEmail());
+        virtualCustomer.setPhone(sample.getCustomerPhone());
+        virtualCustomer.setTenantId(tenantId);
+
+        List<AppointmentActivityLog> logs = activityLogRepository.findByTenantIdAndCustomerEmailIgnoreCaseOrderByCreatedAtDesc(tenantId, email.trim());
+
+        long totalBooked = customerAppointments.size();
+        long totalConfirmed = customerAppointments.stream().filter(a -> a.getStatus() == Appointment.AppointmentStatus.CONFIRMED).count();
+        long totalCompleted = customerAppointments.stream().filter(a -> a.getStatus() == Appointment.AppointmentStatus.COMPLETED).count();
+        long totalCancelled = customerAppointments.stream().filter(a -> a.getStatus() == Appointment.AppointmentStatus.CANCELLED).count();
+        long totalNoShows = customerAppointments.stream().filter(a -> a.getStatus() == Appointment.AppointmentStatus.NO_SHOW).count();
+
+        Map<String, Object> reliability = new LinkedHashMap<>();
+        reliability.put("totalBooked", totalBooked);
+        reliability.put("totalConfirmed", totalConfirmed);
+        reliability.put("totalCompleted", totalCompleted);
+        reliability.put("totalCancelled", totalCancelled);
+        reliability.put("totalNoShows", totalNoShows);
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("customer", virtualCustomer);
+        response.put("reliability", reliability);
+        response.put("appointments", customerAppointments);
+        response.put("activityLogs", logs);
+        return response;
+    }
 }

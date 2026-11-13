@@ -73,15 +73,12 @@ public class NailTechController {
             return tenantTechs;
         }
 
+        // For 1 service, filter strictly for that service's category.
+        // For 2+ services, return the union (anyMatch) of technicians qualified for ANY of the requested services
+        // so per-service staff pickers can filter each service block independently without computing an intersection.
         List<UserEntity> qualifiedTechs = tenantTechs.stream()
-                .filter(tech -> targetCategories.stream().allMatch(cat -> isTechQualifiedForCategory(tech, cat)))
+                .filter(tech -> targetCategories.stream().anyMatch(cat -> isTechQualifiedForCategory(tech, cat)))
                 .toList();
-
-        if (qualifiedTechs.isEmpty()) {
-            qualifiedTechs = tenantTechs.stream()
-                    .filter(tech -> targetCategories.stream().anyMatch(cat -> isTechQualifiedForCategory(tech, cat)))
-                    .toList();
-        }
 
         return qualifiedTechs.isEmpty() ? tenantTechs : qualifiedTechs;
     }

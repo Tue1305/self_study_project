@@ -87,15 +87,20 @@ public class AppointmentController {
 
     /**
      * Tenant-scoped dynamic availability pre-check endpoint.
-     * Checks available time slots for a given date, duration, and optional technician / assignment mode.
+     * Supports both /api/appointments/availability and /api/appointments/available-slots.
+     * Checks available time slots for a given date, duration, turnover buffer, and single or sequential multi-service technicians.
      */
-    @GetMapping("/availability")
+    @GetMapping({"/availability", "/available-slots"})
     public ResponseEntity<?> getAvailableSlots(
             @RequestParam String date,
             @RequestParam(defaultValue = "45") int durationMinutes,
+            @RequestParam(defaultValue = "15") int bufferMinutes,
             @RequestParam(required = false) Long techId,
             @RequestParam(required = false) List<Long> techIds,
             @RequestParam(required = false) List<Long> serviceIds,
+            @RequestParam(required = false) List<Integer> serviceDurations,
+            @RequestParam(required = false) List<String> serviceTechIds,
+            @RequestParam(required = false) String clientNow,
             HttpServletRequest request
     ) {
         String tenantId = tenantContextResolver.resolveTenantId(request);
@@ -119,6 +124,7 @@ public class AppointmentController {
 
         LocalDateTime dayStart = targetDate.atTime(10, 0);
         LocalDateTime dayEnd = targetDate.atTime(19, 0);
+        int effectiveBuffer = Math.max(0, bufferMinutes);
 
         // Fetch all non-cancelled appointments for this tenant on this date
         List<Appointment> dayAppointments = appointmentRepository.findByTenantIdAndAppointmentTimeBetween(
@@ -147,11 +153,69 @@ public class AppointmentController {
             targetTechs.addAll(tenantTechs);
         }
 
+        // Build sequential service segments if 2+ services or explicit serviceDurations/serviceIds were passed
+        List< int[] > sequentialSegments = new ArrayList<>(); // each int[] = { durationMins, techIdOrMinusOne }
+        if (serviceDurations != null && !serviceDurations.isEmpty()) {
+            for (int i = 0; i < serviceDurations.size(); i++) {
+                int segDur = (serviceDurations.get(i) != null && serviceDurations.get(i) > 0) ? serviceDurations.get(i) : 45;
+                int segTechId = -1;
+                if (serviceTechIds != null && i < serviceTechIds.size()) {
+                    String raw = serviceTechIds.get(i);
+                    if (raw != null && !raw.isBlank() && !"anyone".equalsIgnoreCase(raw.trim()) && !"null".equalsIgnoreCase(raw.trim())) {
+                        try {
+                            segTechId = Integer.parseInt(raw.trim());
+                        } catch (NumberFormatException ignored) {
+                        }
+                    }
+                } else if (techIds != null && i < techIds.size() && techIds.get(i) != null) {
+                    segTechId = techIds.get(i).intValue();
+                } else if (techId != null) {
+                    segTechId = techId.intValue();
+                }
+                sequentialSegments.add(new int[]{ segDur, segTechId });
+            }
+        } else if (serviceIds != null && !serviceIds.isEmpty()) {
+            for (int i = 0; i < serviceIds.size(); i++) {
+                Long sid = serviceIds.get(i);
+                int segDur = 45;
+                if (sid != null) {
+                    Optional<ServiceEntity> srvOpt = serviceRepository.findByTenantIdAndId(tenantId, sid);
+                    if (srvOpt.isPresent() && srvOpt.get().getDurationMinutes() != null && srvOpt.get().getDurationMinutes() > 0) {
+                        segDur = srvOpt.get().getDurationMinutes();
+                    }
+                }
+                int segTechId = -1;
+                if (serviceTechIds != null && i < serviceTechIds.size()) {
+                    String raw = serviceTechIds.get(i);
+                    if (raw != null && !raw.isBlank() && !"anyone".equalsIgnoreCase(raw.trim()) && !"null".equalsIgnoreCase(raw.trim())) {
+                        try {
+                            segTechId = Integer.parseInt(raw.trim());
+                        } catch (NumberFormatException ignored) {
+                        }
+                    }
+                } else if (techIds != null && i < techIds.size() && techIds.get(i) != null) {
+                    segTechId = techIds.get(i).intValue();
+                } else if (techId != null) {
+                    segTechId = techId.intValue();
+                }
+                sequentialSegments.add(new int[]{ segDur, segTechId });
+            }
+        }
+
+        int calculatedSegmentsDuration = sequentialSegments.stream().mapToInt(seg -> seg[0]).sum();
+        int effectiveDuration = Math.max(Math.max(durationMinutes, calculatedSegmentsDuration), 15);
+
+        // Determine current real-time clock (prefer clientNow if valid, else server clock)
+        LocalDateTime now = LocalDateTime.now();
+        if (clientNow != null && !clientNow.isBlank()) {
+            try {
+                now = LocalDateTime.parse(clientNow.trim());
+            } catch (Exception ignored) {
+            }
+        }
+
         // Generate all standard 15-minute slots between 10:00 AM and 7:00 PM
         List<Map<String, Object>> slotResults = new ArrayList<>();
-        LocalDateTime now = LocalDateTime.now();
-
-        int effectiveDuration = Math.max(durationMinutes, 15);
 
         for (int hour = 10; hour <= 19; hour++) {
             int maxMin = (hour == 19) ? 0 : 45;
@@ -159,12 +223,12 @@ public class AppointmentController {
                 LocalDateTime slotStart = targetDate.atTime(hour, min);
                 LocalDateTime slotEnd = slotStart.plusMinutes(effectiveDuration);
 
-                // Skip slots that exceed store closing time (19:00 / 7:00 PM)
+                // Skip slots that exceed store closing time (19:00 / 7:00 PM + 15m grace)
                 if (slotEnd.isAfter(dayEnd.plusMinutes(15))) {
                     continue;
                 }
 
-                // Past-time buffer: if date is today, slot must be at least 15 minutes after current local time
+                // Real-Time Today Filter: if date is today, slot must be at least 15 minutes after current local time
                 boolean isPast = false;
                 if (targetDate.isEqual(now.toLocalDate())) {
                     if (!slotStart.isAfter(now.plusMinutes(15))) {
@@ -177,39 +241,88 @@ public class AppointmentController {
                 String hh = String.format("%02d", hour);
                 String mm = String.format("%02d", min);
                 String value24 = hh + ":" + mm + ":00";
-                String period = hour >= 12 ? "PM" : "AM";
-                int hour12 = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
-                String label12 = String.format("%d:%02d %s", hour12, min, period);
+                String label12 = formatTime12Hour(slotStart);
+                String endValue24 = String.format("%02d:%02d:00", slotEnd.getHour(), slotEnd.getMinute());
+                String endLabel12 = formatTime12Hour(slotEnd);
+                String timeRangeLabel = label12 + " – " + endLabel12;
 
                 boolean isAvailable = !isPast;
                 String conflictReason = isPast ? "Slot has passed" : null;
 
                 if (isAvailable) {
-                    if (techId != null) {
-                        // Single specified technician: check if this tech has any overlapping appointment
+                    if (!sequentialSegments.isEmpty()) {
+                        // Sequential Multi-Service Synchronization:
+                        // Validate Service 1's tech is free for [slotStart, slotStart + d1],
+                        // Service 2's tech is free for [slotStart + d1, slotStart + d1 + d2], etc.
+                        LocalDateTime segCursor = slotStart;
+                        for (int[] seg : sequentialSegments) {
+                            int segDur = seg[0];
+                            long segTech = seg[1];
+                            LocalDateTime segStart = segCursor;
+                            LocalDateTime segEnd = segStart.plusMinutes(segDur);
+                            segCursor = segEnd;
+
+                            if (segTech > 0) {
+                                final long targetTid = segTech;
+                                boolean segConflict = dayAppointments.stream().anyMatch(a ->
+                                        a.getNailTech() != null &&
+                                        a.getNailTech().getId() != null &&
+                                        a.getNailTech().getId() == targetTid &&
+                                        hasOverlapWithBuffer(a, segStart, segEnd, effectiveBuffer)
+                                );
+                                if (segConflict) {
+                                    isAvailable = false;
+                                    conflictReason = "Booked";
+                                    break;
+                                }
+                            } else {
+                                // "Anyone Available" for this service segment
+                                boolean atLeastOneFree = tenantTechs.isEmpty() || tenantTechs.stream().anyMatch(t ->
+                                        dayAppointments.stream().noneMatch(a ->
+                                                a.getNailTech() != null &&
+                                                a.getNailTech().getId().equals(t.getId()) &&
+                                                hasOverlapWithBuffer(a, segStart, segEnd, effectiveBuffer)
+                                        )
+                                );
+                                if (!atLeastOneFree) {
+                                    isAvailable = false;
+                                    conflictReason = "Booked";
+                                    break;
+                                }
+                            }
+                        }
+                    } else if (techId != null) {
+                        // Single specified technician: check if this tech has any overlapping appointment (including turnover buffer)
                         boolean techHasConflict = dayAppointments.stream().anyMatch(a -> {
                             if (a.getNailTech() == null || !a.getNailTech().getId().equals(techId)) {
                                 return false;
                             }
-                            return hasOverlap(a, slotStart, slotEnd);
+                            return hasOverlapWithBuffer(a, slotStart, slotEnd, effectiveBuffer);
                         });
                         if (techHasConflict) {
                             isAvailable = false;
-                            conflictReason = "Technician booked";
+                            conflictReason = "Booked";
                         }
                     } else if (techIds != null && !techIds.isEmpty()) {
-                        // Specific Staff Per Service: verify ALL selected technicians are individually free for their durations
-                        // or free sequentially
-                        boolean anyAssignedTechBusy = targetTechs.stream().anyMatch(t ->
-                            dayAppointments.stream().anyMatch(a ->
-                                a.getNailTech() != null &&
-                                a.getNailTech().getId().equals(t.getId()) &&
-                                hasOverlap(a, slotStart, slotEnd)
-                            )
-                        );
-                        if (anyAssignedTechBusy) {
-                            isAvailable = false;
-                            conflictReason = "Assigned staff has a scheduling conflict";
+                        // Multiple technicians without explicit per-service durations: split duration sequentially across assigned technicians
+                        int numTechs = targetTechs.size();
+                        int perTechDuration = numTechs > 0 ? Math.max(15, effectiveDuration / numTechs) : effectiveDuration;
+                        LocalDateTime segCursor = slotStart;
+                        for (int idx = 0; idx < numTechs; idx++) {
+                            UserEntity t = targetTechs.get(idx);
+                            LocalDateTime segStart = segCursor;
+                            LocalDateTime segEnd = (idx == numTechs - 1) ? slotEnd : segStart.plusMinutes(perTechDuration);
+                            segCursor = segEnd;
+                            boolean busy = dayAppointments.stream().anyMatch(a ->
+                                    a.getNailTech() != null &&
+                                    a.getNailTech().getId().equals(t.getId()) &&
+                                    hasOverlapWithBuffer(a, segStart, segEnd, effectiveBuffer)
+                            );
+                            if (busy) {
+                                isAvailable = false;
+                                conflictReason = "Booked";
+                                break;
+                            }
                         }
                     } else {
                         // "Anyone Available": available if AT LEAST ONE qualified technician is free
@@ -217,12 +330,12 @@ public class AppointmentController {
                             dayAppointments.stream().noneMatch(a ->
                                 a.getNailTech() != null &&
                                 a.getNailTech().getId().equals(t.getId()) &&
-                                hasOverlap(a, slotStart, slotEnd)
+                                hasOverlapWithBuffer(a, slotStart, slotEnd, effectiveBuffer)
                             )
                         );
                         if (!atLeastOneTechFree && !targetTechs.isEmpty()) {
                             isAvailable = false;
-                            conflictReason = "All technicians busy";
+                            conflictReason = "Booked";
                         }
                     }
                 }
@@ -230,6 +343,11 @@ public class AppointmentController {
                 Map<String, Object> slot = new LinkedHashMap<>();
                 slot.put("value", value24);
                 slot.put("label", label12);
+                slot.put("endValue", endValue24);
+                slot.put("endLabel", endLabel12);
+                slot.put("timeRangeLabel", timeRangeLabel);
+                slot.put("durationMinutes", effectiveDuration);
+                slot.put("bufferMinutes", effectiveBuffer);
                 slot.put("available", isAvailable);
                 slot.put("isPast", isPast);
                 if (conflictReason != null) {
@@ -243,18 +361,31 @@ public class AppointmentController {
                 "date", date,
                 "isClosed", false,
                 "durationMinutes", effectiveDuration,
+                "bufferMinutes", effectiveBuffer,
                 "availableSlots", slotResults
         ));
     }
 
+    private String formatTime12Hour(LocalDateTime dt) {
+        int hour = dt.getHour();
+        int min = dt.getMinute();
+        String period = hour >= 12 ? "PM" : "AM";
+        int hour12 = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
+        return String.format("%d:%02d %s", hour12, min, period);
+    }
+
     private boolean hasOverlap(Appointment a, LocalDateTime slotStart, LocalDateTime slotEnd) {
+        return hasOverlapWithBuffer(a, slotStart, slotEnd, 0);
+    }
+
+    private boolean hasOverlapWithBuffer(Appointment a, LocalDateTime slotStart, LocalDateTime slotEnd, int bufferMinutes) {
         if (a.getAppointmentTime() == null) return false;
         LocalDateTime apptStart = a.getAppointmentTime();
         int apptDuration = (a.getService() != null && a.getService().getDurationMinutes() != null)
                 ? a.getService().getDurationMinutes()
                 : 45;
-        LocalDateTime apptEnd = apptStart.plusMinutes(apptDuration);
-        return slotStart.isBefore(apptEnd) && apptEnd.isAfter(apptStart) && slotEnd.isAfter(apptStart);
+        LocalDateTime apptBusyEnd = apptStart.plusMinutes(apptDuration + Math.max(0, bufferMinutes));
+        return slotStart.isBefore(apptBusyEnd) && slotEnd.isAfter(apptStart);
     }
 
     @PostMapping
@@ -369,13 +500,17 @@ public class AppointmentController {
                         tenantId
                 );
 
+                LocalDateTime currentServiceStart = bookingRequest.getAppointmentTime();
+
                 for (ServiceEntity srv : guestServices) {
+                    int srvDuration = (srv.getDurationMinutes() != null && srv.getDurationMinutes() > 0) ? srv.getDurationMinutes() : 45;
+
                     Appointment appt = new Appointment();
                     appt.setTenantId(tenantId);
                     appt.setCustomerName(guest.getCustomerName().trim());
                     appt.setCustomerEmail(guest.getCustomerEmail().trim());
                     appt.setCustomerPhone(guest.getCustomerPhone().trim());
-                    appt.setAppointmentTime(bookingRequest.getAppointmentTime());
+                    appt.setAppointmentTime(currentServiceStart);
                     appt.setStationPreference(bookingRequest.getStationPreference());
                     appt.setCancellationToken(UUID.randomUUID().toString());
 
@@ -411,6 +546,9 @@ public class AppointmentController {
                     Appointment saved = appointmentRepository.save(appt);
                     savedAppointments.add(saved);
 
+                    // Advance sequential start time for the next service in this guest's visit
+                    currentServiceStart = currentServiceStart.plusMinutes(srvDuration);
+
                     if (auditService != null) {
                         String performedBy = Boolean.TRUE.equals(bookingRequest.getManualOverride())
                                 ? auditService.resolvePerformedBy("ADMIN")
@@ -444,11 +582,13 @@ public class AppointmentController {
                 guestReceipts.add(guestSummary);
             }
 
+            LocalDateTime estimatedEndTime = bookingRequest.getAppointmentTime().plusMinutes(Math.max(15, totalDurationMinutes));
             Map<String, Object> responseBody = new LinkedHashMap<>();
             Appointment primary = savedAppointments.isEmpty() ? null : savedAppointments.get(0);
             responseBody.put("id", primary != null ? primary.getId() : null);
             responseBody.put("tenantId", tenantId);
             responseBody.put("appointmentTime", bookingRequest.getAppointmentTime());
+            responseBody.put("estimatedEndTime", estimatedEndTime.toString());
             responseBody.put("stationPreference", bookingRequest.getStationPreference());
             responseBody.put("nailTech", resolvedTech);
             responseBody.put("guests", guestReceipts);

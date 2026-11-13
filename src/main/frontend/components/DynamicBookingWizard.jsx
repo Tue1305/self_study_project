@@ -40,16 +40,58 @@ const SERVICE_CATEGORIES = [
   { id: 'gift-packages', title: 'Gift Packages', keywords: ['rejuvenation', 'executive', 'package'] },
 ];
 
-function buildStoreTimeSlots() {
+function formatMinutesTo12HrLabel(totalMinutes) {
+  const clamped = ((totalMinutes % 1440) + 1440) % 1440;
+  const hour24 = Math.floor(clamped / 60);
+  const min = clamped % 60;
+  const period = hour24 >= 12 ? 'PM' : 'AM';
+  const hour12 = hour24 > 12 ? hour24 - 12 : hour24 === 0 ? 12 : hour24;
+  return `${hour12}:${String(min).padStart(2, '0')} ${period}`;
+}
+
+function formatTime24ToRangeLabel(value24, durationMinutes = 45) {
+  if (!value24) return '';
+  const parts = String(value24).split(':');
+  const h = parseInt(parts[0], 10);
+  const m = parseInt(parts[1] || '0', 10);
+  if (isNaN(h) || isNaN(m)) return value24;
+  const startMins = h * 60 + m;
+  const endMins = startMins + (Number(durationMinutes) || 45);
+  return `${formatMinutesTo12HrLabel(startMins)} – ${formatMinutesTo12HrLabel(endMins)}`;
+}
+
+function getLocalTodayDateStr() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+}
+
+function getLocalNowIsoStr() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  const hh = String(now.getHours()).padStart(2, '0');
+  const mm = String(now.getMinutes()).padStart(2, '0');
+  const ss = String(now.getSeconds()).padStart(2, '0');
+  return `${y}-${m}-${d}T${hh}:${mm}:${ss}`;
+}
+
+function buildStoreTimeSlots(durationMinutes = 45) {
   const slots = [];
   for (let hour = 10; hour <= 19; hour++) {
     const maxMinute = hour === 19 ? 0 : 45;
     for (let min = 0; min <= maxMinute; min += 15) {
       const hh = String(hour).padStart(2, '0');
       const mm = String(min).padStart(2, '0');
+      const value = `${hh}:${mm}:00`;
       const period = hour >= 12 ? 'PM' : 'AM';
       const hour12 = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
-      slots.push({ value: `${hh}:${mm}:00`, label: `${hour12}:${mm} ${period}` });
+      const label = `${hour12}:${mm} ${period}`;
+      slots.push({
+        value,
+        label,
+        timeRangeLabel: formatTime24ToRangeLabel(value, durationMinutes),
+      });
     }
   }
   return slots;
@@ -93,17 +135,28 @@ function mapToBackendCategory(catId) {
   }
 }
 
-function isTechQualifiedForBackendCategory(tech, category) {
-  if (category === 'PEDICURE' || category === 'KID_SERVICES') {
+function isTechQualifiedForBackendCategory(tech, category, srv = null) {
+  if (!tech) return false;
+  const targetCat = String(category || '').trim().toUpperCase();
+  if (targetCat === 'PEDICURE' || targetCat === 'KID_SERVICES' || targetCat === 'ALL') {
     return true;
   }
-  const spec = tech?.specialty;
-  if (!spec || !spec.trim()) return false;
-  const tags = spec.split(',').map((s) => s.trim().toUpperCase());
+  const caps = Array.isArray(tech.capabilities)
+    ? tech.capabilities.map((s) => String(s).trim().toUpperCase())
+    : [];
+  const specTags = tech.specialty
+    ? String(tech.specialty).split(',').map((s) => s.trim().toUpperCase())
+    : [];
+  const tags = [...new Set([...caps, ...specTags])].filter(Boolean);
+  if (tags.length === 0) return false;
   if (tags.includes('ALL') || tags.includes('FULL EVERYTHING') || tags.includes('GENERAL')) {
     return true;
   }
-  return tags.includes(category);
+  if (srv && srv.category) {
+    const explicitCat = String(srv.category).trim().toUpperCase();
+    if (tags.includes(explicitCat)) return true;
+  }
+  return tags.includes(targetCat);
 }
 
 
@@ -185,6 +238,7 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [isDateClosed, setIsDateClosed] = useState(false);
   const [closedReason, setClosedReason] = useState('');
+  const [hideUnavailableSlots, setHideUnavailableSlots] = useState(false);
 
   const [alertMessage, setAlertMessage] = useState(null);
   const [submitting, setSubmitting] = useState(false);
@@ -304,29 +358,73 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
     setLoadingSlots(true);
 
     const activeStaffGuest = guests[0];
-    const duration = combinedTotals.totalDurationMinutes || 45;
+    const duration = Math.max(guest1Totals.durationMinutes || 0, guest2Totals.durationMinutes || 0) || 45;
     const params = new URLSearchParams();
     params.set('date', selectedDate);
     params.set('durationMinutes', String(duration));
+    params.set('bufferMinutes', '15');
+    params.set('clientNow', getLocalNowIsoStr());
 
-    // Handle staff parameters
-    if (activeStaffGuest?.staffMode === 'per-service') {
-      const assignedIds = Object.values(activeStaffGuest.serviceStaffAssignments || {})
-        .filter((id) => id != null && id !== 'anyone' && !isNaN(Number(id)));
-      if (assignedIds.length > 0) {
-        params.set('techIds', assignedIds.join(','));
-      }
+    const g0Services = Array.isArray(activeStaffGuest?.services) ? activeStaffGuest.services : [];
+    if (g0Services.length > 0) {
+      params.set('serviceIds', g0Services.map((s) => s.id).join(','));
+      params.set('serviceDurations', g0Services.map((s) => s.durationMinutes || 45).join(','));
+      const srvTechs = g0Services.map((s) => {
+        const assigned = activeStaffGuest?.serviceStaffAssignments?.[s.id];
+        if (assigned != null && assigned !== 'anyone' && !isNaN(Number(assigned))) {
+          return Number(assigned);
+        }
+        if (activeStaffGuest?.selectedStaff?.id && !isNaN(Number(activeStaffGuest.selectedStaff.id))) {
+          return Number(activeStaffGuest.selectedStaff.id);
+        }
+        return 0;
+      });
+      params.set('serviceTechIds', srvTechs.join(','));
+    }
+
+    const assignedIds = Object.values(activeStaffGuest?.serviceStaffAssignments || {})
+      .filter((id) => id != null && id !== 'anyone' && !isNaN(Number(id)));
+    if (assignedIds.length === 1) {
+      params.set('techId', String(assignedIds[0]));
+    } else if (assignedIds.length > 1) {
+      params.set('techIds', [...new Set(assignedIds)].join(','));
     } else if (activeStaffGuest?.selectedStaff?.id) {
       params.set('techId', String(activeStaffGuest.selectedStaff.id));
     }
 
-    fetch(`/api/appointments/availability?${params.toString()}`, {
+    const applyRealTimeTodayFilter = (rawList) => {
+      const isToday = selectedDate === getLocalTodayDateStr();
+      const nowPlusBuffer = new Date(Date.now() + 15 * 60 * 1000);
+      return (rawList || []).map((slot) => {
+        let isAvail = Boolean(slot.available);
+        let reason = slot.reason || null;
+        if (isToday && slot.value) {
+          const parts = String(slot.value).split(':');
+          const slotDt = new Date();
+          slotDt.setHours(parseInt(parts[0], 10), parseInt(parts[1] || '0', 10), 0, 0);
+          if (slotDt < nowPlusBuffer) {
+            isAvail = false;
+            reason = 'Passed';
+          }
+        }
+        return {
+          ...slot,
+          available: isAvail,
+          reason,
+          timeRangeLabel: slot.timeRangeLabel || formatTime24ToRangeLabel(slot.value, duration),
+        };
+      });
+    };
+
+    fetch(`/api/appointments/available-slots?${params.toString()}`, {
       headers: { 'X-Tenant-ID': tenant.tenantKey },
     })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (!data) {
-          setAvailableSlots(buildStoreTimeSlots().map((s) => ({ ...s, available: true })));
+          setAvailableSlots(
+            applyRealTimeTodayFilter(buildStoreTimeSlots(duration).map((s) => ({ ...s, available: true })))
+          );
           return;
         }
         if (data.isClosed) {
@@ -336,9 +434,8 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
           setAppointmentSchedule((prev) => ({ ...prev, appointmentTime: '' }));
         } else {
           setIsDateClosed(false);
-          const slots = data.availableSlots || [];
+          const slots = applyRealTimeTodayFilter(data.availableSlots || []);
           setAvailableSlots(slots);
-          // If current selected time is not available or passed, reset it
           const currentValid = slots.find(
             (s) => s.value === appointmentSchedule.appointmentTime && s.available
           );
@@ -349,12 +446,15 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
       })
       .catch((err) => {
         console.warn('Availability check failed, using local slots:', err);
-        setAvailableSlots(buildStoreTimeSlots().map((s) => ({ ...s, available: true })));
+        setAvailableSlots(
+          applyRealTimeTodayFilter(buildStoreTimeSlots(duration).map((s) => ({ ...s, available: true })))
+        );
       })
       .finally(() => setLoadingSlots(false));
   }, [
     appointmentSchedule.appointmentDate,
-    combinedTotals.totalDurationMinutes,
+    guest1Totals.durationMinutes,
+    guest2Totals.durationMinutes,
     currentStepKey,
     guests,
     tenant.tenantKey,
@@ -528,6 +628,22 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
       serviceStaffAssignments: assignments,
       selectedStaff: chosen,
     };
+  };
+
+  const handleSelectServiceStaff = (srvId, tech) => {
+    setAlertMessage(null);
+    setGuests((prev) =>
+      prev.map((g, idx) => {
+        if (idx !== staffGuestIndex) return g;
+        const assignments = { ...(g.serviceStaffAssignments || {}) };
+        assignments[srvId] = tech ? tech.id : null;
+        const updated = updateMultiServiceStaffStatus(g, assignments);
+        if (idx === 0 && updated.selectedStaff) {
+          setSelectedStaff(updated.selectedStaff);
+        }
+        return updated;
+      })
+    );
   };
 
   const handleSelectCategoryStaff = (catId, tech) => {
@@ -812,8 +928,18 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
               </div>
             )}
             <div className="d-flex justify-content-between py-1 border-bottom">
-              <span className="text-muted">Date &amp; Time</span>
-              <strong>{confirmedBooking.submittedPayload?.appointmentTime}</strong>
+              <span className="text-muted">Date &amp; Time Window</span>
+              <strong>
+                {(() => {
+                  const raw = confirmedBooking.submittedPayload?.appointmentTime || '';
+                  if (!raw.includes('T')) return raw;
+                  const [datePart, timePart] = raw.split('T');
+                  return `${datePart} • ${formatTime24ToRangeLabel(
+                    timePart,
+                    confirmedBooking.totalDurationMinutes || 45
+                  )}`;
+                })()}
+              </strong>
             </div>
             <div className="d-flex justify-content-between pt-2 fs-5">
               <span className="fw-bold">Grand Total</span>
@@ -1298,37 +1424,44 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
                         })}
                     </div>
                   ) : (
-                    /* 2+ Services Selection: Big cards per category with staff cards (no dropdowns) */
+                    /* 2+ Services Selection: Independent per-service staff cards filtered strictly by each service's category */
                     <div className="d-flex flex-column gap-4 mb-4">
-                      {currentGuestCategoryGroups.map((group) => {
+                      {(currentStaffGuest?.services || []).map((srv, srvIdx) => {
+                        const catId = getCategoryForService(srv);
+                        const backendCat = mapToBackendCategory(catId);
+                        const catConfig = SERVICE_CATEGORIES.find((c) => c.id === catId);
+                        const catTitle = catConfig ? catConfig.title : 'Treatment';
                         const qualifiedTechs = staffList.filter((tech) =>
-                          isTechQualifiedForBackendCategory(tech, group.backendCat)
+                          isTechQualifiedForBackendCategory(tech, backendCat, srv)
                         );
-                        const isAnyoneAssigned = group.services.every(
-                          (s) => currentStaffGuest?.serviceStaffAssignments?.[s.id] === null
-                        );
+                        const assignedVal = currentStaffGuest?.serviceStaffAssignments?.[srv.id];
+                        const isAnyoneAssigned = assignedVal === null;
 
                         return (
-                          <div key={group.catId} className="card border rounded-4 p-4 shadow-sm bg-white">
+                          <div key={srv.id} className="card border rounded-4 p-4 shadow-sm bg-white">
                             <div className="d-flex flex-wrap justify-content-between align-items-center border-bottom pb-3 mb-3">
                               <div>
-                                <h5 className="fw-bold text-dark mb-1">
+                                <span
+                                  className="badge rounded-pill px-2 py-1 small mb-1 text-white"
+                                  style={{ backgroundColor: 'var(--primary-color)' }}
+                                >
+                                  Service {srvIdx + 1} of {currentStaffGuest.services.length} • {catTitle}
+                                </span>
+                                <h5 className="fw-bold text-dark mb-1 mt-1">
                                   <span className="me-2" style={{ color: 'var(--primary-color)' }}>✦</span>
-                                  {group.catTitle}
+                                  {srv.name}
                                 </h5>
                                 <div className="small text-muted">
-                                  {group.services
-                                    .map((s) => `${s.name} ($${Number(s.price || 0).toFixed(2)})`)
-                                    .join(', ')}
+                                  ${Number(srv.price || 0).toFixed(2)} • {srv.durationMinutes || 45} mins
                                 </div>
                               </div>
                               <span className="badge bg-light text-secondary border px-3 py-2 rounded-pill small">
-                                {group.services.length} Treatment{group.services.length === 1 ? '' : 's'}
+                                {qualifiedTechs.length} Specialist{qualifiedTechs.length === 1 ? '' : 's'} Available
                               </span>
                             </div>
 
                             <div className="row g-3">
-                              {/* Anyone Available for this category */}
+                              {/* Anyone Available for this specific service */}
                               <div className="col-md-6">
                                 <div
                                   className="card p-3 h-100 d-flex flex-row align-items-center justify-content-between rounded-3 shadow-sm"
@@ -1338,7 +1471,7 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
                                     borderWidth: isAnyoneAssigned ? '2px' : '1px',
                                     backgroundColor: isAnyoneAssigned ? 'var(--primary-color-soft)' : '#fff',
                                   }}
-                                  onClick={() => handleSelectCategoryStaff(group.catId, null)}
+                                  onClick={() => handleSelectServiceStaff(srv.id, null)}
                                 >
                                   <div className="d-flex align-items-center gap-3">
                                     <div
@@ -1358,11 +1491,9 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
                                 </div>
                               </div>
 
-                              {/* Qualified staff for this category */}
+                              {/* Qualified staff for this specific service */}
                               {qualifiedTechs.map((tech) => {
-                                const isAssigned = group.services.every(
-                                  (s) => currentStaffGuest?.serviceStaffAssignments?.[s.id] === tech.id
-                                );
+                                const isAssigned = assignedVal === tech.id;
 
                                 return (
                                   <div key={tech.id} className="col-md-6">
@@ -1374,7 +1505,7 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
                                         borderWidth: isAssigned ? '2px' : '1px',
                                         backgroundColor: isAssigned ? 'var(--primary-color-soft)' : '#fff',
                                       }}
-                                      onClick={() => handleSelectCategoryStaff(group.catId, tech)}
+                                      onClick={() => handleSelectServiceStaff(srv.id, tech)}
                                     >
                                       <div className="d-flex align-items-center gap-3">
                                         <div
@@ -1550,12 +1681,23 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
                           ))}
                         </ul>
                         <div className="row g-2 pt-2 border-top small">
-                          <div className="col-md-6">
+                          <div className="col-md-4">
                             <span className="text-muted">Technician Assignment: </span>
                             <strong>{currentGuest.selectedStaff?.name || selectedStaff?.name || 'Anyone Available'}</strong>
                           </div>
+                          <div className="col-md-4">
+                            <span className="text-muted">Time Window: </span>
+                            <strong style={{ color: 'var(--primary-color)' }}>
+                              {appointmentSchedule.appointmentTime
+                                ? `${appointmentSchedule.appointmentDate} • ${formatTime24ToRangeLabel(
+                                    appointmentSchedule.appointmentTime,
+                                    currentTotals.durationMinutes || 45
+                                  )}`
+                                : 'Select slot below'}
+                            </strong>
+                          </div>
                           {wizard?.enableStationSelection && activeSteps.includes('STATION') && (
-                            <div className="col-md-6">
+                            <div className="col-md-4">
                               <span className="text-muted">Station / Room: </span>
                               <strong>{selectedStation}</strong>
                             </div>
@@ -1612,13 +1754,13 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
                   </div>
 
                   <div className="row g-3 mb-3">
-                    <div className="col-md-6">
+                    <div className="col-md-5">
                       <label className="form-label fw-semibold">Appointment Date *</label>
                       <input
                         type="date"
                         className="form-control"
                         required
-                        min={new Date().toISOString().split('T')[0]}
+                        min={getLocalTodayDateStr()}
                         value={appointmentSchedule.appointmentDate}
                         onChange={(e) => handleDateChange(e.target.value)}
                       />
@@ -1628,41 +1770,117 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
                         </div>
                       )}
                     </div>
-                    <div className="col-md-6">
+                    <div className="col-md-7 d-flex align-items-end">
+                      <div className="w-100 p-2 px-3 rounded-3 border bg-light d-flex flex-wrap justify-content-between align-items-center gap-2">
+                        <div>
+                          <div className="small text-muted fw-semibold">Selected Time Window</div>
+                          <div className="fw-bold small" style={{ color: 'var(--primary-color)' }}>
+                            {appointmentSchedule.appointmentTime
+                              ? `${formatTime24ToRangeLabel(
+                                  appointmentSchedule.appointmentTime,
+                                  Math.max(guest1Totals.durationMinutes || 0, guest2Totals.durationMinutes || 0) || 45
+                                )} (${Math.max(guest1Totals.durationMinutes || 0, guest2Totals.durationMinutes || 0) || 45} mins)`
+                              : 'Click an available time card below'}
+                          </div>
+                        </div>
+                        <div className="form-check form-switch mb-0">
+                          <input
+                            className="form-check-input"
+                            type="checkbox"
+                            id="reactHideUnavailableToggle"
+                            checked={hideUnavailableSlots}
+                            onChange={(e) => setHideUnavailableSlots(e.target.checked)}
+                          />
+                          <label className="form-check-label small text-muted" htmlFor="reactHideUnavailableToggle">
+                            Hide Booked
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="col-12">
                       <label className="form-label fw-semibold">
-                        Time Slot (10:00 AM – 7:00 PM) *
+                        Select Time Slot Card (Start – Est. End Time) *
                       </label>
-                      <select
-                        className="form-select"
-                        required
-                        disabled={isDateClosed || loadingSlots}
-                        value={appointmentSchedule.appointmentTime}
-                        onChange={(e) =>
-                          setAppointmentSchedule({
-                            ...appointmentSchedule,
-                            appointmentTime: e.target.value,
-                          })
-                        }
-                      >
-                        <option value="">
-                          {loadingSlots
-                            ? 'Checking real-time slot availability...'
-                            : isDateClosed
-                            ? '-- Closed on this date --'
-                            : '-- Choose an Available Time --'}
-                        </option>
-                        {availableSlots.map((slot) => (
-                          <option
-                            key={slot.value}
-                            value={slot.value}
-                            disabled={!slot.available}
-                          >
-                            {slot.label} {!slot.available ? `(${slot.reason || 'Unavailable'})` : ''}
-                          </option>
-                        ))}
-                      </select>
+                      {loadingSlots ? (
+                        <div className="text-muted small py-3 text-center border rounded-3 bg-light">
+                          Synchronizing technician schedule &amp; available time windows...
+                        </div>
+                      ) : isDateClosed ? (
+                        <div className="text-danger small py-3 text-center border rounded-3 bg-light fw-semibold">
+                          {closedReason || 'Salon is closed on this date.'}
+                        </div>
+                      ) : (
+                        <div
+                          style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+                            gap: '0.6rem',
+                            maxHeight: 310,
+                            overflowY: 'auto',
+                            padding: '0.35rem',
+                          }}
+                        >
+                          {availableSlots
+                            .filter((slot) => !hideUnavailableSlots || slot.available)
+                            .map((slot) => {
+                              const isSelected =
+                                slot.available && appointmentSchedule.appointmentTime === slot.value;
+                              const rangeLabel =
+                                slot.timeRangeLabel ||
+                                formatTime24ToRangeLabel(
+                                  slot.value,
+                                  Math.max(guest1Totals.durationMinutes || 0, guest2Totals.durationMinutes || 0) || 45
+                                );
+                              return (
+                                <div
+                                  key={slot.value}
+                                  onClick={() => {
+                                    if (!slot.available) return;
+                                    setAppointmentSchedule({
+                                      ...appointmentSchedule,
+                                      appointmentTime: slot.value,
+                                    });
+                                  }}
+                                  style={{
+                                    borderRadius: 12,
+                                    padding: '0.6rem 0.7rem',
+                                    textAlign: 'center',
+                                    cursor: slot.available ? 'pointer' : 'not-allowed',
+                                    border: isSelected
+                                      ? '2px solid var(--primary-color)'
+                                      : slot.available
+                                      ? '1.5px solid #e2e8f0'
+                                      : '1.5px dashed #dee2e6',
+                                    backgroundColor: isSelected
+                                      ? 'var(--primary-color-soft, #fff0f5)'
+                                      : slot.available
+                                      ? '#fff'
+                                      : '#f8f9fa',
+                                    opacity: slot.available ? 1 : 0.58,
+                                  }}
+                                >
+                                  <div className="fw-bold small text-dark">{slot.label}</div>
+                                  <div
+                                    style={{ fontSize: '0.73rem' }}
+                                    className={isSelected ? 'fw-semibold' : 'text-muted'}
+                                  >
+                                    {rangeLabel}
+                                  </div>
+                                  <span
+                                    className={`badge rounded-pill mt-1 ${
+                                      slot.available ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger'
+                                    }`}
+                                    style={{ fontSize: '0.62rem' }}
+                                  >
+                                    {slot.available ? 'Open' : slot.reason === 'Passed' ? 'Passed' : 'Booked'}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                        </div>
+                      )}
                       <div className="small text-muted mt-1">
-                        Slots dynamically pre-checked against existing salon appointments.
+                        Includes service duration + 15-minute sanitization &amp; turnover buffer.
                       </div>
                     </div>
                   </div>

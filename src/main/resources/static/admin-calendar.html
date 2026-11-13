@@ -584,6 +584,8 @@
         return `${hours12}:${String(mins).padStart(2, '0')} ${period}`;
     }
 
+    const TURNOVER_BUFFER_MINUTES = 15;
+
     /**
      * Side-by-Side Collision Stacking Algorithm
      */
@@ -595,7 +597,8 @@
             const startMinutes = dt.getHours() * 60 + dt.getMinutes();
             const durationMinutes = Number((apt.service && apt.service.durationMinutes) || 45);
             const endMinutes = startMinutes + durationMinutes;
-            return { apt, startMinutes, endMinutes, durationMinutes };
+            const busyUntilMinutes = endMinutes + TURNOVER_BUFFER_MINUTES;
+            return { apt, startMinutes, endMinutes, durationMinutes, busyUntilMinutes };
         });
 
         parsed.sort((a, b) => {
@@ -650,8 +653,9 @@
             for (const item of cluster) {
                 const offsetMinutes = Math.max(0, item.startMinutes - openMinutes);
                 const topPx = (offsetMinutes / 60) * HOUR_ROW_HEIGHT_PX;
-                const heightPx = Math.max(38, (item.durationMinutes / 60) * HOUR_ROW_HEIGHT_PX);
+                const heightPx = Math.max(44, (item.durationMinutes / 60) * HOUR_ROW_HEIGHT_PX);
                 const timeRangeLabel = `${formatMinutesToTimeLabel(item.startMinutes)} – ${formatMinutesToTimeLabel(item.endMinutes)}`;
+                const nextFreeLabel = formatMinutesToTimeLabel(item.busyUntilMinutes);
 
                 let leftStyle;
                 let widthStyle;
@@ -672,6 +676,8 @@
                     leftStyle,
                     widthStyle,
                     timeRangeLabel,
+                    durationMinutes: item.durationMinutes,
+                    nextFreeLabel,
                     isColliding,
                     colIndex: item.colIndex,
                     totalCols
@@ -1189,8 +1195,9 @@
                                         title: `Click empty slot on ${col.name}'s column to book walk-in`
                                     },
                                         layoutBlocks.map(item => {
-                                            const { apt, topPx, heightPx, leftStyle, widthStyle, timeRangeLabel, isColliding } = item;
+                                            const { apt, topPx, heightPx, leftStyle, widthStyle, timeRangeLabel, durationMinutes, nextFreeLabel, isColliding } = item;
                                             const statusLower = String(apt.status || 'PENDING').toLowerCase();
+                                            const srvName = (apt.service && apt.service.name) || 'Service';
 
                                             return h('div', {
                                                 key: apt.id,
@@ -1205,14 +1212,14 @@
                                                     e.stopPropagation();
                                                     setSelectedAppointment(apt);
                                                 },
-                                                title: `${apt.customerName || 'Walk-In'} - ${(apt.service && apt.service.name) || 'Service'} (${timeRangeLabel})`
+                                                title: `${timeRangeLabel} • ${srvName} (${durationMinutes}m) — ${apt.customerName || 'Walk-In'} | Free at ${nextFreeLabel}`
                                             },
                                                 h('div', { className: 'd-flex justify-content-between align-items-start gap-1' },
-                                                    h('span', { className: 'appt-time-badge' }, timeRangeLabel),
+                                                    h('span', { className: 'appt-time-badge text-truncate' }, `${timeRangeLabel} • ${srvName}`),
                                                     isColliding && h('span', { className: 'collision-badge', title: 'Side-by-side overlapping appointment' }, 'Overlap')
                                                 ),
                                                 h('div', { className: 'appt-customer-name text-truncate' }, apt.customerName || 'Walk-In Guest'),
-                                                h('div', { className: 'appt-service-name text-truncate' }, (apt.service && apt.service.name) || 'Service')
+                                                h('div', { className: 'appt-service-name text-truncate' }, `${durationMinutes}m • Free ${nextFreeLabel}`)
                                             );
                                         })
                                     );
@@ -1448,10 +1455,24 @@
                             ),
                             h('p', { className: 'mb-2' }, h('strong', null, 'Phone Number: '), selectedAppointment.customerPhone || 'N/A'),
                             h('p', { className: 'mb-2' }, h('strong', null, 'Email: '), selectedAppointment.customerEmail || 'N/A'),
-                            h('p', { className: 'mb-2' }, h('strong', null, 'Service: '), (selectedAppointment.service && selectedAppointment.service.name) || 'Service'),
+                            h('p', { className: 'mb-2' }, h('strong', null, 'Service: '), `${(selectedAppointment.service && selectedAppointment.service.name) || 'Service'} (${(selectedAppointment.service && selectedAppointment.service.durationMinutes) || 45} mins)`),
                             h('p', { className: 'mb-2' }, h('strong', null, 'Nail Technician: '), (selectedAppointment.nailTech && (selectedAppointment.nailTech.name || selectedAppointment.nailTech.username)) || 'Anyone Available'),
                             selectedAppointment.stationPreference && h('p', { className: 'mb-2' }, h('strong', null, 'Station / Suite: '), selectedAppointment.stationPreference),
-                            h('p', { className: 'mb-2' }, h('strong', null, 'Time: '), new Date(selectedAppointment.appointmentTime).toLocaleString()),
+                            (() => {
+                                const dt = new Date(selectedAppointment.appointmentTime);
+                                const startMins = dt.getHours() * 60 + dt.getMinutes();
+                                const durMins = Number((selectedAppointment.service && selectedAppointment.service.durationMinutes) || 45);
+                                const endMins = startMins + durMins;
+                                const freeMins = endMins + TURNOVER_BUFFER_MINUTES;
+                                const rangeStr = `${formatMinutesToTimeLabel(startMins)} – ${formatMinutesToTimeLabel(endMins)}`;
+                                const freeStr = formatMinutesToTimeLabel(freeMins);
+                                return h('p', { className: 'mb-2' },
+                                    h('strong', null, 'Time Window: '),
+                                    `${dt.toLocaleDateString()} • `,
+                                    h('span', { className: 'fw-bold text-pink' }, rangeStr),
+                                    h('span', { className: 'small text-muted ms-2' }, `(Tech next free at ${freeStr} w/ ${TURNOVER_BUFFER_MINUTES}m buffer)`)
+                                );
+                            })(),
                             selectedAppointment.notes && h('p', { className: 'mb-2' }, h('strong', null, 'Notes: '), selectedAppointment.notes),
                             h('p', { className: 'mb-3' }, h('strong', null, 'Status: '), h('span', { className: 'badge bg-secondary' }, selectedAppointment.status || 'PENDING')),
 

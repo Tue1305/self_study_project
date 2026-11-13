@@ -694,6 +694,7 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
     }
 
     setSubmitting(true);
+    const primaryGuest = guests[0] || {};
     const payload = {
       appointmentTime: `${appointmentSchedule.appointmentDate}T${appointmentSchedule.appointmentTime}`,
       stationPreference:
@@ -702,6 +703,16 @@ export default function DynamicBookingWizard({ onRegisterResetHandler }) {
           : null,
       nailTech: (guests[0]?.selectedStaff?.id || selectedStaff?.id)
         ? { id: guests[0]?.selectedStaff?.id || selectedStaff.id }
+        : null,
+      customerName: primaryGuest.customerName ? primaryGuest.customerName.trim() : '',
+      customerPhone: primaryGuest.customerPhone ? primaryGuest.customerPhone.trim() : '',
+      customerEmail: primaryGuest.customerEmail ? primaryGuest.customerEmail.trim() : '',
+      notes: wizard?.showAppointmentNotes && primaryGuest.notes ? primaryGuest.notes.trim() : '',
+      serviceIds: (primaryGuest.services && Array.isArray(primaryGuest.services))
+        ? primaryGuest.services.map((s) => s.id)
+        : [],
+      service: (primaryGuest.services && primaryGuest.services.length > 0)
+        ? { id: primaryGuest.services[0].id }
         : null,
       guests: guests.map((g, idx) => ({
         guestNumber: idx + 1,

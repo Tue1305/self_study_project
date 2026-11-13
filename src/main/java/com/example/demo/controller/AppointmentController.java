@@ -692,6 +692,7 @@ public class AppointmentController {
                     details.put("customerPhone", appt.getCustomerPhone());
                     details.put("appointmentTime", appt.getAppointmentTime());
                     details.put("service", appt.getService());
+                    details.put("serviceName", appt.getService() != null ? appt.getService().getName() : "Service");
                     details.put("nailTech", appt.getNailTech());
                     details.put("stationPreference", appt.getStationPreference());
                     details.put("status", appt.getStatus());
@@ -898,6 +899,7 @@ public class AppointmentController {
                 "message", "Appointment rescheduled successfully",
                 "status", "CONFIRMED",
                 "appointmentTime", newTime,
+                "newAppointmentTime", newTime.toString(),
                 "appointment", updated
         ));
     }

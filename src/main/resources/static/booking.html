@@ -1458,12 +1458,13 @@
         params.set('date', selectedDate);
         params.set('durationMinutes', String(totalDuration));
 
-        if (guest0 && guest0.staffMode === 'per-service') {
-            const assignedIds = Object.values(guest0.serviceStaffAssignments || {})
-                .filter(id => id != null && id !== 'anyone' && !isNaN(Number(id)));
-            if (assignedIds.length > 0) {
-                params.set('techIds', assignedIds.join(','));
-            }
+        const assignedIds = guest0 && guest0.serviceStaffAssignments
+            ? [...new Set(Object.values(guest0.serviceStaffAssignments).filter(id => id != null && id !== 'anyone' && !isNaN(Number(id))))]
+            : [];
+        if (assignedIds.length === 1) {
+            params.set('techId', String(assignedIds[0]));
+        } else if (assignedIds.length > 1) {
+            params.set('techIds', assignedIds.join(','));
         } else if (guest0 && guest0.selectedStaff && guest0.selectedStaff.id) {
             params.set('techId', String(guest0.selectedStaff.id));
         }
@@ -1753,7 +1754,15 @@
         if (effectiveCatId) {
             const collapseEl = document.getElementById(`bookingCollapse_${effectiveCatId}`);
             if (collapseEl && !collapseEl.classList.contains('show')) {
-                new bootstrap.Collapse(collapseEl, { show: true });
+                if (typeof bootstrap !== 'undefined' && bootstrap.Collapse) {
+                    try {
+                        new bootstrap.Collapse(collapseEl, { show: true });
+                    } catch (_) {
+                        collapseEl.classList.add('show');
+                    }
+                } else {
+                    collapseEl.classList.add('show');
+                }
                 toggleBookingCategoryCard(effectiveCatId);
             }
         }
@@ -2319,7 +2328,6 @@
                 floatingBar.classList.add('visible');
             }
         }
-        }
     }
 
     function triggerStaffFloatingActionBar(staffName) {
@@ -2666,6 +2674,7 @@
         submitBtn.disabled = true;
         submitBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Submitting...`;
 
+        const primaryGuest = bookingState.guests[0] || {};
         const bookingPayload = {
             appointmentTime: `${selectedDate}T${selectedTime}`,
             stationPreference: bookingState.stepOrder.includes('STATION')
@@ -2673,6 +2682,16 @@
                 : null,
             nailTech: (bookingState.selectedStaff && bookingState.selectedStaff.id)
                 ? { id: bookingState.selectedStaff.id }
+                : null,
+            customerName: primaryGuest.customerName || '',
+            customerPhone: primaryGuest.customerPhone || '',
+            customerEmail: primaryGuest.customerEmail || '',
+            notes: primaryGuest.notes || '',
+            serviceIds: (primaryGuest.services && Array.isArray(primaryGuest.services))
+                ? primaryGuest.services.map(s => s.id)
+                : [],
+            service: (primaryGuest.services && primaryGuest.services.length > 0)
+                ? { id: primaryGuest.services[0].id }
                 : null,
             guests: bookingState.guests.map((g, idx) => ({
                 guestNumber: idx + 1,

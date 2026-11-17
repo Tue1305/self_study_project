@@ -1090,31 +1090,37 @@ public class AppointmentController {
         }
 
         Appointment appt = existingOpt.get();
-        if (body == null || (!body.containsKey("appointmentTime") && !body.containsKey("date"))) {
-            return ResponseEntity.badRequest().body(Map.of("message", "New appointment date/time is required."));
-        }
 
         LocalDateTime newTime;
-        try {
-            if (body.containsKey("appointmentTime") && body.get("appointmentTime") != null && !String.valueOf(body.get("appointmentTime")).isBlank()) {
-                newTime = LocalDateTime.parse(String.valueOf(body.get("appointmentTime")));
-            } else {
-                String dateStr = String.valueOf(body.get("date")).trim();
-                String timeStr = String.valueOf(body.get("startTime") != null ? body.get("startTime") : body.get("time")).trim();
-                if (!timeStr.contains(":")) timeStr += ":00";
-                if (timeStr.length() == 5) timeStr += ":00";
-                newTime = LocalDateTime.parse(dateStr + "T" + timeStr);
+        if (body != null && (body.containsKey("appointmentTime") || body.containsKey("date") || body.containsKey("startTime") || body.containsKey("time"))) {
+            try {
+                if (body.containsKey("appointmentTime") && body.get("appointmentTime") != null && !String.valueOf(body.get("appointmentTime")).isBlank()) {
+                    newTime = LocalDateTime.parse(String.valueOf(body.get("appointmentTime")));
+                } else {
+                    String dateStr = body.containsKey("date") ? String.valueOf(body.get("date")).trim() : appt.getAppointmentTime().toLocalDate().toString();
+                    String timeStr = String.valueOf(body.get("startTime") != null ? body.get("startTime") : (body.get("time") != null ? body.get("time") : appt.getAppointmentTime().toLocalTime().toString())).trim();
+                    if (!timeStr.contains(":")) timeStr += ":00";
+                    if (timeStr.length() == 5) timeStr += ":00";
+                    newTime = LocalDateTime.parse(dateStr + "T" + timeStr);
+                }
+            } catch (Exception e) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Invalid date/time format."));
             }
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Invalid date/time format."));
+        } else {
+            newTime = appt.getAppointmentTime();
         }
 
         // Optional technician reassignment
-        if (body.containsKey("techId") && body.get("techId") != null && !String.valueOf(body.get("techId")).isBlank()) {
-            try {
-                Long techId = Long.parseLong(String.valueOf(body.get("techId")));
-                userRepository.findByTenantIdAndId(tenantId, techId).ifPresent(appt::setNailTech);
-            } catch (Exception ignored) {
+        if (body != null && body.containsKey("techId")) {
+            Object rawTech = body.get("techId");
+            if (rawTech == null || "-1".equals(String.valueOf(rawTech).trim()) || "null".equalsIgnoreCase(String.valueOf(rawTech).trim()) || String.valueOf(rawTech).isBlank()) {
+                appt.setNailTech(null);
+            } else {
+                try {
+                    Long techId = Long.parseLong(String.valueOf(rawTech).trim());
+                    userRepository.findByTenantIdAndId(tenantId, techId).ifPresent(appt::setNailTech);
+                } catch (Exception ignored) {
+                }
             }
         }
 
@@ -1195,6 +1201,107 @@ public class AppointmentController {
         return ResponseEntity.ok(Map.of(
                 "message", "Appointment rescheduled successfully",
                 "status", "CONFIRMED",
+                "appointment", updated
+        ));
+    }
+
+    /**
+     * Reassigns an appointment to a specific staff member (or unassigns to 'Anyone Available')
+     * with conflict checking against the target technician's active schedule.
+     */
+    @PatchMapping("/{id}/assign-tech")
+    public ResponseEntity<?> assignTechnician(
+            @PathVariable Long id,
+            @RequestBody(required = false) Map<String, Object> body,
+            @RequestParam(required = false) Long techId,
+            HttpServletRequest request
+    ) {
+        String tenantId = tenantContextResolver.resolveTenantId(request);
+        Optional<Appointment> existingOpt = appointmentRepository.findByTenantIdAndId(tenantId, id);
+        if (existingOpt.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", "Appointment not found"));
+        }
+
+        Appointment appt = existingOpt.get();
+        Long targetTechId = techId;
+        if (targetTechId == null && body != null && body.containsKey("techId")) {
+            Object raw = body.get("techId");
+            if (raw != null && !"-1".equals(String.valueOf(raw).trim()) && !"null".equalsIgnoreCase(String.valueOf(raw).trim()) && !String.valueOf(raw).isBlank()) {
+                try {
+                    targetTechId = Long.parseLong(String.valueOf(raw).trim());
+                } catch (Exception ignored) {}
+            }
+        }
+
+        UserEntity targetTech = null;
+        if (targetTechId != null) {
+            Optional<UserEntity> techOpt = userRepository.findByTenantIdAndId(tenantId, targetTechId);
+            if (techOpt.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Selected technician not found"));
+            }
+            targetTech = techOpt.get();
+        }
+
+        // Conflict check if assigned to a specific technician
+        if (targetTech != null) {
+            LocalDateTime apptTime = appt.getAppointmentTime();
+            int duration = (appt.getService() != null && appt.getService().getDurationMinutes() != null)
+                    ? appt.getService().getDurationMinutes() : 45;
+            LocalDateTime slotEnd = apptTime.plusMinutes(duration);
+
+            List<Appointment> dayAppts = appointmentRepository.findByTenantIdAndAppointmentTimeBetween(
+                    tenantId,
+                    apptTime.toLocalDate().atStartOfDay(),
+                    apptTime.toLocalDate().plusDays(1).atStartOfDay()
+            );
+
+            Long techIdToCheck = targetTech.getId();
+            boolean conflict = dayAppts.stream()
+                    .filter(a -> !a.getId().equals(appt.getId()))
+                    .filter(a -> a.getStatus() != Appointment.AppointmentStatus.CANCELLED)
+                    .filter(a -> a.getNailTech() != null && a.getNailTech().getId().equals(techIdToCheck))
+                    .anyMatch(a -> hasOverlapWithBuffer(a, apptTime, slotEnd, 15));
+
+            if (conflict) {
+                String techName = targetTech.getName() != null ? targetTech.getName() : targetTech.getUsername();
+                return ResponseEntity.status(HttpStatus.CONFLICT)
+                        .body(Map.of("message", techName + " is already booked at this time slot."));
+            }
+        }
+
+        String oldTechName = appt.getNailTech() != null ? (appt.getNailTech().getName() != null ? appt.getNailTech().getName() : appt.getNailTech().getUsername()) : "Anyone Available";
+        String newTechName = targetTech != null ? (targetTech.getName() != null ? targetTech.getName() : targetTech.getUsername()) : "Anyone Available";
+
+        appt.setNailTech(targetTech);
+        String reason = (body != null && body.containsKey("reason")) ? String.valueOf(body.get("reason")) : "Reassigned from " + oldTechName + " to " + newTechName;
+        String existingNotes = appt.getNotes() != null ? appt.getNotes().trim() : "";
+        String reassignTag = "[REASSIGNED: " + oldTechName + " -> " + newTechName + "]";
+        appt.setNotes(existingNotes.isEmpty() ? reassignTag : existingNotes + " | " + reassignTag);
+
+        Appointment updated = appointmentRepository.save(appt);
+
+        if (auditService != null) {
+            Customer customer = null;
+            if (appt.getCustomerEmail() != null && !appt.getCustomerEmail().isBlank()) {
+                customer = customerRepository.findByEmail(appt.getCustomerEmail().trim()).orElse(null);
+            }
+            String performedBy = auditService.resolvePerformedBy("ADMIN");
+            auditService.logActivity(
+                    tenantId,
+                    customer != null ? customer.getId() : null,
+                    updated.getId(),
+                    updated.getCustomerName(),
+                    updated.getCustomerEmail(),
+                    updated.getCustomerPhone(),
+                    "REASSIGNED",
+                    performedBy,
+                    reason
+            );
+        }
+
+        return ResponseEntity.ok(Map.of(
+                "message", "Appointment reassigned successfully to " + newTechName,
+                "status", updated.getStatus().name(),
                 "appointment", updated
         ));
     }

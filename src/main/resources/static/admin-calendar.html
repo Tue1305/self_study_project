@@ -247,6 +247,82 @@
             z-index: 10;
         }
 
+        /* Drag and Drop Styling */
+        .timeline-appt-block[draggable="true"] {
+            cursor: grab;
+            user-select: none;
+            -webkit-user-drag: element;
+        }
+
+        .timeline-appt-block[draggable="true"]:active {
+            cursor: grabbing;
+        }
+
+        .timeline-appt-block.is-dragging {
+            opacity: 0.35;
+            cursor: grabbing !important;
+            transform: scale(0.96);
+            box-shadow: 0 12px 28px rgba(15, 23, 42, 0.3) !important;
+            z-index: 100 !important;
+            border: 2px dashed #0d6efd !important;
+        }
+
+        .timeline-staff-column.drag-target-active {
+            background-color: rgba(13, 110, 253, 0.08) !important;
+            outline: 2px dashed #0d6efd;
+            outline-offset: -2px;
+        }
+
+        .timeline-staff-col-header.drag-target-active {
+            background-color: rgba(13, 110, 253, 0.15) !important;
+            outline: 2px dashed #0d6efd;
+            outline-offset: -2px;
+            box-shadow: inset 0 0 14px rgba(13, 110, 253, 0.25);
+        }
+
+        .timeline-drag-ghost {
+            position: absolute;
+            left: 6px;
+            right: 6px;
+            border-radius: 8px;
+            padding: 6px 10px;
+            pointer-events: none;
+            z-index: 50;
+            background-color: rgba(13, 110, 253, 0.2);
+            border: 2px dashed #0d6efd;
+            color: #0b5ed7;
+            font-size: 0.75rem;
+            font-weight: 700;
+            box-shadow: 0 4px 14px rgba(13, 110, 253, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            backdrop-filter: blur(2px);
+            animation: pulseGhost 0.8s infinite alternate;
+        }
+
+        @keyframes pulseGhost {
+            0% { opacity: 0.8; transform: scale(0.99); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+
+        .drag-toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            z-index: 1090;
+            min-width: 320px;
+            max-width: 440px;
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.18);
+            border-radius: 12px;
+            animation: slideInUp 0.25s ease-out;
+        }
+
+        @keyframes slideInUp {
+            from { transform: translateY(100%); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
         /* Side-by-side collision stacking styles */
         .timeline-appt-block.is-colliding {
             box-shadow: 0 2px 8px rgba(245, 159, 0, 0.22);
@@ -574,7 +650,7 @@
     }
 
     // ==================== REACT DAILY STAFF TIMELINE COMPONENT ====================
-    const { useState, useEffect, useMemo, useCallback } = React;
+    const { useState, useEffect, useMemo, useCallback, useRef } = React;
     const h = React.createElement;
 
     const DEFAULT_OPEN_HOUR = 10; // 10:00 AM
@@ -750,6 +826,200 @@
 
         const [dispatchingReminders, setDispatchingReminders] = useState(false);
         const [reminderNotice, setReminderNotice] = useState(null);
+
+        // Drag-and-drop state & drag-end click suppression
+        const [draggingApt, setDraggingApt] = useState(null);
+        const [dragOverColumn, setDragOverColumn] = useState(null);
+        const [isDragMoving, setIsDragMoving] = useState(false);
+        const [dragToast, setDragToast] = useState(null);
+        const dragJustEndedRef = useRef(false);
+
+        const handleDragStart = (e, apt) => {
+            dragJustEndedRef.current = false;
+            setDraggingApt(apt);
+            e.dataTransfer.setData('text/plain', String(apt.id));
+            e.dataTransfer.effectAllowed = 'move';
+            setTimeout(() => {
+                setIsDragMoving(true);
+            }, 10);
+        };
+
+        const handleDragEnd = () => {
+            setIsDragMoving(false);
+            setDraggingApt(null);
+            setDragOverColumn(null);
+            dragJustEndedRef.current = true;
+            setTimeout(() => {
+                dragJustEndedRef.current = false;
+            }, 250);
+        };
+
+        const handleHeaderDragOver = (e, col) => {
+            if (!draggingApt) return;
+            e.preventDefault();
+            e.stopPropagation();
+            e.dataTransfer.dropEffect = 'move';
+            setDragOverColumn({
+                techId: col.techId,
+                techName: col.name,
+                isHeader: true,
+                isUnassigned: col.isUnassigned,
+                topPx: 0,
+                timeStr: null
+            });
+        };
+
+        const handleColumnDragOver = (e, col) => {
+            if (!draggingApt) return;
+            e.preventDefault();
+            e.stopPropagation();
+            e.dataTransfer.dropEffect = 'move';
+
+            const rect = e.currentTarget.getBoundingClientRect();
+            const clickY = Math.max(0, e.clientY - rect.top);
+            const elapsedMins = (clickY / HOUR_ROW_HEIGHT_PX) * 60;
+            const roundedMins = Math.round(elapsedMins / 15) * 15;
+            const targetTotalMins = DEFAULT_OPEN_HOUR * 60 + roundedMins;
+            const duration = Number((draggingApt.service && draggingApt.service.durationMinutes) || 45);
+            const maxStartMins = DEFAULT_CLOSE_HOUR * 60 - 15;
+            const clampedTotalMins = Math.max(DEFAULT_OPEN_HOUR * 60, Math.min(maxStartMins, targetTotalMins));
+
+            const hours24 = Math.floor(clampedTotalMins / 60);
+            const mins = clampedTotalMins % 60;
+            const timeStr = `${String(hours24).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+            const topPx = ((clampedTotalMins - DEFAULT_OPEN_HOUR * 60) / 60) * HOUR_ROW_HEIGHT_PX;
+            const heightPx = Math.max(44, (duration / 60) * HOUR_ROW_HEIGHT_PX);
+
+            setDragOverColumn({
+                techId: col.techId,
+                techName: col.name,
+                isHeader: false,
+                isUnassigned: col.isUnassigned,
+                topPx,
+                timeStr,
+                heightPx,
+                timeRangeLabel: `${formatMinutesToTimeLabel(clampedTotalMins)} – ${formatMinutesToTimeLabel(clampedTotalMins + duration)}`
+            });
+        };
+
+        const handleColumnDragLeave = (e, col) => {
+            if (e.currentTarget.contains(e.relatedTarget)) return;
+            setDragOverColumn(prev => {
+                if (prev && prev.techId === col.techId) return null;
+                return prev;
+            });
+        };
+
+        const handleDropOnStaff = async (e, col, isHeader = false) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const apt = draggingApt;
+            const dragTarget = dragOverColumn;
+            handleDragEnd();
+
+            if (!apt) return;
+
+            const targetTechId = col.isUnassigned ? null : col.techId;
+            const currentTechId = apt.nailTech ? apt.nailTech.id : null;
+            const currentDt = new Date(apt.appointmentTime);
+            const currentTimeStr = `${String(currentDt.getHours()).padStart(2, '0')}:${String(currentDt.getMinutes()).padStart(2, '0')}`;
+
+            let newTimeStr = currentTimeStr;
+            if (!isHeader && dragTarget && dragTarget.timeStr) {
+                newTimeStr = dragTarget.timeStr;
+            }
+
+            if (targetTechId === currentTechId && newTimeStr === currentTimeStr) {
+                return;
+            }
+
+            const targetStaffName = col.name;
+            const customerName = apt.customerName || 'Walk-In Guest';
+            const srvName = (apt.service && apt.service.name) || 'Service';
+
+            setDragToast({
+                type: 'info',
+                message: `Assigning ${customerName} to ${targetStaffName}...`
+            });
+
+            try {
+                const payload = {
+                    date: selectedDateKey,
+                    startTime: newTimeStr,
+                    techId: targetTechId,
+                    notifyCustomer: false,
+                    reason: `Reassigned to ${targetStaffName} at ${newTimeStr} via calendar drag & drop`
+                };
+
+                const res = await fetch(`/api/appointments/${apt.id}/reschedule`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Tenant-ID': activeTenant,
+                        'Authorization': 'Bearer ' + token
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await res.json().catch(() => ({}));
+                if (res.ok) {
+                    const timeLabel = formatMinutesToTimeLabel(Number(newTimeStr.split(':')[0]) * 60 + Number(newTimeStr.split(':')[1]));
+                    setDragToast({
+                        type: 'success',
+                        message: `✅ Reassigned ${customerName} (${srvName}) to ${targetStaffName} at ${timeLabel}!`
+                    });
+                    await fetchScheduleData(true);
+                } else {
+                    const errMsg = data.message || 'Cannot assign technician at this time slot.';
+                    setDragToast({
+                        type: 'danger',
+                        message: `⚠️ ${errMsg}`
+                    });
+                }
+            } catch (err) {
+                setDragToast({
+                    type: 'danger',
+                    message: `⚠️ Failed to reassign: ${err.message || 'Network error'}`
+                });
+            } finally {
+                setTimeout(() => setDragToast(null), 5000);
+            }
+        };
+
+        const handleQuickAssignFromModal = async (apt, newTechId) => {
+            const targetTechId = (newTechId === 'unassigned' || !newTechId) ? null : Number(newTechId);
+            const targetTechObj = staffList.find(t => t.id === targetTechId);
+            const targetName = targetTechObj ? (targetTechObj.name || targetTechObj.username) : 'Anyone Available';
+
+            try {
+                const res = await fetch(`/api/appointments/${apt.id}/assign-tech`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Tenant-ID': activeTenant,
+                        'Authorization': 'Bearer ' + token
+                    },
+                    body: JSON.stringify({
+                        techId: targetTechId,
+                        reason: `Reassigned to ${targetName} via details drawer`
+                    })
+                });
+
+                const data = await res.json().catch(() => ({}));
+                if (res.ok) {
+                    setSelectedAppointment(prev => prev ? { ...prev, nailTech: targetTechObj || null } : null);
+                    setDragToast({
+                        type: 'success',
+                        message: `✅ Assigned to ${targetName}!`
+                    });
+                    await fetchScheduleData(true);
+                } else {
+                    alert(data.message || 'Failed to reassign technician.');
+                }
+            } catch (err) {
+                alert('Network error while assigning technician.');
+            }
+        };
 
         const handleDispatchReminders = async () => {
             setDispatchingReminders(true);
@@ -1203,7 +1473,14 @@
                                     col.isUnassigned ? (!apt.nailTech || !apt.nailTech.id) : (apt.nailTech && apt.nailTech.id === col.techId)
                                 ).length;
 
-                                return h('div', { key: col.id, className: 'timeline-staff-col-header' },
+                                return h('div', {
+                                    key: col.id,
+                                    className: `timeline-staff-col-header ${dragOverColumn && dragOverColumn.techId === col.techId && dragOverColumn.isHeader ? 'drag-target-active' : ''}`,
+                                    onDragOver: (e) => handleHeaderDragOver(e, col),
+                                    onDragLeave: (e) => handleColumnDragLeave(e, col),
+                                    onDrop: (e) => handleDropOnStaff(e, col, true),
+                                    title: draggingApt ? `Drop here to assign to ${col.name} at current time` : col.name
+                                },
                                     h('div', { className: 'd-flex align-items-center justify-content-center gap-2' },
                                         h('div', { className: 'staff-header-avatar' }, col.name.charAt(0).toUpperCase()),
                                         h('div', { className: 'text-start overflow-hidden' },
@@ -1261,36 +1538,61 @@
                                     );
 
                                     const layoutBlocks = computeStaffColumnLayout(colAppts, DEFAULT_OPEN_HOUR);
+                                    const isHoveredCol = dragOverColumn && dragOverColumn.techId === col.techId && !dragOverColumn.isHeader;
 
                                     return h('div', {
                                         key: col.id,
-                                        className: 'timeline-staff-column',
+                                        className: `timeline-staff-column ${isHoveredCol ? 'drag-target-active' : ''}`,
                                         onClick: (e) => handleColumnClick(e, col),
-                                        title: `Click empty slot on ${col.name}'s column to book walk-in`
+                                        onDragOver: (e) => handleColumnDragOver(e, col),
+                                        onDragLeave: (e) => handleColumnDragLeave(e, col),
+                                        onDrop: (e) => handleDropOnStaff(e, col, false),
+                                        title: draggingApt ? `Drop here to assign to ${col.name}` : `Click empty slot on ${col.name}'s column to book walk-in`
                                     },
+                                        /* Drag preview ghost indicating the snap slot and technician */
+                                        isHoveredCol && h('div', {
+                                            className: 'timeline-drag-ghost',
+                                            style: {
+                                                top: `${dragOverColumn.topPx}px`,
+                                                height: `${dragOverColumn.heightPx}px`
+                                            }
+                                        },
+                                            h('span', { className: 'text-truncate' }, `⚡ ${col.name}`),
+                                            h('span', { className: 'badge bg-primary text-white ms-1' }, dragOverColumn.timeRangeLabel)
+                                        ),
                                         layoutBlocks.map(item => {
                                             const { apt, topPx, heightPx, leftStyle, widthStyle, timeRangeLabel, durationMinutes, nextFreeLabel, isColliding } = item;
                                             const statusLower = String(apt.status || 'PENDING').toLowerCase();
                                             const srvName = (apt.service && apt.service.name) || 'Service';
+                                            const isBeingDragged = isDragMoving && draggingApt && draggingApt.id === apt.id;
 
                                             return h('div', {
                                                 key: apt.id,
-                                                className: `timeline-appt-block status-${statusLower} ${isColliding ? 'is-colliding' : ''}`,
+                                                draggable: true,
+                                                className: `timeline-appt-block status-${statusLower} ${isColliding ? 'is-colliding' : ''} ${isBeingDragged ? 'is-dragging' : ''}`,
                                                 style: {
                                                     top: `${topPx}px`,
                                                     height: `${heightPx}px`,
                                                     left: leftStyle,
                                                     width: widthStyle
                                                 },
+                                                onDragStart: (e) => handleDragStart(e, apt),
+                                                onDragEnd: handleDragEnd,
                                                 onClick: (e) => {
                                                     e.stopPropagation();
+                                                    if (dragJustEndedRef.current) {
+                                                        return;
+                                                    }
                                                     setSelectedAppointment(apt);
                                                 },
-                                                title: `${timeRangeLabel} • ${srvName} (${durationMinutes}m) — ${apt.customerName || 'Walk-In'} | Free at ${nextFreeLabel}`
+                                                title: `${timeRangeLabel} • ${srvName} (${durationMinutes}m) — ${apt.customerName || 'Walk-In'} | Drag to assign to any staff`
                                             },
                                                 h('div', { className: 'd-flex justify-content-between align-items-start gap-1' },
                                                     h('span', { className: 'appt-time-badge text-truncate' }, `${timeRangeLabel} • ${srvName}`),
-                                                    isColliding && h('span', { className: 'collision-badge', title: 'Side-by-side overlapping appointment' }, 'Overlap')
+                                                    h('div', { className: 'd-flex align-items-center gap-1' },
+                                                        isColliding && h('span', { className: 'collision-badge', title: 'Side-by-side overlapping appointment' }, 'Overlap'),
+                                                        h('i', { className: 'bi bi-grip-vertical text-muted opacity-50', style: { fontSize: '0.75rem' }, title: 'Drag to reassign' })
+                                                    )
                                                 ),
                                                 h('div', { className: 'appt-customer-name text-truncate' }, apt.customerName || 'Walk-In Guest'),
                                                 h('div', { className: 'appt-service-name text-truncate' }, `${durationMinutes}m • Free ${nextFreeLabel}`)
@@ -1530,7 +1832,25 @@
                             h('p', { className: 'mb-2' }, h('strong', null, 'Phone Number: '), selectedAppointment.customerPhone || 'N/A'),
                             h('p', { className: 'mb-2' }, h('strong', null, 'Email: '), selectedAppointment.customerEmail || 'N/A'),
                             h('p', { className: 'mb-2' }, h('strong', null, 'Service: '), `${(selectedAppointment.service && selectedAppointment.service.name) || 'Service'} (${(selectedAppointment.service && selectedAppointment.service.durationMinutes) || 45} mins)`),
-                            h('p', { className: 'mb-2' }, h('strong', null, 'Nail Technician: '), (selectedAppointment.nailTech && (selectedAppointment.nailTech.name || selectedAppointment.nailTech.username)) || 'Anyone Available'),
+                            h('div', { className: 'mb-3 bg-light p-2 rounded-3 border' },
+                                h('div', { className: 'd-flex justify-content-between align-items-center mb-1' },
+                                    h('strong', { className: 'small' }, 'Assigned Nail Technician:'),
+                                    h('span', { className: 'badge bg-white text-dark border extra-small' }, 'Reassign')
+                                ),
+                                h('div', { className: 'input-group input-group-sm' },
+                                    h('span', { className: 'input-group-text bg-white' }, h('i', { className: 'bi bi-person-badge text-pink' })),
+                                    h('select', {
+                                        className: 'form-select form-select-sm fw-semibold',
+                                        value: selectedAppointment.nailTech ? selectedAppointment.nailTech.id : 'unassigned',
+                                        onChange: (e) => handleQuickAssignFromModal(selectedAppointment, e.target.value)
+                                    },
+                                        h('option', { value: 'unassigned' }, 'Anyone Available (Open Queue)'),
+                                        staffList.map(tech =>
+                                            h('option', { key: tech.id, value: tech.id }, tech.name || tech.username)
+                                        )
+                                    )
+                                )
+                            ),
                             selectedAppointment.stationPreference && h('p', { className: 'mb-2' }, h('strong', null, 'Station / Suite: '), selectedAppointment.stationPreference),
                             (() => {
                                 const dt = new Date(selectedAppointment.appointmentTime);
@@ -1761,6 +2081,21 @@
                         )
                     )
                 )
+            ),
+
+            /* 6. Drag & Drop Toast Alert Notification */
+            dragToast && h('div', {
+                className: `drag-toast alert alert-${dragToast.type} alert-dismissible fade show d-flex align-items-center justify-content-between py-2 px-3 m-0 shadow`,
+                role: 'alert'
+            },
+                h('div', { className: 'd-flex align-items-center gap-2 small fw-semibold' },
+                    dragToast.message
+                ),
+                h('button', {
+                    type: 'button',
+                    className: 'btn-close btn-close-sm ms-2',
+                    onClick: () => setDragToast(null)
+                })
             )
         );
     }

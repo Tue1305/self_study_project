@@ -379,6 +379,12 @@
             color: #145a32;
         }
 
+        .timeline-appt-block.status-completed {
+            border-left-color: #0d6efd;
+            background-color: #e7f1ff;
+            color: #084298;
+        }
+
         .timeline-appt-block.status-cancelled {
             border-left-color: #dc3545;
             background-color: #fff5f5;
@@ -863,6 +869,14 @@
             error: null
         });
 
+        const [completeModal, setCompleteModal] = useState({
+            isOpen: false,
+            apt: null,
+            notes: '',
+            saving: false,
+            error: null
+        });
+
         const [dispatchingReminders, setDispatchingReminders] = useState(false);
         const [reminderNotice, setReminderNotice] = useState(null);
 
@@ -1304,6 +1318,67 @@
                 alert('Error saving notes: ' + (err.message || 'Network error'));
             } finally {
                 setSavingNotes(false);
+            }
+        };
+
+        const handleOpenCompleteModal = (apt) => {
+            if (!apt) return;
+            setCompleteModal({
+                isOpen: true,
+                apt: apt,
+                notes: '',
+                saving: false,
+                error: null
+            });
+        };
+
+        const handleAppendCompleteChip = (chipText) => {
+            setCompleteModal(prev => {
+                const cur = prev.notes ? prev.notes.trim() : '';
+                if (!cur) return { ...prev, notes: chipText };
+                if (cur.includes(chipText)) return prev;
+                return { ...prev, notes: cur + '; ' + chipText };
+            });
+        };
+
+        const handleConfirmComplete = async () => {
+            if (!completeModal.apt) return;
+            const apt = completeModal.apt;
+            setCompleteModal(prev => ({ ...prev, saving: true, error: null }));
+            try {
+                const effectiveNotes = completeModal.notes ? completeModal.notes.trim() : 'Service completed';
+                const res = await fetch(`/api/appointments/${apt.id}/status?status=COMPLETED&reason=${encodeURIComponent(effectiveNotes)}&notifyCustomer=${notifyCustomer}`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Tenant-ID': activeTenant,
+                        ...(token ? { 'Authorization': 'Bearer ' + token } : {})
+                    },
+                    body: JSON.stringify({
+                        status: 'COMPLETED',
+                        reason: effectiveNotes,
+                        notes: effectiveNotes,
+                        notifyCustomer: notifyCustomer
+                    })
+                });
+                const data = await res.json().catch(() => ({}));
+                if (res.ok) {
+                    if (data.appointment) {
+                        setAppointments(prev => prev.map(a => a.id === apt.id ? data.appointment : a));
+                    }
+                    setCompleteModal({ isOpen: false, apt: null, notes: '', saving: false, error: null });
+                    setSelectedAppointment(null);
+                    setDragToast({
+                        type: 'success',
+                        message: `✅ Appointment #${apt.id} (${apt.customerName || 'Guest'}) marked COMPLETED!`
+                    });
+                    await fetchScheduleData(true);
+                } else {
+                    setCompleteModal(prev => ({ ...prev, saving: false, error: data.message || 'Failed to complete appointment.' }));
+                }
+            } catch (err) {
+                console.error('Error completing appointment:', err);
+                setCompleteModal(prev => ({ ...prev, saving: false, error: err.message || 'Network error' }));
             }
         };
 
@@ -1991,7 +2066,7 @@
                                     h('strong', { className: 'small text-secondary' }, 'Status:'),
                                     h('span', { className: `badge ${selectedAppointment.status === 'CONFIRMED' ? 'bg-success' : selectedAppointment.status === 'COMPLETED' ? 'bg-primary' : selectedAppointment.status === 'CANCELLED' ? 'bg-danger' : selectedAppointment.status === 'NO_SHOW' ? 'bg-warning text-dark' : 'bg-secondary'}` }, selectedAppointment.status || 'PENDING')
                                 ),
-                                h('div', { className: 'd-flex align-items-center gap-2' },
+                                h('div', { className: 'd-flex align-items-center gap-2 flex-wrap' },
                                     selectedAppointment.reminderSentAt && h('span', { className: 'small text-muted', style: { fontSize: '0.74rem' } }, `Reminder sent: ${new Date(selectedAppointment.reminderSentAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`),
                                     h('button', {
                                         type: 'button',
@@ -1999,7 +2074,13 @@
                                         style: { fontSize: '0.78rem' },
                                         disabled: remindingAptId === selectedAppointment.id || selectedAppointment.status === 'CANCELLED',
                                         onClick: () => handleSendReminder(selectedAppointment)
-                                    }, remindingAptId === selectedAppointment.id ? 'Sending...' : [h('i', { className: 'bi bi-bell-fill text-warning' }), ' Remind Customer'])
+                                    }, remindingAptId === selectedAppointment.id ? 'Sending...' : [h('i', { className: 'bi bi-bell-fill text-warning' }), ' Remind Customer']),
+                                    selectedAppointment.status !== 'COMPLETED' && selectedAppointment.status !== 'CANCELLED' && h('button', {
+                                        type: 'button',
+                                        className: 'btn btn-sm btn-primary fw-bold rounded-pill px-3 py-1 d-inline-flex align-items-center gap-1',
+                                        style: { fontSize: '0.78rem' },
+                                        onClick: () => handleOpenCompleteModal(selectedAppointment)
+                                    }, [h('i', { className: 'bi bi-check2-all' }), ' Complete Service'])
                                 )
                             ),
 
@@ -2168,6 +2249,11 @@
                         ),
                         h('div', { className: 'modal-footer d-flex justify-content-between' },
                             h('div', { className: 'd-flex gap-2 flex-wrap' },
+                                selectedAppointment.status !== 'COMPLETED' && h('button', {
+                                    type: 'button',
+                                    className: 'btn btn-sm btn-primary fw-bold px-3 d-inline-flex align-items-center gap-1',
+                                    onClick: () => handleOpenCompleteModal(selectedAppointment)
+                                }, [h('i', { className: 'bi bi-check2-all' }), ' Complete Service']),
                                 h('button', {
                                     type: 'button',
                                     className: 'btn btn-sm btn-success fw-bold px-3 d-inline-flex align-items-center gap-1',
@@ -2193,6 +2279,145 @@
                                     setRescheduleBoxOpen(false);
                                 }
                             }, 'Close')
+                        )
+                    )
+                )
+            ),
+
+            /* Complete Appointment & Checkout Modal */
+            completeModal.isOpen && completeModal.apt && h('div', {
+                className: 'modal show d-block',
+                style: { backgroundColor: 'rgba(15, 23, 42, 0.65)', zIndex: 1080 },
+                tabIndex: -1,
+                onClick: () => !completeModal.saving && setCompleteModal({ isOpen: false, apt: null, notes: '', saving: false, error: null })
+            },
+                h('div', {
+                    className: 'modal-dialog modal-dialog-centered',
+                    style: { maxWidth: '560px' },
+                    onClick: (e) => e.stopPropagation()
+                },
+                    h('div', { className: 'modal-content border-0 shadow-lg rounded-4 overflow-hidden' },
+                        /* Header */
+                        h('div', { className: 'modal-header bg-light border-bottom py-3 px-4' },
+                            h('div', null,
+                                h('h5', { className: 'modal-title fw-bold text-dark d-flex align-items-center gap-2 mb-0' },
+                                    h('i', { className: 'bi bi-check-circle-fill text-success fs-5' }),
+                                    'Complete Service & Checkout'
+                                ),
+                                h('div', { className: 'small text-muted mt-1' },
+                                    `Appointment #${completeModal.apt.id} • ${completeModal.apt.customerName || 'Walk-In Guest'}`
+                                )
+                            ),
+                            h('button', {
+                                type: 'button',
+                                className: 'btn-close',
+                                disabled: completeModal.saving,
+                                onClick: () => setCompleteModal({ isOpen: false, apt: null, notes: '', saving: false, error: null })
+                            })
+                        ),
+
+                        /* Body */
+                        h('div', { className: 'modal-body p-4' },
+                            completeModal.error && h('div', { className: 'alert alert-danger py-2 px-3 small mb-3' }, completeModal.error),
+
+                            /* 1. Services being done based on the appointment */
+                            h('div', { className: 'card border-0 bg-light rounded-3 p-3 mb-3' },
+                                h('div', { className: 'd-flex justify-content-between align-items-center mb-2 border-bottom pb-2' },
+                                    h('span', { className: 'small fw-bold text-uppercase text-secondary', style: { letterSpacing: '0.5px' } }, 'Services Performed'),
+                                    h('span', { className: 'badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2 py-1' },
+                                        'Ready to Complete'
+                                    )
+                                ),
+                                h('div', { className: 'd-flex justify-content-between align-items-center' },
+                                    h('div', null,
+                                        h('div', { className: 'fw-bold text-dark fs-6' },
+                                            (completeModal.apt.service && completeModal.apt.service.name) || 'Nail Service'
+                                        ),
+                                        h('div', { className: 'small text-muted mt-1' },
+                                            `Duration: ${(completeModal.apt.service && completeModal.apt.service.durationMinutes) || 45} mins • Staff: ${completeModal.apt.nailTech ? (completeModal.apt.nailTech.name || completeModal.apt.nailTech.username) : 'Anyone Available'}`
+                                        )
+                                    ),
+                                    h('div', { className: 'text-end' },
+                                        h('div', { className: 'fs-5 fw-bold text-pink' },
+                                            `$${Number((completeModal.apt.service && completeModal.apt.service.price) || 0).toFixed(2)}`
+                                        ),
+                                        h('div', { className: 'small text-muted', style: { fontSize: '0.72rem' } }, 'Payment due in salon')
+                                    )
+                                ),
+                                completeModal.apt.stationPreference && h('div', { className: 'small text-muted mt-2 pt-2 border-top' },
+                                    h('strong', null, 'Station / Room: '), completeModal.apt.stationPreference
+                                ),
+                                completeModal.apt.notes && h('div', { className: 'small text-muted mt-2 pt-2 border-top' },
+                                    h('strong', null, 'Initial Booking Request: '), completeModal.apt.notes
+                                )
+                            ),
+
+                            /* 2. Staff typed notes section */
+                            h('div', { className: 'mb-3' },
+                                h('label', { className: 'form-label small fw-bold text-dark d-flex align-items-center gap-1 mb-1' }, [
+                                    h('i', { className: 'bi bi-pencil-fill text-pink' }),
+                                    'Staff Notes & Service Remarks:'
+                                ]),
+                                h('div', { className: 'small text-muted mb-2' },
+                                    'Type any remarks on nail colors used, retail recommended, payment details, or client feedback:'
+                                ),
+                                /* Quick chips */
+                                h('div', { className: 'd-flex flex-wrap gap-1 mb-2' },
+                                    [
+                                        'Paid via Card',
+                                        'Paid Cash',
+                                        'Paid Apple Pay',
+                                        'Rebooked next visit',
+                                        'Cuticle oil recommended',
+                                        'Loved the design / color'
+                                    ].map(chip =>
+                                        h('button', {
+                                            key: chip,
+                                            type: 'button',
+                                            className: 'btn btn-outline-secondary btn-sm py-0 px-2 rounded-pill',
+                                            style: { fontSize: '0.73rem' },
+                                            onClick: () => handleAppendCompleteChip(chip)
+                                        }, `+ ${chip}`)
+                                    )
+                                ),
+                                h('textarea', {
+                                    className: 'form-control',
+                                    rows: 3,
+                                    placeholder: 'e.g. OPI Bubble Bath 2 coats, chrome accent. Paid in cash with tip. Rebooked for Dec 10.',
+                                    value: completeModal.notes,
+                                    onChange: (e) => setCompleteModal(prev => ({ ...prev, notes: e.target.value }))
+                                })
+                            ),
+
+                            /* 3. Notify customer toggle */
+                            h('div', { className: 'form-check' },
+                                h('input', {
+                                    className: 'form-check-input',
+                                    type: 'checkbox',
+                                    id: 'completeNotifyCustomer',
+                                    checked: notifyCustomer,
+                                    onChange: (e) => setNotifyCustomer(e.target.checked)
+                                }),
+                                h('label', { className: 'form-check-label small fw-semibold text-secondary', htmlFor: 'completeNotifyCustomer' },
+                                    'Send thank-you receipt / notification via Email & SMS'
+                                )
+                            )
+                        ),
+
+                        /* Footer */
+                        h('div', { className: 'modal-footer bg-light border-top d-flex justify-content-between p-3' },
+                            h('button', {
+                                type: 'button',
+                                className: 'btn btn-outline-secondary btn-sm px-3 fw-semibold',
+                                disabled: completeModal.saving,
+                                onClick: () => setCompleteModal({ isOpen: false, apt: null, notes: '', saving: false, error: null })
+                            }, 'Cancel'),
+                            h('button', {
+                                type: 'button',
+                                className: 'btn btn-success px-4 py-2 fw-bold d-inline-flex align-items-center gap-2 rounded-3 shadow-sm',
+                                disabled: completeModal.saving,
+                                onClick: handleConfirmComplete
+                            }, completeModal.saving ? 'Completing...' : [h('i', { className: 'bi bi-check2-circle fs-6' }), ' Confirm & Complete'])
                         )
                     )
                 )

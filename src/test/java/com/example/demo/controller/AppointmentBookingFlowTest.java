@@ -785,4 +785,41 @@ class AppointmentBookingFlowTest {
 
         org.junit.jupiter.api.Assertions.assertNotNull(appt.getReminderSentAt());
     }
+
+    @Test
+    void testUpdateStatusCompletedWithStaffNotes() throws Exception {
+        ServiceEntity svc = new ServiceEntity("default", "Gel Manicure Deluxe", "Mani", new BigDecimal("48.00"), 45);
+        svc.setId(107L);
+        UserEntity tony = new UserEntity();
+        tony.setId(7L);
+        tony.setName("Tony");
+
+        Appointment appt = new Appointment();
+        appt.setId(507L);
+        appt.setTenantId("default");
+        appt.setCustomerName("Jessica Alba");
+        appt.setCustomerEmail("jessica@example.com");
+        appt.setCustomerPhone("(555) 777-1111");
+        appt.setAppointmentTime(LocalDateTime.of(2026, 11, 20, 14, 0));
+        appt.setService(svc);
+        appt.setNailTech(tony);
+        appt.setStatus(Appointment.AppointmentStatus.CONFIRMED);
+
+        when(appointmentRepository.findByTenantIdAndId("default", 507L)).thenReturn(Optional.of(appt));
+        when(appointmentRepository.save(any(Appointment.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        String staffNotes = "OPI Bubble Bath 2 coats, chrome top coat. Paid in cash with tip.";
+
+        mockMvc.perform(patch("/api/appointments/507/status")
+                        .header("X-Tenant-ID", "default")
+                        .param("status", "COMPLETED")
+                        .param("reason", staffNotes))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("COMPLETED"))
+                .andExpect(jsonPath("$.appointment.notes").value(org.hamcrest.Matchers.containsString("COMPLETED: Gel Manicure Deluxe with Tony")))
+                .andExpect(jsonPath("$.appointment.notes").value(org.hamcrest.Matchers.containsString(staffNotes)));
+
+        org.junit.jupiter.api.Assertions.assertEquals(Appointment.AppointmentStatus.COMPLETED, appt.getStatus());
+        org.junit.jupiter.api.Assertions.assertTrue(appt.getNotes().contains("OPI Bubble Bath"));
+    }
 }

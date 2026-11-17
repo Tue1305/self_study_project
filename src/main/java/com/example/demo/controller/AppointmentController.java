@@ -1298,7 +1298,8 @@ public class AppointmentController {
             } else if (newStatus == Appointment.AppointmentStatus.COMPLETED) {
                 auditDescription = "Service completed: " + serviceName + " with " + staffName +
                         (finalReason != null && !finalReason.isBlank() ? " | " + finalReason : "");
-                noteTag = "[COMPLETED: " + serviceName + " with " + staffName + "]";
+                noteTag = "[COMPLETED: " + serviceName + " with " + staffName +
+                        (finalReason != null && !finalReason.isBlank() ? " | Notes: " + finalReason : "") + "]";
             } else {
                 auditDescription = "Status changed to " + newStatus.name() +
                         (finalReason != null && !finalReason.isBlank() ? " (" + finalReason + ")" : "");

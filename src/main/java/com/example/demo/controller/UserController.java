@@ -5,6 +5,7 @@ import com.example.demo.dto.UserUpdateDto;
 import com.example.demo.entity.UserEntity;
 import com.example.demo.repository.UserRepository;
 import com.example.demo.service.CustomerService;
+import com.example.demo.service.TenantContext;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -30,6 +31,20 @@ public class UserController {
         this.customerService = customerService;
     }
 
+    private UserEntity resolveCurrentUser(UserDetails userDetails) {
+        String username = userDetails.getUsername();
+        String tenantId = TenantContext.getCurrentTenant();
+        if (tenantId != null && !tenantId.isBlank()) {
+            return userRepository.findByTenantIdAndUsernameIgnoreCase(tenantId, username)
+                    .or(() -> userRepository.findByTenantIdAndEmailIgnoreCase(tenantId, username))
+                    .or(() -> userRepository.findFirstByUsernameIgnoreCase(username))
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+        }
+        return userRepository.findByTenantIdAndUsernameIgnoreCase("default", username)
+                .or(() -> userRepository.findFirstByUsernameIgnoreCase(username))
+                .orElseThrow(() -> new RuntimeException("User not found"));
+    }
+
     // Get current logged-in user profile details
     @GetMapping("/me")
     public ResponseEntity<?> getCurrentUser(@AuthenticationPrincipal UserDetails userDetails) {
@@ -37,8 +52,7 @@ public class UserController {
             return ResponseEntity.status(401).body("Unauthorized");
         }
 
-        UserEntity user = userRepository.findByUsername(userDetails.getUsername())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+        UserEntity user = resolveCurrentUser(userDetails);
 
         Map<String, Object> response = new HashMap<>();
         response.put("username", user.getUsername());
@@ -56,8 +70,7 @@ public class UserController {
             return ResponseEntity.status(401).body("Unauthorized");
         }
 
-        UserEntity user = userRepository.findByUsername(userDetails.getUsername())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+        UserEntity user = resolveCurrentUser(userDetails);
 
         if (updateDto.getUsername() != null && !updateDto.getUsername().trim().isEmpty()) {
             user.setUsername(updateDto.getUsername());
@@ -84,8 +97,7 @@ public class UserController {
             return ResponseEntity.status(401).body("Unauthorized");
         }
 
-        UserEntity user = userRepository.findByUsername(userDetails.getUsername())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+        UserEntity user = resolveCurrentUser(userDetails);
 
         if (!passwordEncoder.matches(dto.getCurrentPassword(), user.getPassword())) {
             return ResponseEntity.badRequest().body("Current password is incorrect");

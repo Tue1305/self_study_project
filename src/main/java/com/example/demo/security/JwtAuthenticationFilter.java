@@ -53,6 +53,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         try {
             final String token = authHeader.substring(7);
             final String username = jwtUtil.extractUsername(token);
+            final String tokenTenantId = jwtUtil.extractTenantId(token);
+
+            if (tokenTenantId != null && !tokenTenantId.isBlank()) {
+                String cleanTenant = tokenTenantId.trim().toLowerCase();
+                com.example.demo.service.TenantContext.setCurrentTenant(cleanTenant);
+                request.setAttribute("tenant_id", cleanTenant);
+            }
 
             if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                 UserDetails userDetails = this.userDetailsService.loadUserByUsername(username);
@@ -63,13 +70,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     );
                     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authToken);
-
-                    String tenantId = jwtUtil.extractTenantId(token);
-                    if (tenantId != null && !tenantId.isBlank()) {
-                        String cleanTenant = tenantId.trim().toLowerCase();
-                        com.example.demo.service.TenantContext.setCurrentTenant(cleanTenant);
-                        request.setAttribute("tenant_id", cleanTenant);
-                    }
                 }
             }
         } catch (Exception e) {

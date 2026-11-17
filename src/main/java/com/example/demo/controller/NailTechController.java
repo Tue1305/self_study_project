@@ -146,21 +146,39 @@ public class NailTechController {
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ADMIN')")
     @PostMapping
     public ResponseEntity<?> createNailTech(@RequestBody UserEntity tech, HttpServletRequest request) {
-        String identifier = tech.getEmail() != null ? tech.getEmail() : tech.getUsername();
+        String tenantId = tenantContextResolver.resolveTenantId(request);
+        tech.setTenantId(tenantId);
 
-        if (identifier == null || userRepository.existsByUsername(identifier)) {
+        String email = (tech.getEmail() != null && !tech.getEmail().isBlank()) ? tech.getEmail().trim() : null;
+        String username = (tech.getUsername() != null && !tech.getUsername().isBlank()) ? tech.getUsername().trim() : email;
+
+        if (username == null && email == null) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Email or username is required!"));
+        }
+        if (username == null) {
+            username = email;
+        }
+        tech.setUsername(username);
+        tech.setEmail(email != null ? email : username);
+
+        // Strict tenant-scoped duplicate check for username
+        if (Boolean.TRUE.equals(userRepository.existsByTenantIdAndUsername(tenantId, username))
+                || Boolean.TRUE.equals(userRepository.existsByTenantIdAndUsernameIgnoreCase(tenantId, username))) {
             return ResponseEntity.badRequest().body(Map.of("message", "Email or username is already taken!"));
         }
 
-        if (tech.getUsername() == null && tech.getEmail() != null) {
-            tech.setUsername(tech.getEmail());
+        // Strict tenant-scoped duplicate check for email
+        if (email != null && !email.isBlank()) {
+            if (Boolean.TRUE.equals(userRepository.existsByTenantIdAndEmail(tenantId, email))
+                    || Boolean.TRUE.equals(userRepository.existsByTenantIdAndEmailIgnoreCase(tenantId, email))) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Email or username is already taken!"));
+            }
         }
+
         if (tech.getPassword() == null || tech.getPassword().isEmpty()) {
             tech.setPassword(passwordEncoder.encode("defaultPassword123"));
         }
 
-        String tenantId = tenantContextResolver.resolveTenantId(request);
-        tech.setTenantId(tenantId);
         tech.setRole("ROLE_NAIL_TECH");
 
         UserEntity savedTech = userRepository.save(tech);
@@ -177,11 +195,32 @@ public class NailTechController {
         String tenantId = tenantContextResolver.resolveTenantId(request);
         return userRepository.findByTenantIdAndId(tenantId, id)
                 .map(tech -> {
+                    String newEmail = (updatedTech.getEmail() != null && !updatedTech.getEmail().isBlank())
+                            ? updatedTech.getEmail().trim() : null;
+                    String newUsername = (updatedTech.getUsername() != null && !updatedTech.getUsername().isBlank())
+                            ? updatedTech.getUsername().trim() : newEmail;
+
+                    // Check for tenant-scoped username conflict
+                    if (newUsername != null) {
+                        Optional<UserEntity> conflict = userRepository.findByTenantIdAndUsernameIgnoreCase(tenantId, newUsername);
+                        if (conflict.isPresent() && !conflict.get().getId().equals(id)) {
+                            return ResponseEntity.badRequest().body(Map.of("message", "Email or username is already taken!"));
+                        }
+                    }
+
+                    // Check for tenant-scoped email conflict
+                    if (newEmail != null) {
+                        Optional<UserEntity> conflict = userRepository.findByTenantIdAndEmailIgnoreCase(tenantId, newEmail);
+                        if (conflict.isPresent() && !conflict.get().getId().equals(id)) {
+                            return ResponseEntity.badRequest().body(Map.of("message", "Email or username is already taken!"));
+                        }
+                    }
+
                     tech.setName(updatedTech.getName());
-                    tech.setEmail(updatedTech.getEmail());
+                    tech.setEmail(newEmail);
                     tech.setSpecialty(updatedTech.getSpecialty());
-                    if (updatedTech.getEmail() != null) {
-                        tech.setUsername(updatedTech.getEmail());
+                    if (newUsername != null) {
+                        tech.setUsername(newUsername);
                     }
                     userRepository.save(tech);
                     return ResponseEntity.ok(Map.of("message", "Nail technician updated successfully"));

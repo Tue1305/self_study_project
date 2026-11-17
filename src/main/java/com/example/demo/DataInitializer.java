@@ -264,7 +264,9 @@ public class DataInitializer implements CommandLineRunner {
         );
 
         for (StaffConfig config : staffConfigs) {
-            UserEntity tech = userRepository.findByUsername(config.username()).orElseGet(UserEntity::new);
+            UserEntity tech = userRepository.findByTenantIdAndUsername("default", config.username())
+                    .or(() -> userRepository.findFirstByUsername(config.username()))
+                    .orElseGet(UserEntity::new);
             tech.setTenantId("default");
             tech.setUsername(config.username());
             tech.setName(config.name());
@@ -286,7 +288,9 @@ public class DataInitializer implements CommandLineRunner {
         }
 
         // Seed or update the sole Luxe Admin account: admin@luxenailspa.com
-        UserEntity luxeAdmin = userRepository.findByUsername("admin@luxenailspa.com").orElseGet(UserEntity::new);
+        UserEntity luxeAdmin = userRepository.findByTenantIdAndUsername("luxe", "admin@luxenailspa.com")
+                .or(() -> userRepository.findFirstByUsername("admin@luxenailspa.com"))
+                .orElseGet(UserEntity::new);
         luxeAdmin.setTenantId("luxe");
         luxeAdmin.setUsername("admin@luxenailspa.com");
         luxeAdmin.setName("Luxe Admin");

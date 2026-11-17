@@ -126,13 +126,21 @@
 
         errorMsg.innerText = '';
 
+        const activeTenant = (typeof TenantTheme !== 'undefined' && TenantTheme.resolveTenantId)
+            ? TenantTheme.resolveTenantId()
+            : (localStorage.getItem('active_tenant') || localStorage.getItem('tenant') || 'default');
+
         try {
             const response = await fetch('/api/auth/login', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Tenant-ID': activeTenant
+                },
                 body: JSON.stringify({
                     username: username,
-                    password: password
+                    password: password,
+                    tenantId: activeTenant
                 })
             });
 

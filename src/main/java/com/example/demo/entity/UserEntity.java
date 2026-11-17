@@ -4,7 +4,18 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 
 @Entity
-@Table(name = "users", indexes = @Index(name = "idx_users_tenant_id", columnList = "tenant_id"))
+@Table(
+        name = "users",
+        indexes = {
+                @Index(name = "idx_users_tenant_id", columnList = "tenant_id"),
+                @Index(name = "idx_users_tenant_username", columnList = "tenant_id, username"),
+                @Index(name = "idx_users_tenant_email", columnList = "tenant_id, email")
+        },
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uk_users_tenant_username", columnNames = {"tenant_id", "username"}),
+                @UniqueConstraint(name = "uk_users_tenant_email", columnNames = {"tenant_id", "email"})
+        }
+)
 public class UserEntity {
 
     @Id
@@ -14,7 +25,7 @@ public class UserEntity {
     @Column(name = "tenant_id", nullable = false, length = 64)
     private String tenantId = "default";
 
-    @Column(unique = true, nullable = false)
+    @Column(nullable = false)
     private String username;
 
     @JsonIgnore

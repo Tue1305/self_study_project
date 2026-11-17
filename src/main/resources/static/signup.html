@@ -133,11 +133,18 @@
 
         errorMsg.innerText = '';
 
+        const activeTenant = (typeof TenantTheme !== 'undefined' && TenantTheme.resolveTenantId)
+            ? TenantTheme.resolveTenantId()
+            : (localStorage.getItem('active_tenant') || localStorage.getItem('tenant') || 'default');
+
         try {
             // 1. Send registration request (or authenticate directly depending on backend)
             const response = await fetch('/api/auth/register', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Tenant-ID': activeTenant
+                },
                 body: JSON.stringify({ username, password })
             });
 
@@ -145,8 +152,15 @@
                 // 2. Perform auto-login after successful registration to get JWT
                 const loginRes = await fetch('/api/auth/login', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, password })
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Tenant-ID': activeTenant
+                    },
+                    body: JSON.stringify({
+                        username,
+                        password,
+                        tenantId: activeTenant
+                    })
                 });
 
                 if (loginRes.ok) {

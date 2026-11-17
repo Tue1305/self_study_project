@@ -7,6 +7,28 @@ import java.util.List;
 import java.util.Optional;
 
 public interface UserRepository extends JpaRepository<UserEntity, Long> {
+    // Tenant-scoped lookups and duplicate checks
+    Optional<UserEntity> findByTenantIdAndUsername(String tenantId, String username);
+
+    Optional<UserEntity> findByTenantIdAndUsernameIgnoreCase(String tenantId, String username);
+
+    Optional<UserEntity> findByTenantIdAndEmail(String tenantId, String email);
+
+    Optional<UserEntity> findByTenantIdAndEmailIgnoreCase(String tenantId, String email);
+
+    Boolean existsByTenantIdAndUsername(String tenantId, String username);
+
+    Boolean existsByTenantIdAndUsernameIgnoreCase(String tenantId, String username);
+
+    Boolean existsByTenantIdAndEmail(String tenantId, String email);
+
+    Boolean existsByTenantIdAndEmailIgnoreCase(String tenantId, String email);
+
+    // Legacy / fallback global methods
+    Optional<UserEntity> findFirstByUsername(String username);
+
+    Optional<UserEntity> findFirstByUsernameIgnoreCase(String username);
+
     Optional<UserEntity> findByUsername(String username);
 
     Boolean existsByUsername(String username); // Required for registration check

@@ -7,6 +7,9 @@ import com.example.demo.entity.UserEntity;
 import com.example.demo.repository.UserRepository;
 import com.example.demo.security.JwtUtil;
 import com.example.demo.service.CustomerService;
+import com.example.demo.service.TenantContext;
+import com.example.demo.service.TenantContextResolver;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -30,22 +33,37 @@ public class AuthController {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final CustomerService customerService;
+    private final TenantContextResolver tenantContextResolver;
 
     public AuthController(AuthenticationManager authenticationManager,
                           JwtUtil jwtUtil,
                           UserRepository userRepository,
                           PasswordEncoder passwordEncoder,
-                          CustomerService customerService) {
+                          CustomerService customerService,
+                          TenantContextResolver tenantContextResolver) {
         this.authenticationManager = authenticationManager;
         this.jwtUtil = jwtUtil;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.customerService = customerService;
+        this.tenantContextResolver = tenantContextResolver;
     }
 
     @PostMapping("/login")
-    public ResponseEntity<?> authenticateUser(@RequestBody LoginRequest loginRequest) {
+    public ResponseEntity<?> authenticateUser(@RequestBody LoginRequest loginRequest, HttpServletRequest request) {
+        String initialTenant = null;
+        if (loginRequest != null && loginRequest.getTenantId() != null && !loginRequest.getTenantId().isBlank()) {
+            initialTenant = loginRequest.getTenantId().trim().toLowerCase();
+        } else if (request != null && tenantContextResolver != null) {
+            initialTenant = tenantContextResolver.resolveTenantId(request);
+        }
+        final String resolvedTenant = initialTenant;
+
         try {
+            if (resolvedTenant != null && !resolvedTenant.isBlank()) {
+                TenantContext.setCurrentTenant(resolvedTenant);
+            }
+
             Authentication authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(
                             loginRequest.getUsername(),
@@ -56,9 +74,23 @@ public class AuthController {
             SecurityContextHolder.getContext().setAuthentication(authentication);
 
             UserDetails userDetails = (UserDetails) authentication.getPrincipal();
-            UserEntity user = userRepository.findByUsername(userDetails.getUsername()).orElse(null);
+
+            // Look up UserEntity tenant-scoped
+            UserEntity user = null;
+            if (resolvedTenant != null && !resolvedTenant.isBlank()) {
+                user = userRepository.findByTenantIdAndUsernameIgnoreCase(resolvedTenant, userDetails.getUsername())
+                        .or(() -> userRepository.findByTenantIdAndEmailIgnoreCase(resolvedTenant, userDetails.getUsername()))
+                        .orElse(null);
+            }
+            if (user == null) {
+                user = userRepository.findByTenantIdAndUsernameIgnoreCase("default", userDetails.getUsername())
+                        .or(() -> userRepository.findFirstByUsernameIgnoreCase(userDetails.getUsername()))
+                        .orElse(null);
+            }
+
             String tenantId = (user != null && user.getTenantId() != null && !user.getTenantId().isBlank())
-                    ? user.getTenantId().trim().toLowerCase() : "default";
+                    ? user.getTenantId().trim().toLowerCase()
+                    : (resolvedTenant != null ? resolvedTenant : "default");
             String role = (user != null && user.getRole() != null) ? user.getRole() : "ROLE_USER";
 
             String jwt = jwtUtil.generateToken(userDetails, tenantId);
@@ -77,17 +109,30 @@ public class AuthController {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("message", "An unexpected error occurred: " + e.getMessage()));
+        } finally {
+            TenantContext.clear();
         }
     }
 
     @PostMapping("/register")
-    public ResponseEntity<?> registerUser(@RequestBody RegisterRequest registerRequest) {
-        if (userRepository.existsByUsername(registerRequest.getUsername())) {
+    public ResponseEntity<?> registerUser(@RequestBody RegisterRequest registerRequest, HttpServletRequest request) {
+        String tenantId = (tenantContextResolver != null && request != null)
+                ? tenantContextResolver.resolveTenantId(request)
+                : "default";
+
+        String username = registerRequest.getUsername() != null ? registerRequest.getUsername().trim() : null;
+        if (username == null || username.isBlank()) {
+            return ResponseEntity.badRequest().body("Username cannot be empty!");
+        }
+
+        if (Boolean.TRUE.equals(userRepository.existsByTenantIdAndUsername(tenantId, username))
+                || Boolean.TRUE.equals(userRepository.existsByTenantIdAndUsernameIgnoreCase(tenantId, username))) {
             return ResponseEntity.badRequest().body("Username is already taken!");
         }
 
         UserEntity user = new UserEntity();
-        user.setUsername(registerRequest.getUsername());
+        user.setTenantId(tenantId);
+        user.setUsername(username);
         user.setPassword(passwordEncoder.encode(registerRequest.getPassword()));
         user.setRole("ROLE_USER");
 

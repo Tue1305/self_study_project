@@ -41,6 +41,10 @@ public class JwtUtil {
     }
 
     public String generateToken(UserDetails userDetails) {
+        return generateToken(userDetails, "default");
+    }
+
+    public String generateToken(UserDetails userDetails, String tenantId) {
         if (userDetails == null || userDetails.getUsername() == null) {
             throw new IllegalArgumentException("UserDetails or username cannot be null");
         }
@@ -51,17 +55,39 @@ public class JwtUtil {
                 .map(GrantedAuthority::getAuthority)
                 .orElse("ROLE_USER");
 
-        return createToken(userDetails.getUsername(), role);
+        return createToken(userDetails.getUsername(), role, tenantId);
     }
 
     private String createToken(String subject, String role) {
+        return createToken(subject, role, "default");
+    }
+
+    private String createToken(String subject, String role, String tenantId) {
+        String cleanTenant = (tenantId != null && !tenantId.isBlank()) ? tenantId.trim().toLowerCase() : "default";
         return Jwts.builder()
                 .setSubject(subject)
                 .claim("role", role) // Embeds the role into the token claims
+                .claim("tenant_id", cleanTenant) // Embeds tenant_id into token claims
                 .setIssuedAt(new Date(System.currentTimeMillis()))
                 .setExpiration(new Date(System.currentTimeMillis() + 1000L * 60 * 60 * 10)) // 10 Hours
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
+    }
+
+    public String extractTenantId(String token) {
+        try {
+            return extractClaim(token, claims -> claims.get("tenant_id", String.class));
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    public String extractRole(String token) {
+        try {
+            return extractClaim(token, claims -> claims.get("role", String.class));
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     public boolean isTokenValid(String token, UserDetails userDetails) {

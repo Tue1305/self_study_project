@@ -98,8 +98,8 @@
 
     <div class="text-center mt-4 pt-3 border-top">
         <span class="text-muted small">Don't have an account?</span>
-        <a href="./forgot-password.html" class="text-decoration-none text-muted small">Forgot password?</a>
-        <a href="./signup.html" class="text-pink fw-semibold small text-decoration-none ms-1">Sign Up</a>
+        <a href="/forgot-password" class="text-decoration-none text-muted small">Forgot password?</a>
+        <a href="/signup" class="text-pink fw-semibold small text-decoration-none ms-1">Sign Up</a>
     </div>
 </div>
 
@@ -148,40 +148,18 @@
                     localStorage.setItem('userRole', role);
                 }
 
-                // Check for Luxe account login to redirect to tenant subdomain / Blue Sky layout
-                const isLuxeAccount = username.toLowerCase().includes('luxe');
-                if (isLuxeAccount) {
-                    localStorage.setItem('tenant', 'luxe');
-                    const host = window.location.hostname;
-                    const port = window.location.port ? `:${window.location.port}` : '';
-                    const isSubdomain = host.startsWith('luxe.');
+                // Store tenant from response or username
+                const tenantId = data.tenantId || (username.toLowerCase().includes('luxe') ? 'luxe' : 'default');
+                localStorage.setItem('tenant', tenantId);
+                localStorage.setItem('active_tenant', tenantId);
 
-                    if (role === 'ROLE_ADMIN' || role === 'ADMIN') {
-                        if ((host === 'localhost' || host === '127.0.0.1') && !isSubdomain) {
-                            window.location.assign(`${window.location.protocol}//luxe.localhost${port}/admin-dashboard.html?tenant=luxe`);
-                        } else {
-                            window.location.assign('./admin-dashboard.html?tenant=luxe');
-                        }
-                        return;
-                    }
-
-                    if ((host === 'localhost' || host === '127.0.0.1') && !isSubdomain) {
-                        window.location.assign(`${window.location.protocol}//luxe.localhost${port}/booking.html?tenant=luxe`);
-                        return;
-                    } else {
-                        window.location.assign('./booking.html?tenant=luxe');
-                        return;
-                    }
-                }
-
-                // Default tenant for regular accounts
-                localStorage.setItem('tenant', 'default');
-
-                // Route based on role
+                // Clean extensionless routing based on role and tenant
                 if (role === 'ROLE_ADMIN' || role === 'ADMIN') {
-                    window.location.assign('./admin-dashboard.html?tenant=default');
+                    window.location.assign('/admin/dashboard');
+                } else if (tenantId === 'luxe') {
+                    window.location.assign('/book/luxe');
                 } else {
-                    window.location.assign('./index.html');
+                    window.location.assign('/');
                 }
             } else {
                 errorMsg.innerText = 'Invalid username or password.';

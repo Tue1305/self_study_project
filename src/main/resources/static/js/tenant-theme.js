@@ -1,15 +1,35 @@
 /**
- * Shared Tenant Theme Manager
- * Provides synchronous pre-loading, localStorage caching, and async API synchronization
- * to eliminate Flash of Unstyled Content (FOUC).
+ * Shared Tenant Theme & Clean URL Manager
+ * Provides synchronous pre-loading, localStorage caching, clean URL helpers,
+ * and automatic session/subdomain/slug tenant resolution without query parameters.
  */
 const TenantTheme = (function() {
+
     function resolveTenantId() {
         try {
-            const urlParams = new URLSearchParams(window.location.search);
-            const tenant = urlParams.get('tenant') || urlParams.get('tenantId');
-            if (tenant) return tenant.trim().toLowerCase();
+            // 1. Check path slug for public booking routes: /book/{tenantSlug} or /booking/{tenantSlug}
+            const path = window.location.pathname || '';
+            const slugMatch = path.match(/^\/(?:book|booking)\/([a-zA-Z0-9_-]+)/i);
+            if (slugMatch && slugMatch[1]) {
+                const candidate = slugMatch[1].trim().toLowerCase();
+                // Exclude system keywords if any
+                if (candidate !== 'manage' && candidate !== 'confirmation') {
+                    return candidate;
+                }
+            }
 
+            // 2. Check JWT token in storage (authenticated admin / staff session)
+            const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
+            if (token && token.includes('.')) {
+                try {
+                    const payload = JSON.parse(atob(token.split('.')[1]));
+                    if (payload && payload.tenant_id) {
+                        return payload.tenant_id.trim().toLowerCase();
+                    }
+                } catch (e) {}
+            }
+
+            // 3. Check Subdomain from hostname (e.g. luxe.salon.com or luxe.localhost)
             const host = window.location.hostname;
             if (host && host !== 'localhost' && !/^\d+\.\d+\.\d+\.\d+$/.test(host)) {
                 const parts = host.split('.');
@@ -18,9 +38,16 @@ const TenantTheme = (function() {
                 }
             }
 
+            // 4. Check localStorage / sessionStorage
             const stored = localStorage.getItem('active_tenant') || localStorage.getItem('tenant') || sessionStorage.getItem('active_tenant');
             if (stored) return stored.trim().toLowerCase();
+
+            // 5. Query parameter fallback for backwards compatibility (?tenant=)
+            const urlParams = new URLSearchParams(window.location.search);
+            const tenant = urlParams.get('tenant') || urlParams.get('tenantId');
+            if (tenant) return tenant.trim().toLowerCase();
         } catch (e) {}
+
         return 'default';
     }
 
@@ -50,7 +77,7 @@ const TenantTheme = (function() {
         const secondary = theme.secondaryColor || (tenant === 'luxe' ? '#03045e' : '#343a40');
         const hover = theme.primaryPinkHover || darkenHex(primary, 12);
         const soft = theme.softPink || hexToRgba(primary, 0.1);
-        const font = theme.fontFamily || (tenant === 'luxe' ? 'system-ui, -apple-system, sans-serif' : 'system-ui, -apple-system, sans-serif');
+        const font = theme.fontFamily || 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
 
         const rootStyle = document.documentElement.style;
         rootStyle.setProperty('--primary-color', primary);
@@ -110,11 +137,41 @@ const TenantTheme = (function() {
         }
     }
 
+    // Helper to generate auth headers including tenant
+    function getAuthHeaders(customHeaders = {}) {
+        const tenant = resolveTenantId();
+        const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
+        return {
+            'X-Tenant-ID': tenant,
+            ...(token ? { 'Authorization': 'Bearer ' + token } : {}),
+            ...customHeaders
+        };
+    }
+
+    // Clean URL mapping helper
+    function cleanPath(url) {
+        if (!url) return '/';
+        return url
+            .replace(/admin-dashboard\.html/g, '/admin/dashboard')
+            .replace(/admin-calendar\.html/g, '/admin/calendar')
+            .replace(/admin-customers\.html/g, '/admin/customers')
+            .replace(/nail-techs\.html/g, '/admin/nail-techs')
+            .replace(/booking\.html/g, '/book')
+            .replace(/services\.html/g, '/services')
+            .replace(/login\.html/g, '/login')
+            .replace(/signup\.html/g, '/signup')
+            .replace(/forgot-password\.html/g, '/forgot-password')
+            .replace(/profile\.html/g, '/profile')
+            .replace(/dashboard\.html/g, '/dashboard')
+            .replace(/index\.html/g, '/');
+    }
+
     // Background asynchronous sync with backend config
     async function syncFromApi(tenantId) {
         const tenant = (tenantId || resolveTenantId()).trim().toLowerCase();
         try {
-            const res = await fetch(`/api/public/tenant-config?tenant=${encodeURIComponent(tenant)}`);
+            const headers = getAuthHeaders();
+            const res = await fetch(`/api/public/tenant-config?tenant=${encodeURIComponent(tenant)}`, { headers });
             if (!res.ok) return null;
             const cfg = await res.json();
             const themeConfig = cfg.theme || {};
@@ -139,7 +196,9 @@ const TenantTheme = (function() {
         hexToRgba,
         applyThemeToDom,
         syncPreload,
-        syncFromApi
+        syncFromApi,
+        getAuthHeaders,
+        cleanPath
     };
 })();
 

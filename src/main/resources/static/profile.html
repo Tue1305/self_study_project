@@ -94,7 +94,7 @@
 <header class="navbar navbar-expand-lg bg-white shadow-sm sticky-top px-3 px-lg-4">
     <div class="container-fluid">
         <div class="d-flex align-items-center gap-3">
-            <a href="./index.html" class="navbar-brand fw-bold text-pink fs-4 mb-0">Jenny's Nail Studio</a>
+            <a href="/" class="navbar-brand fw-bold text-pink fs-4 mb-0">Jenny's Nail Studio</a>
             <div class="badge bg-danger-subtle text-pink border border-danger-subtle rounded-pill px-3 py-2 fs-6 d-inline-flex align-items-center gap-1" id="userBadge">
                 <i class="bi bi-person-fill"></i>
                 <span id="usernameDisplay"></span>
@@ -107,12 +107,12 @@
 
         <div class="collapse navbar-collapse" id="navbarNav">
             <div class="navbar-nav ms-auto align-items-lg-center gap-2 gap-lg-3 pt-3 pt-lg-0" id="authNav">
-                <a href="./index.html" class="nav-link fw-semibold text-dark">Home</a>
-                <a href="./dashboard.html" class="nav-link fw-semibold text-dark">Showcase</a>
-                <a href="./services.html" class="nav-link fw-semibold text-dark">Services</a>
-                <a href="./booking.html" class="nav-btn-book"><i class="bi bi-calendar2-check-fill"></i>Book Now</a>
+                <a href="/" class="nav-link fw-semibold text-dark">Home</a>
+                <a href="/dashboard" class="nav-link fw-semibold text-dark">Showcase</a>
+                <a href="/services" class="nav-link fw-semibold text-dark">Services</a>
+                <a href="/book" class="nav-btn-book"><i class="bi bi-calendar2-check-fill"></i>Book Now</a>
                 <span id="adminNavPlaceholder"></span>
-                <a href="./profile.html" class="nav-link fw-semibold text-pink active">Profile</a>
+                <a href="/profile" class="nav-link fw-semibold text-pink active">Profile</a>
                 <a href="#" onclick="handleLogout()" class="nav-link fw-semibold text-dark">Logout</a>
             </div>
         </div>
@@ -207,7 +207,7 @@
 <script>
     const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
     if (!token) {
-        window.location.href = './login.html';
+        window.location.href = '/login';
     }
 
     function parseJwt(jwtToken) {
@@ -240,7 +240,7 @@
 
         if (jwtRole === 'ROLE_ADMIN' || jwtRole === 'ADMIN') {
             document.getElementById('adminNavPlaceholder').outerHTML =
-                `<a href="./admin-dashboard.html" class="nav-link fw-bold text-danger"><i class="bi bi-shield-lock-fill me-1"></i>Admin Portal</a>`;
+                `<a href="/admin/dashboard" class="nav-link fw-bold text-danger"><i class="bi bi-shield-lock-fill me-1"></i>Admin Portal</a>`;
         }
 
         try {
@@ -342,7 +342,7 @@
         localStorage.removeItem('token');
         localStorage.removeItem('username');
         localStorage.removeItem('userRole');
-        window.location.href = './login.html';
+        window.location.href = '/login';
     }
 
     loadUserProfile();

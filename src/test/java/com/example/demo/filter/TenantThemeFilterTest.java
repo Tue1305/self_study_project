@@ -2,10 +2,12 @@ package com.example.demo.filter;
 
 import com.example.demo.entity.TenantConfig;
 import com.example.demo.repository.TenantConfigRepository;
+import com.example.demo.service.TenantContext;
 import com.example.demo.service.TenantContextResolver;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletResponse;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -29,6 +31,7 @@ class TenantThemeFilterTest {
 
     @BeforeEach
     void setUp() {
+        TenantContext.clear();
         tenantConfigRepository = Mockito.mock(TenantConfigRepository.class);
         tenantContextResolver = new TenantContextResolver(tenantConfigRepository);
         filter = new TenantThemeFilter(tenantContextResolver, tenantConfigRepository);
@@ -49,6 +52,11 @@ class TenantThemeFilterTest {
         defaultConfig.setDefaultTenant(true);
         when(tenantConfigRepository.findByTenantKeyIgnoreCase("default")).thenReturn(Optional.of(defaultConfig));
         when(tenantConfigRepository.findFirstByDefaultTenantTrue()).thenReturn(Optional.of(defaultConfig));
+    }
+
+    @AfterEach
+    void tearDown() {
+        TenantContext.clear();
     }
 
     @Test

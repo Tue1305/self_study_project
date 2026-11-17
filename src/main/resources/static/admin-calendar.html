@@ -411,27 +411,27 @@
         <div class="collapse navbar-collapse" id="adminNav">
             <ul class="navbar-nav me-auto mb-2 mb-lg-0 ms-lg-4 gap-1">
                 <li class="nav-item">
-                    <a id="navDashboardLink" class="nav-link btn btn-light btn-sm px-3 fw-semibold text-dark me-1" href="./admin-dashboard.html">
+                    <a id="navDashboardLink" class="nav-link btn btn-light btn-sm px-3 fw-semibold text-dark me-1" href="/admin/dashboard">
                         <i class="bi bi-speedometer2 me-1"></i> Dashboard
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a id="navCalendarLink" class="nav-link btn btn-pink text-white btn-sm px-3 fw-semibold me-1" href="./admin-calendar.html">
+                    <a id="navCalendarLink" class="nav-link btn btn-pink text-white btn-sm px-3 fw-semibold me-1" href="/admin/calendar">
                         <i class="bi bi-calendar-check me-1"></i> Calendar
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a id="navTechsLink" class="nav-link btn btn-light btn-sm px-3 fw-semibold text-dark me-1" href="./nail-techs.html">
+                    <a id="navTechsLink" class="nav-link btn btn-light btn-sm px-3 fw-semibold text-dark me-1" href="/admin/nail-techs">
                         <i class="bi bi-people me-1"></i> Nail Techs
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a id="navCustomersLink" class="nav-link btn btn-light btn-sm px-3 fw-semibold text-dark me-1" href="./admin-customers.html">
+                    <a id="navCustomersLink" class="nav-link btn btn-light btn-sm px-3 fw-semibold text-dark me-1" href="/admin/customers">
                         <i class="bi bi-person-lines-fill me-1"></i> Customers
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a id="navWebsiteLink" class="nav-link btn btn-outline-secondary btn-sm px-3 fw-semibold text-dark" href="./index.html">
+                    <a id="navWebsiteLink" class="nav-link btn btn-outline-secondary btn-sm px-3 fw-semibold text-dark" href="/">
                         <i class="bi bi-globe me-1"></i> Main Website
                     </a>
                 </li>
@@ -472,7 +472,7 @@
     // --- ADMIN ROUTE GUARD ---
     (function() {
         if (!token) {
-            window.location.href = './login.html';
+            window.location.href = '/login';
             return;
         }
 
@@ -481,7 +481,7 @@
 
         if (role !== 'ROLE_ADMIN' && role !== 'ADMIN') {
             alert('Access Denied: Administrator privileges are required to view this page.');
-            window.location.href = './index.html';
+            window.location.href = '/';
         }
 
         function parseJwtRole(jwtToken) {
@@ -517,16 +517,16 @@
 
     const activeTenant = getActiveTenant();
     localStorage.setItem('tenant', activeTenant);
+    localStorage.setItem('active_tenant', activeTenant);
 
-    // Apply navigation links
-    const tenantQuery = `?tenant=${encodeURIComponent(activeTenant)}`;
-    document.getElementById('navDashboardLink').href = `./admin-dashboard.html${tenantQuery}`;
+    // Apply clean navigation links
+    document.getElementById('navDashboardLink').href = '/admin/dashboard';
     if (document.getElementById('navCalendarLink')) {
-        document.getElementById('navCalendarLink').href = `./admin-calendar.html${tenantQuery}`;
+        document.getElementById('navCalendarLink').href = '/admin/calendar';
     }
-    document.getElementById('navTechsLink').href = `./nail-techs.html${tenantQuery}`;
-    document.getElementById('navCustomersLink').href = `./admin-customers.html${tenantQuery}`;
-    document.getElementById('navWebsiteLink').href = activeTenant === 'luxe' ? `./booking.html${tenantQuery}` : `./index.html${tenantQuery}`;
+    document.getElementById('navTechsLink').href = '/admin/nail-techs';
+    document.getElementById('navCustomersLink').href = '/admin/customers';
+    document.getElementById('navWebsiteLink').href = activeTenant === 'luxe' ? '/book/luxe' : '/';
 
     async function loadBranding() {
         try {
@@ -561,12 +561,12 @@
     }
 
     function handleLogout() {
-        const tenant = getActiveTenant();
         localStorage.removeItem('accessToken');
         localStorage.removeItem('token');
         localStorage.removeItem('userRole');
         localStorage.removeItem('tenant');
-        window.location.href = tenant === 'luxe' ? './login.html?tenant=luxe' : './index.html';
+        localStorage.removeItem('active_tenant');
+        window.location.href = '/login';
     }
 
     // ==================== REACT DAILY STAFF TIMELINE COMPONENT ====================

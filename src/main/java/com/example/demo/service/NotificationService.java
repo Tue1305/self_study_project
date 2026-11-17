@@ -659,7 +659,7 @@ public class NotificationService {
                 ? config.getCustomDomain().trim()
                 : "localhost:8080";
         String scheme = domain.contains("localhost") ? "http" : "https";
-        return scheme + "://" + domain + "/booking.html?token=" + token + "&action=manage";
+        return scheme + "://" + domain + "/manage-booking?token=" + token + "&action=manage";
     }
 
     private String buildSmsBody(

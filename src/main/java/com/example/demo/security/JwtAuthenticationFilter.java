@@ -58,24 +58,31 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 UserDetails userDetails = this.userDetailsService.loadUserByUsername(username);
 
                 if (jwtUtil.isTokenValid(token, userDetails)) {
-                    // ---> ADD THESE TWO DEBUG LINES HERE <---
-                    System.out.println("DEBUG: Authenticated User: " + userDetails.getUsername());
-                    System.out.println("DEBUG: Loaded Authorities: " + userDetails.getAuthorities());
-
                     UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                             userDetails, null, userDetails.getAuthorities()
                     );
                     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authToken);
+
+                    String tenantId = jwtUtil.extractTenantId(token);
+                    if (tenantId != null && !tenantId.isBlank()) {
+                        String cleanTenant = tenantId.trim().toLowerCase();
+                        com.example.demo.service.TenantContext.setCurrentTenant(cleanTenant);
+                        request.setAttribute("tenant_id", cleanTenant);
+                    }
                 }
             }
         } catch (Exception e) {
             // If the token is invalid/expired, do not crash; clear context and proceed
-            // PRINT THE EXACT ERROR TO DOCKER LOGS
             logger.error("JWT Authentication failed: " + e.getMessage(), e);
             SecurityContextHolder.clearContext();
+            com.example.demo.service.TenantContext.clear();
         }
 
-        filterChain.doFilter(request, response);
+        try {
+            filterChain.doFilter(request, response);
+        } finally {
+            com.example.demo.service.TenantContext.clear();
+        }
     }
 }

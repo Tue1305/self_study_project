@@ -63,7 +63,7 @@ public class SecurityConfig {
                             if (request.getRequestURI().startsWith("/api/")) {
                                 response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized: Token is missing or invalid");
                             } else {
-                                response.sendRedirect("/login.html");
+                                response.sendRedirect("/login");
                             }
                         })
                 )
@@ -71,17 +71,34 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/",
                                 "/index.html",
+                                "/book",
+                                "/book/**",
+                                "/booking",
+                                "/booking/**",
                                 "/booking.html",
-                                "/login.html",
-                                "/signup.html",
-                                "/forgot-password.html",
-                                "/profile.html",
+                                "/manage-booking",
+                                "/manage-reservation",
+                                "/admin/dashboard",
+                                "/admin/calendar",
+                                "/admin/customers",
+                                "/admin/nail-techs",
+                                "/admin",
                                 "/admin-calendar.html",
                                 "/admin-dashboard.html",
                                 "/admin-customers.html",
                                 "/nail-techs.html",
-                                "/dashboard.html",
+                                "/services",
                                 "/services.html",
+                                "/login",
+                                "/login.html",
+                                "/signup",
+                                "/signup.html",
+                                "/forgot-password",
+                                "/forgot-password.html",
+                                "/profile",
+                                "/profile.html",
+                                "/dashboard",
+                                "/dashboard.html",
                                 "/api/appointments",
                                 "/api/appointments/**",
                                 "/api/bookings",
@@ -97,7 +114,6 @@ public class SecurityConfig {
                                 "/*.png",
                                 "/*.jpg",
                                 "/*.jpeg",
-                                "/login",
                                 "/api/public/**"
                         ).permitAll()
                         // Services rules (public GET, admin-only POST/PUT/DELETE)

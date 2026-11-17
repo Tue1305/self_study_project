@@ -2,6 +2,7 @@ package com.example.demo.filter;
 
 import com.example.demo.entity.TenantConfig;
 import com.example.demo.repository.TenantConfigRepository;
+import com.example.demo.service.TenantContext;
 import com.example.demo.service.TenantContextResolver;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -63,8 +64,10 @@ public class TenantThemeFilter extends OncePerRequestFilter {
         if (path.startsWith("/api/") || path.startsWith("/actuator/")) {
             return true;
         }
-        // Only process HTML pages and root
-        return !(path.endsWith(".html") || path.equals("/") || path.isEmpty());
+        // Exclude binary static assets (images, css, js, fonts)
+        return path.endsWith(".css") || path.endsWith(".js") || path.endsWith(".png")
+                || path.endsWith(".jpg") || path.endsWith(".jpeg") || path.endsWith(".ico")
+                || path.endsWith(".svg") || path.endsWith(".woff") || path.endsWith(".woff2");
     }
 
     @Override
@@ -78,25 +81,29 @@ public class TenantThemeFilter extends OncePerRequestFilter {
         try {
             filterChain.doFilter(request, wrappedResponse);
         } finally {
-            int status = wrappedResponse.getStatus();
-            byte[] body = wrappedResponse.getContentAsByteArray();
+            try {
+                int status = wrappedResponse.getStatus();
+                byte[] body = wrappedResponse.getContentAsByteArray();
 
-            if (status == HttpServletResponse.SC_OK && body.length > 0) {
-                String contentType = wrappedResponse.getContentType();
-                if (contentType == null || contentType.contains("text/html")) {
-                    String originalHtml = new String(body, StandardCharsets.UTF_8);
-                    String injectedHtml = injectTenantThemeVars(originalHtml, request);
+                if (status == HttpServletResponse.SC_OK && body.length > 0) {
+                    String contentType = wrappedResponse.getContentType();
+                    if (contentType == null || contentType.contains("text/html")) {
+                        String originalHtml = new String(body, StandardCharsets.UTF_8);
+                        String injectedHtml = injectTenantThemeVars(originalHtml, request);
 
-                    byte[] modifiedBytes = injectedHtml.getBytes(StandardCharsets.UTF_8);
-                    response.setContentType(contentType != null ? contentType : "text/html;charset=UTF-8");
-                    response.setContentLength(modifiedBytes.length);
-                    response.getOutputStream().write(modifiedBytes);
-                    response.getOutputStream().flush();
-                    return;
+                        byte[] modifiedBytes = injectedHtml.getBytes(StandardCharsets.UTF_8);
+                        response.setContentType(contentType != null ? contentType : "text/html;charset=UTF-8");
+                        response.setContentLength(modifiedBytes.length);
+                        response.getOutputStream().write(modifiedBytes);
+                        response.getOutputStream().flush();
+                        return;
+                    }
                 }
-            }
 
-            wrappedResponse.copyBodyToResponse();
+                wrappedResponse.copyBodyToResponse();
+            } finally {
+                TenantContext.clear();
+            }
         }
     }
 

@@ -56,13 +56,20 @@ public class AuthController {
             SecurityContextHolder.getContext().setAuthentication(authentication);
 
             UserDetails userDetails = (UserDetails) authentication.getPrincipal();
-            String jwt = jwtUtil.generateToken(userDetails);
+            UserEntity user = userRepository.findByUsername(userDetails.getUsername()).orElse(null);
+            String tenantId = (user != null && user.getTenantId() != null && !user.getTenantId().isBlank())
+                    ? user.getTenantId().trim().toLowerCase() : "default";
+            String role = (user != null && user.getRole() != null) ? user.getRole() : "ROLE_USER";
+
+            String jwt = jwtUtil.generateToken(userDetails, tenantId);
 
             // Ensure ROLE_USER accounts are synced into the Customer database on login
-            userRepository.findByUsername(userDetails.getUsername())
-                    .ifPresent(customerService::syncUserToCustomer);
+            if (user != null) {
+                customerService.syncUserToCustomer(user);
+            }
 
-            return ResponseEntity.ok(new JwtAuthResponse(jwt));
+            JwtAuthResponse authResponse = new JwtAuthResponse(jwt, tenantId, role);
+            return ResponseEntity.ok(authResponse);
 
         } catch (BadCredentialsException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)

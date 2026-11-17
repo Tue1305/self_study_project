@@ -89,6 +89,8 @@ public class SecurityConfig {
                                 "/favicon.ico",
                                 "/*.css",
                                 "/*.js",
+                                "/js/**",
+                                "/css/**",
                                 "/error",
                                 "/nail_collection/**",
                                 "/static/**",

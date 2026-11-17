@@ -104,7 +104,7 @@ public class AppointmentReminderService {
                 if (auditService != null) {
                     Customer customer = null;
                     if (appt.getCustomerEmail() != null && !appt.getCustomerEmail().isBlank()) {
-                        customer = customerRepository.findByEmail(appt.getCustomerEmail().trim()).orElse(null);
+                        customer = customerRepository.findByTenantIdAndEmail(appt.getTenantId(), appt.getCustomerEmail().trim()).orElse(null);
                     }
                     auditService.logActivity(
                             appt.getTenantId(),

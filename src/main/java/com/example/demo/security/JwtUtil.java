@@ -16,11 +16,20 @@ import java.util.function.Function;
 @Component
 public class JwtUtil {
 
-    private static final String SECRET_KEY = "mySuperSecretKeyForJwtTokenGenerationPurposeThatIs32BytesLong";
+    private static final String DEFAULT_SECRET = "mySuperSecretKeyForJwtTokenGenerationPurposeThatIs32BytesLong";
+
+    @org.springframework.beans.factory.annotation.Value("${jwt.secret:" + DEFAULT_SECRET + "}")
+    private String secretKey = DEFAULT_SECRET;
+
+    public void setSecretKey(String secretKey) {
+        if (secretKey != null && !secretKey.isBlank()) {
+            this.secretKey = secretKey.trim();
+        }
+    }
 
     private Key getSigningKey() {
         // Use UTF-8 explicitly to avoid platform-encoding character length mismatches
-        return Keys.hmacShaKeyFor(SECRET_KEY.getBytes(StandardCharsets.UTF_8));
+        return Keys.hmacShaKeyFor(secretKey.getBytes(StandardCharsets.UTF_8));
     }
 
     public String extractUsername(String token) {

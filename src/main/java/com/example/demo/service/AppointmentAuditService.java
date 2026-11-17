@@ -202,7 +202,7 @@ public class AppointmentAuditService {
         if (email == null || email.isBlank()) {
             return null;
         }
-        Optional<Customer> customerOpt = customerRepository.findByEmail(email.trim());
+        Optional<Customer> customerOpt = customerRepository.findByTenantIdAndEmail(tenantId, email.trim());
         if (customerOpt.isPresent()) {
             return getCustomerHistory(tenantId, customerOpt.get().getId());
         }

@@ -158,11 +158,4 @@ public class AuthController {
         // Return a generic success message for security best practices (prevents email enumeration)
         return ResponseEntity.ok(Map.of("message", "If an account with this email exists, password reset instructions have been sent."));
     }
-
-    // Admin page to display all users
-    @GetMapping("/admin/users")
-    public ResponseEntity<List<UserEntity>> getAllUsers() {
-        List<UserEntity> users = userRepository.findAll();
-        return ResponseEntity.ok(users);
-    }
 }

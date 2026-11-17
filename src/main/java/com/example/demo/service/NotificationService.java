@@ -435,32 +435,67 @@ public class NotificationService {
                     BigDecimal subtotal = (BigDecimal) receipt.getOrDefault("subtotal", BigDecimal.ZERO);
                     String notes = (String) receipt.getOrDefault("notes", "");
 
-                    // Extract services for this guest
+                    // Extract services for this guest and correlate each with its specific appointment, technician, and timeslot
                     @SuppressWarnings("unchecked")
                     List<ServiceEntity> services = (List<ServiceEntity>) receipt.get("services");
                     List<ServiceItem> serviceItems = new ArrayList<>();
+                    List<String> guestTechNames = new ArrayList<>();
+                    String cancellationToken = "";
+
                     if (services != null) {
                         for (ServiceEntity s : services) {
+                            String itemTechName = null;
+                            String itemTimeStr = null;
+
+                            // Find matching appointment for this guest and service
+                            Optional<Appointment> matchingAppt = savedAppointments.stream()
+                                    .filter(a -> a.getCustomerEmail() != null && a.getCustomerEmail().equalsIgnoreCase(guestEmail))
+                                    .filter(a -> a.getService() != null && s.getId() != null && s.getId().equals(a.getService().getId()))
+                                    .findFirst();
+
+                            if (matchingAppt.isPresent()) {
+                                Appointment ma = matchingAppt.get();
+                                if (cancellationToken.isEmpty() && ma.getCancellationToken() != null) {
+                                    cancellationToken = ma.getCancellationToken();
+                                }
+                                if (ma.getNailTech() != null && ma.getNailTech().getName() != null && !ma.getNailTech().getName().isBlank()) {
+                                    itemTechName = ma.getNailTech().getName();
+                                    if (!guestTechNames.contains(itemTechName)) {
+                                        guestTechNames.add(itemTechName);
+                                    }
+                                }
+                                if (ma.getAppointmentTime() != null) {
+                                    int hour = ma.getAppointmentTime().getHour();
+                                    int min = ma.getAppointmentTime().getMinute();
+                                    String period = hour >= 12 ? "p.m." : "a.m.";
+                                    int hour12 = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
+                                    itemTimeStr = String.format("%d:%02d %s", hour12, min, period);
+                                }
+                            }
+
                             serviceItems.add(new ServiceItem(
                                     s.getName(),
                                     s.getDurationMinutes() != null ? s.getDurationMinutes() : 45,
-                                    s.getPrice() != null ? s.getPrice() : BigDecimal.ZERO
+                                    s.getPrice() != null ? s.getPrice() : BigDecimal.ZERO,
+                                    itemTechName,
+                                    itemTimeStr
                             ));
                         }
                     }
 
-                    // Find cancellation token for this guest's primary appointment
-                    String cancellationToken = "";
-                    String techName = "First Available Specialist";
-                    for (Appointment a : savedAppointments) {
-                        if (a.getCustomerEmail() != null && a.getCustomerEmail().equalsIgnoreCase(guestEmail)) {
-                            cancellationToken = a.getCancellationToken();
-                            if (a.getNailTech() != null && a.getNailTech().getName() != null) {
-                                techName = a.getNailTech().getName();
+                    // Fallback to sample or first matching appointment token if needed
+                    if (cancellationToken.isEmpty()) {
+                        for (Appointment a : savedAppointments) {
+                            if (a.getCustomerEmail() != null && a.getCustomerEmail().equalsIgnoreCase(guestEmail)) {
+                                cancellationToken = a.getCancellationToken() != null ? a.getCancellationToken() : "";
+                                break;
                             }
-                            break;
                         }
                     }
+
+                    String techName = guestTechNames.isEmpty()
+                            ? "First Available Specialist"
+                            : String.join(" & ", guestTechNames);
 
                     String cancellationUrl = buildSelfServiceLink(config, cancellationToken);
                     String subject = "Booking Confirmed: Your Appointment at " + salonName;
@@ -696,13 +731,23 @@ public class NotificationService {
         StringBuilder serviceRows = new StringBuilder();
         if (services != null) {
             for (ServiceItem s : services) {
+                String displayName = s.name();
+                if (s.specialistName() != null && !s.specialistName().isBlank()) {
+                    displayName += String.format("<div style=\"font-size: 12px; color: #718096; margin-top: 3px;\"><span style=\"color: %s;\">&bull;</span> Specialist: <strong>%s</strong>%s</div>",
+                            primaryColor,
+                            s.specialistName(),
+                            (s.scheduledTime() != null && !s.scheduledTime().isBlank()) ? " at " + s.scheduledTime() : "");
+                } else if (s.scheduledTime() != null && !s.scheduledTime().isBlank()) {
+                    displayName += String.format("<div style=\"font-size: 12px; color: #718096; margin-top: 3px;\">Time: <strong>%s</strong></div>", s.scheduledTime());
+                }
+
                 serviceRows.append(String.format("""
                         <tr>
                             <td style="padding: 10px 14px; border-bottom: 1px solid #edf2f7; font-size: 14px; color: #2d3748;">%s</td>
                             <td style="padding: 10px 14px; border-bottom: 1px solid #edf2f7; font-size: 14px; color: #718096; text-align: center;">%d min</td>
                             <td style="padding: 10px 14px; border-bottom: 1px solid #edf2f7; font-size: 14px; color: #2d3748; font-weight: 600; text-align: right;">$%.2f</td>
                         </tr>
-                        """, s.name(), s.durationMinutes(), s.price()));
+                        """, displayName, s.durationMinutes(), s.price()));
             }
         }
 
@@ -900,7 +945,17 @@ public class NotificationService {
         );
     }
 
-    public record ServiceItem(String name, Integer durationMinutes, BigDecimal price) {}
+    public record ServiceItem(
+            String name,
+            Integer durationMinutes,
+            BigDecimal price,
+            String specialistName,
+            String scheduledTime
+    ) {
+        public ServiceItem(String name, Integer durationMinutes, BigDecimal price) {
+            this(name, durationMinutes, price, null, null);
+        }
+    }
 
     public record NotificationResult(
             boolean success,

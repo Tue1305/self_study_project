@@ -72,18 +72,19 @@ public class CustomerService {
                 ? user.getEmail().trim()
                 : username;
         String phone = user.getPhoneNumber();
+        String tenantId = (user.getTenantId() != null && !user.getTenantId().isBlank())
+                ? user.getTenantId().trim().toLowerCase()
+                : "default";
 
         try {
-            Customer customer = customerRepository.findByEmail(email)
-                    .or(() -> customerRepository.findByEmail(username))
-                    .or(() -> customerRepository.findByName(displayName))
+            Customer customer = customerRepository.findByTenantIdAndEmail(tenantId, email)
+                    .or(() -> customerRepository.findByTenantIdAndEmail(tenantId, username))
+                    .or(() -> customerRepository.findByTenantIdAndName(tenantId, displayName))
                     .orElseGet(Customer::new);
 
             customer.setName(displayName);
             customer.setEmail(email);
-            if (user.getTenantId() != null && !user.getTenantId().isBlank()) {
-                customer.setTenantId(user.getTenantId().trim().toLowerCase());
-            }
+            customer.setTenantId(tenantId);
             if (phone != null && !phone.isBlank()) {
                 customer.setPhone(phone.trim());
             }

@@ -16,6 +16,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.math.BigDecimal;
 import com.example.demo.entity.Customer;
@@ -26,6 +28,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -621,8 +624,43 @@ public class AppointmentController {
         return slotStart.isBefore(apptBusyEnd) && slotEnd.isAfter(apptStart);
     }
 
+    private boolean isTechBusyAtWindow(
+            Long techId,
+            LocalDateTime start,
+            LocalDateTime end,
+            int bufferMinutes,
+            List<Appointment> dbAppts,
+            List<Appointment> batchAppts
+    ) {
+        if (techId == null) return false;
+        if (dbAppts != null) {
+            boolean conflict = dbAppts.stream()
+                    .filter(a -> a.getStatus() != Appointment.AppointmentStatus.CANCELLED)
+                    .filter(a -> a.getNailTech() != null && techId.equals(a.getNailTech().getId()))
+                    .anyMatch(a -> hasOverlapWithBuffer(a, start, end, bufferMinutes));
+            if (conflict) return true;
+        }
+        if (batchAppts != null) {
+            return batchAppts.stream()
+                    .filter(a -> a.getStatus() != Appointment.AppointmentStatus.CANCELLED)
+                    .filter(a -> a.getNailTech() != null && techId.equals(a.getNailTech().getId()))
+                    .anyMatch(a -> hasOverlapWithBuffer(a, start, end, bufferMinutes));
+        }
+        return false;
+    }
+
+    @Transactional
     @PostMapping
     public ResponseEntity<?> bookAppointment(@RequestBody BookingRequestDto bookingRequest, HttpServletRequest request) {
+        try {
+            return doBookAppointment(bookingRequest, request);
+        } catch (DataIntegrityViolationException dive) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(Map.of("message", "This time slot was just booked by another customer. Please choose another time."));
+        }
+    }
+
+    private ResponseEntity<?> doBookAppointment(BookingRequestDto bookingRequest, HttpServletRequest request) {
         if (bookingRequest.getAppointmentTime() == null) {
             return ResponseEntity.badRequest().body(Map.of("message", "Please select an appointment date and time."));
         }
@@ -640,6 +678,11 @@ public class AppointmentController {
             if (bookingRequest.getCustomerPhone() == null || bookingRequest.getCustomerPhone().isBlank()) {
                 bookingRequest.setCustomerPhone("(555) 000-0000");
             }
+        }
+
+        List<UserEntity> tenantTechs = userRepository.findAllByTenantIdAndRole(tenantId, "ROLE_NAIL_TECH");
+        if (tenantTechs == null) {
+            tenantTechs = Collections.emptyList();
         }
 
         // Validate technician belongs to active tenant and has no conflict at the requested time slot
@@ -714,6 +757,15 @@ public class AppointmentController {
             List<Map<String, Object>> guestReceipts = new ArrayList<>();
             BigDecimal grandTotal = BigDecimal.ZERO;
             int totalDurationMinutes = 0;
+
+            List<Appointment> dayAppts = appointmentRepository.findByTenantIdAndAppointmentTimeBetween(
+                    tenantId,
+                    bookingRequest.getAppointmentTime().toLocalDate().atStartOfDay(),
+                    bookingRequest.getAppointmentTime().toLocalDate().plusDays(1).atStartOfDay()
+            );
+            if (dayAppts == null) {
+                dayAppts = Collections.emptyList();
+            }
 
             for (int i = 0; i < guestItems.size(); i++) {
                 BookingRequestDto.GuestBookingItem guest = guestItems.get(i);
@@ -807,6 +859,37 @@ public class AppointmentController {
                         }
                         if (assignedTechId != null) {
                             serviceSpecificTech = userRepository.findByTenantIdAndId(tenantId, assignedTechId).orElse(resolvedTech);
+                        }
+                    }
+
+                    LocalDateTime serviceSlotEnd = serviceApptTime.plusMinutes(srvDuration);
+
+                    // Conflict & Overbooking check
+                    if (!Boolean.TRUE.equals(bookingRequest.getManualOverride())) {
+                        if (serviceSpecificTech != null && serviceSpecificTech.getId() != null) {
+                            Long checkTechId = serviceSpecificTech.getId();
+                            boolean hasConf = isTechBusyAtWindow(checkTechId, serviceApptTime, serviceSlotEnd, 15, dayAppts, savedAppointments);
+                            if (hasConf) {
+                                String tName = serviceSpecificTech.getName() != null ? serviceSpecificTech.getName() : "Selected specialist";
+                                return ResponseEntity.status(HttpStatus.CONFLICT)
+                                        .body(Map.of("message", tName + " is already booked at " + formatTime12Hour(serviceApptTime) + ". Please choose another time or specialist."));
+                            }
+                        } else if (!tenantTechs.isEmpty()) {
+                            // Anyone Available mode: find a free specialist who is not booked at this window
+                            UserEntity freeTech = null;
+                            for (UserEntity tech : tenantTechs) {
+                                if (tech.getId() == null) continue;
+                                boolean busy = isTechBusyAtWindow(tech.getId(), serviceApptTime, serviceSlotEnd, 15, dayAppts, savedAppointments);
+                                if (!busy) {
+                                    freeTech = tech;
+                                    break;
+                                }
+                            }
+                            if (freeTech == null) {
+                                return ResponseEntity.status(HttpStatus.CONFLICT)
+                                        .body(Map.of("message", "All specialists are booked for " + srv.getName() + " at " + formatTime12Hour(serviceApptTime) + ". Please choose another time."));
+                            }
+                            serviceSpecificTech = freeTech;
                         }
                     }
 
@@ -916,18 +999,6 @@ public class AppointmentController {
             return ResponseEntity.badRequest().body(Map.of("message", "Selected service does not belong to this salon."));
         }
 
-        Customer customer = syncCustomerRecord(
-                bookingRequest.getCustomerName(),
-                bookingRequest.getCustomerEmail(),
-                bookingRequest.getCustomerPhone(),
-                tenantId
-        );
-
-        Appointment appointment = new Appointment();
-        appointment.setTenantId(tenantId);
-        appointment.setCustomerName(bookingRequest.getCustomerName().trim());
-        appointment.setCustomerEmail(bookingRequest.getCustomerEmail().trim());
-        appointment.setCustomerPhone(bookingRequest.getCustomerPhone().trim());
         LocalDateTime singleApptTime = bookingRequest.getAppointmentTime();
         if (bookingRequest.getServiceTimeSlots() != null && singleServiceId != null) {
             String customSlot = bookingRequest.getServiceTimeSlots().get(String.valueOf(singleServiceId));
@@ -943,6 +1014,47 @@ public class AppointmentController {
                 }
             }
         }
+
+        int estDuration = (tenantService.get().getDurationMinutes() != null && tenantService.get().getDurationMinutes() > 0)
+                ? tenantService.get().getDurationMinutes() : 45;
+        LocalDateTime singleSlotEnd = singleApptTime.plusMinutes(estDuration);
+
+        if (!Boolean.TRUE.equals(bookingRequest.getManualOverride())) {
+            if (resolvedTech == null && !tenantTechs.isEmpty()) {
+                List<Appointment> dayAppts = appointmentRepository.findByTenantIdAndAppointmentTimeBetween(
+                        tenantId,
+                        singleApptTime.toLocalDate().atStartOfDay(),
+                        singleApptTime.toLocalDate().plusDays(1).atStartOfDay()
+                );
+                UserEntity freeTech = null;
+                for (UserEntity tech : tenantTechs) {
+                    if (tech.getId() == null) continue;
+                    boolean busy = isTechBusyAtWindow(tech.getId(), singleApptTime, singleSlotEnd, 15, dayAppts, null);
+                    if (!busy) {
+                        freeTech = tech;
+                        break;
+                    }
+                }
+                if (freeTech == null) {
+                    return ResponseEntity.status(HttpStatus.CONFLICT)
+                            .body(Map.of("message", "All specialists are booked at the selected time slot. Please choose another time or specialist."));
+                }
+                resolvedTech = freeTech;
+            }
+        }
+
+        Customer customer = syncCustomerRecord(
+                bookingRequest.getCustomerName(),
+                bookingRequest.getCustomerEmail(),
+                bookingRequest.getCustomerPhone(),
+                tenantId
+        );
+
+        Appointment appointment = new Appointment();
+        appointment.setTenantId(tenantId);
+        appointment.setCustomerName(bookingRequest.getCustomerName().trim());
+        appointment.setCustomerEmail(bookingRequest.getCustomerEmail().trim());
+        appointment.setCustomerPhone(bookingRequest.getCustomerPhone().trim());
         appointment.setAppointmentTime(singleApptTime);
         appointment.setNotes(bookingRequest.getNotes());
         appointment.setStationPreference(bookingRequest.getStationPreference());
@@ -1006,21 +1118,21 @@ public class AppointmentController {
         if (email == null || email.isBlank()) {
             return null;
         }
+        String cleanTenant = (tenantId != null && !tenantId.isBlank()) ? tenantId.trim().toLowerCase() : "default";
         try {
-            Customer customer = customerRepository.findByEmail(email.trim())
+            Customer customer = customerRepository.findByTenantIdAndEmail(cleanTenant, email.trim())
                     .orElseGet(Customer::new);
             customer.setName(name != null ? name.trim() : "");
             customer.setEmail(email.trim());
             customer.setPhone(phone != null ? phone.trim() : "");
-            if (customer.getTenantId() == null || customer.getTenantId().isBlank()) {
-                customer.setTenantId(tenantId != null ? tenantId : "default");
-            }
+            customer.setTenantId(cleanTenant);
             return customerRepository.save(customer);
         } catch (Exception ignored) {
             return null;
         }
     }
 
+    @Transactional
     @PatchMapping("/{id}/status")
     public ResponseEntity<?> updateAppointmentStatus(
             @PathVariable Long id,
@@ -1070,7 +1182,7 @@ public class AppointmentController {
                         // Look up customer record to link customer_id
                         Customer customer = null;
                         if (appointment.getCustomerEmail() != null && !appointment.getCustomerEmail().isBlank()) {
-                            customer = customerRepository.findByEmail(appointment.getCustomerEmail().trim()).orElse(null);
+                            customer = customerRepository.findByTenantIdAndEmail(tenantId, appointment.getCustomerEmail().trim()).orElse(null);
                         }
 
                         if (auditService != null) {
@@ -1147,6 +1259,7 @@ public class AppointmentController {
                 .orElse(ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", "Appointment not found for provided token")));
     }
 
+    @Transactional
     @PostMapping("/by-token/{token}/cancel")
     public ResponseEntity<?> cancelAppointmentByToken(
             @PathVariable String token,
@@ -1174,7 +1287,7 @@ public class AppointmentController {
                     if (auditService != null) {
                         Customer customer = null;
                         if (appt.getCustomerEmail() != null && !appt.getCustomerEmail().isBlank()) {
-                            customer = customerRepository.findByEmail(appt.getCustomerEmail().trim()).orElse(null);
+                            customer = customerRepository.findByTenantIdAndEmail(appt.getTenantId(), appt.getCustomerEmail().trim()).orElse(null);
                         }
                         auditService.logActivity(
                                 appt.getTenantId(),
@@ -1205,6 +1318,7 @@ public class AppointmentController {
                 .orElse(ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", "Appointment not found for provided token")));
     }
 
+    @Transactional
     @PostMapping("/by-token/{token}/reschedule")
     public ResponseEntity<?> rescheduleAppointmentByToken(
             @PathVariable String token,
@@ -1337,6 +1451,7 @@ public class AppointmentController {
         ));
     }
 
+    @Transactional
     @PatchMapping("/{id}/reschedule")
     public ResponseEntity<?> adminRescheduleAppointment(
             @PathVariable Long id,
@@ -1469,6 +1584,7 @@ public class AppointmentController {
      * Reassigns an appointment to a specific staff member (or unassigns to 'Anyone Available')
      * with conflict checking against the target technician's active schedule.
      */
+    @Transactional
     @PatchMapping("/{id}/assign-tech")
     public ResponseEntity<?> assignTechnician(
             @PathVariable Long id,

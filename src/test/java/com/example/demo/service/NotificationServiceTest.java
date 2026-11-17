@@ -146,6 +146,70 @@ class NotificationServiceTest {
     }
 
     @Test
+    @DisplayName("Multi-Service Booking: Formats individual technician and scheduled time per service")
+    void testSendMultiServiceBookingConfirmationWithPerServiceTechAndTimes() {
+        ServiceEntity mani = new ServiceEntity();
+        mani.setId(101L);
+        mani.setName("Classic Manicure");
+        mani.setPrice(new BigDecimal("35.00"));
+        mani.setDurationMinutes(30);
+
+        ServiceEntity pedi = new ServiceEntity();
+        pedi.setId(102L);
+        pedi.setName("Deluxe Pedicure");
+        pedi.setPrice(new BigDecimal("55.00"));
+        pedi.setDurationMinutes(45);
+
+        UserEntity tony = new UserEntity();
+        tony.setName("Tony");
+
+        UserEntity chloe = new UserEntity();
+        chloe.setName("Chloe");
+
+        Appointment appt1 = new Appointment();
+        appt1.setId(601L);
+        appt1.setTenantId("luxe");
+        appt1.setCustomerName("Jane Doe");
+        appt1.setCustomerEmail("jane@example.com");
+        appt1.setCustomerPhone("(555) 123-4567");
+        appt1.setAppointmentTime(LocalDateTime.of(2026, 11, 20, 15, 0));
+        appt1.setService(mani);
+        appt1.setNailTech(tony);
+        appt1.setCancellationToken("token-mani");
+
+        Appointment appt2 = new Appointment();
+        appt2.setId(602L);
+        appt2.setTenantId("luxe");
+        appt2.setCustomerName("Jane Doe");
+        appt2.setCustomerEmail("jane@example.com");
+        appt2.setCustomerPhone("(555) 123-4567");
+        appt2.setAppointmentTime(LocalDateTime.of(2026, 11, 20, 15, 30));
+        appt2.setService(pedi);
+        appt2.setNailTech(chloe);
+        appt2.setCancellationToken("token-pedi");
+
+        List<Appointment> savedAppointments = List.of(appt1, appt2);
+
+        Map<String, Object> receipt = new LinkedHashMap<>();
+        receipt.put("customerName", "Jane Doe");
+        receipt.put("customerEmail", "jane@example.com");
+        receipt.put("customerPhone", "(555) 123-4567");
+        receipt.put("subtotal", new BigDecimal("90.00"));
+        receipt.put("services", List.of(mani, pedi));
+
+        List<NotificationService.NotificationResult> results = notificationService.sendMultiGuestBookingConfirmations(
+                savedAppointments,
+                List.of(receipt),
+                "luxe",
+                new BigDecimal("90.00")
+        );
+
+        assertEquals(1, results.size());
+        assertTrue(results.get(0).success());
+        assertTrue(results.get(0).simulated());
+    }
+
+    @Test
     @DisplayName("Cancellation Notice: Dispatches branded cancellation notification with reason")
     void testSendCancellationNotice() {
         ServiceEntity service = new ServiceEntity();

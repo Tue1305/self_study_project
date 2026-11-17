@@ -16,4 +16,5 @@ public interface CustomerRepository extends JpaRepository<Customer, Long> {
     List<Customer> findByTenantIdOrderByNameAsc(String tenantId);
     Optional<Customer> findByTenantIdAndEmail(String tenantId, String email);
     Optional<Customer> findByTenantIdAndName(String tenantId, String name);
+    boolean existsByTenantIdAndEmail(String tenantId, String email);
 }

@@ -62,13 +62,11 @@ public class CustomerController {
         }
 
         String tenantId = tenantContextResolver.resolveTenantId(request);
-        if (customer.getTenantId() == null || customer.getTenantId().isBlank()) {
-            customer.setTenantId(tenantId);
-        }
+        customer.setTenantId(tenantId);
 
-        Optional<Customer> existing = customerRepository.findByEmail(customer.getEmail().trim());
+        Optional<Customer> existing = customerRepository.findByTenantIdAndEmail(tenantId, customer.getEmail().trim());
         if (existing.isPresent()) {
-            return ResponseEntity.badRequest().body(Map.of("message", "A customer with this email already exists."));
+            return ResponseEntity.badRequest().body(Map.of("message", "A customer with this email already exists in this salon."));
         }
 
         customer.setEmail(customer.getEmail().trim());
@@ -77,16 +75,21 @@ public class CustomerController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<?> updateCustomer(@PathVariable Long id, @RequestBody Customer updatedCustomer) {
+    public ResponseEntity<?> updateCustomer(
+            @PathVariable Long id,
+            @RequestBody Customer updatedCustomer,
+            jakarta.servlet.http.HttpServletRequest request
+    ) {
+        String tenantId = tenantContextResolver.resolveTenantId(request);
         Customer existing = customerService.getCustomerById(id);
-        if (existing == null) {
+        if (existing == null || (existing.getTenantId() != null && !existing.getTenantId().equalsIgnoreCase(tenantId))) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", "Customer not found."));
         }
 
         if (updatedCustomer.getEmail() != null && !updatedCustomer.getEmail().isBlank()) {
-            Optional<Customer> emailOwner = customerRepository.findByEmail(updatedCustomer.getEmail().trim());
+            Optional<Customer> emailOwner = customerRepository.findByTenantIdAndEmail(tenantId, updatedCustomer.getEmail().trim());
             if (emailOwner.isPresent() && !emailOwner.get().getId().equals(id)) {
-                return ResponseEntity.badRequest().body(Map.of("message", "Email is already used by another customer."));
+                return ResponseEntity.badRequest().body(Map.of("message", "Email is already used by another customer in this salon."));
             }
             existing.setEmail(updatedCustomer.getEmail().trim());
         }
@@ -101,8 +104,13 @@ public class CustomerController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> deleteCustomer(@PathVariable Long id) {
-        if (customerService.getCustomerById(id) == null) {
+    public ResponseEntity<?> deleteCustomer(
+            @PathVariable Long id,
+            jakarta.servlet.http.HttpServletRequest request
+    ) {
+        String tenantId = tenantContextResolver.resolveTenantId(request);
+        Customer existing = customerService.getCustomerById(id);
+        if (existing == null || (existing.getTenantId() != null && !existing.getTenantId().equalsIgnoreCase(tenantId))) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", "Customer not found."));
         }
         customerService.deleteCustomerById(id);

@@ -160,56 +160,76 @@ public class AppointmentController {
             targetTechs.addAll(tenantTechs);
         }
 
-        // Build sequential service segments if 2+ services or explicit serviceDurations/serviceIds were passed
-        List< int[] > sequentialSegments = new ArrayList<>(); // each int[] = { durationMins, techIdOrMinusOne }
+        // Build sequential service segments configuration
+        List<ServiceSegmentConfig> segments = new ArrayList<>();
+        int segmentCount = 0;
         if (serviceDurations != null && !serviceDurations.isEmpty()) {
-            for (int i = 0; i < serviceDurations.size(); i++) {
-                int segDur = (serviceDurations.get(i) != null && serviceDurations.get(i) > 0) ? serviceDurations.get(i) : 45;
-                int segTechId = -1;
-                if (serviceTechIds != null && i < serviceTechIds.size()) {
-                    String raw = serviceTechIds.get(i);
-                    if (raw != null && !raw.isBlank() && !"anyone".equalsIgnoreCase(raw.trim()) && !"null".equalsIgnoreCase(raw.trim())) {
-                        try {
-                            segTechId = Integer.parseInt(raw.trim());
-                        } catch (NumberFormatException ignored) {
-                        }
-                    }
-                } else if (techIds != null && i < techIds.size() && techIds.get(i) != null) {
-                    segTechId = techIds.get(i).intValue();
-                } else if (techId != null) {
-                    segTechId = techId.intValue();
-                }
-                sequentialSegments.add(new int[]{ segDur, segTechId });
-            }
+            segmentCount = serviceDurations.size();
         } else if (serviceIds != null && !serviceIds.isEmpty()) {
-            for (int i = 0; i < serviceIds.size(); i++) {
-                Long sid = serviceIds.get(i);
-                int segDur = 45;
-                if (sid != null) {
-                    Optional<ServiceEntity> srvOpt = serviceRepository.findByTenantIdAndId(tenantId, sid);
-                    if (srvOpt.isPresent() && srvOpt.get().getDurationMinutes() != null && srvOpt.get().getDurationMinutes() > 0) {
-                        segDur = srvOpt.get().getDurationMinutes();
-                    }
-                }
-                int segTechId = -1;
-                if (serviceTechIds != null && i < serviceTechIds.size()) {
-                    String raw = serviceTechIds.get(i);
-                    if (raw != null && !raw.isBlank() && !"anyone".equalsIgnoreCase(raw.trim()) && !"null".equalsIgnoreCase(raw.trim())) {
-                        try {
-                            segTechId = Integer.parseInt(raw.trim());
-                        } catch (NumberFormatException ignored) {
-                        }
-                    }
-                } else if (techIds != null && i < techIds.size() && techIds.get(i) != null) {
-                    segTechId = techIds.get(i).intValue();
-                } else if (techId != null) {
-                    segTechId = techId.intValue();
-                }
-                sequentialSegments.add(new int[]{ segDur, segTechId });
-            }
+            segmentCount = serviceIds.size();
+        } else if (techIds != null && !techIds.isEmpty()) {
+            segmentCount = techIds.size();
+        } else {
+            segmentCount = 1;
         }
 
-        int calculatedSegmentsDuration = sequentialSegments.stream().mapToInt(seg -> seg[0]).sum();
+        for (int i = 0; i < segmentCount; i++) {
+            ServiceSegmentConfig seg = new ServiceSegmentConfig();
+
+            // Service ID
+            if (serviceIds != null && i < serviceIds.size()) {
+                seg.serviceId = serviceIds.get(i);
+            }
+
+            // Duration
+            if (serviceDurations != null && i < serviceDurations.size() && serviceDurations.get(i) != null && serviceDurations.get(i) > 0) {
+                seg.durationMinutes = serviceDurations.get(i);
+            } else if (seg.serviceId != null) {
+                Optional<ServiceEntity> srvOpt = serviceRepository.findByTenantIdAndId(tenantId, seg.serviceId);
+                seg.durationMinutes = (srvOpt.isPresent() && srvOpt.get().getDurationMinutes() != null && srvOpt.get().getDurationMinutes() > 0)
+                        ? srvOpt.get().getDurationMinutes() : 45;
+            } else {
+                seg.durationMinutes = (segmentCount == 1) ? Math.max(15, durationMinutes) : 45;
+            }
+
+            // Service Name
+            if (seg.serviceId != null) {
+                Optional<ServiceEntity> srvOpt = serviceRepository.findByTenantIdAndId(tenantId, seg.serviceId);
+                seg.serviceName = srvOpt.map(ServiceEntity::getName).orElse("Service " + (i + 1));
+            } else {
+                seg.serviceName = (segmentCount == 1) ? "Salon Service" : ("Service " + (i + 1));
+            }
+
+            // Tech ID
+            Long resolvedTid = null;
+            if (serviceTechIds != null && i < serviceTechIds.size()) {
+                String raw = serviceTechIds.get(i);
+                if (raw != null && !raw.isBlank() && !"anyone".equalsIgnoreCase(raw.trim()) && !"null".equalsIgnoreCase(raw.trim())) {
+                    try {
+                        long parsed = Long.parseLong(raw.trim());
+                        if (parsed > 0) resolvedTid = parsed;
+                    } catch (NumberFormatException ignored) {}
+                }
+            } else if (techIds != null && i < techIds.size() && techIds.get(i) != null && techIds.get(i) > 0) {
+                resolvedTid = techIds.get(i);
+            } else if (techId != null && techId > 0 && (segmentCount == 1 || serviceTechIds == null)) {
+                resolvedTid = techId;
+            }
+            seg.techId = resolvedTid;
+
+            // Tech Name
+            if (resolvedTid != null) {
+                Optional<UserEntity> uOpt = userRepository.findByTenantIdAndId(tenantId, resolvedTid);
+                seg.techName = uOpt.map(u -> (u.getName() != null && !u.getName().isBlank()) ? u.getName() : u.getUsername())
+                        .orElse("Specialist #" + resolvedTid);
+            } else {
+                seg.techName = "Anyone Available";
+            }
+
+            segments.add(seg);
+        }
+
+        int calculatedSegmentsDuration = segments.stream().mapToInt(seg -> seg.durationMinutes).sum();
         int effectiveDuration = Math.max(Math.max(durationMinutes, calculatedSegmentsDuration), 15);
 
         // Determine current real-time clock (prefer clientNow if valid, else server clock)
@@ -254,97 +274,122 @@ public class AppointmentController {
                 String timeRangeLabel = label12 + " – " + endLabel12;
 
                 boolean isAvailable = !isPast;
-                String conflictReason = isPast ? "Slot has passed" : null;
+                List<Map<String, Object>> staffBreakdown = new ArrayList<>();
+                List<String> conflictMessages = new ArrayList<>();
+                String staffBookedDesc = null;
 
-                if (isAvailable) {
-                    if (!sequentialSegments.isEmpty()) {
-                        // Sequential Multi-Service Synchronization:
-                        // Validate Service 1's tech is free for [slotStart, slotStart + d1],
-                        // Service 2's tech is free for [slotStart + d1, slotStart + d1 + d2], etc.
-                        LocalDateTime segCursor = slotStart;
-                        for (int[] seg : sequentialSegments) {
-                            int segDur = seg[0];
-                            long segTech = seg[1];
-                            LocalDateTime segStart = segCursor;
-                            LocalDateTime segEnd = segStart.plusMinutes(segDur);
-                            segCursor = segEnd;
+                LocalDateTime segCursor = slotStart;
+                for (ServiceSegmentConfig seg : segments) {
+                    int segDur = seg.durationMinutes;
+                    LocalDateTime segStart = segCursor;
+                    LocalDateTime segEnd = segStart.plusMinutes(segDur);
+                    segCursor = segEnd;
 
-                            if (segTech > 0) {
-                                final long targetTid = segTech;
-                                boolean segConflict = dayAppointments.stream().anyMatch(a ->
-                                        a.getNailTech() != null &&
+                    boolean segAvailable = true;
+                    String segBusyWindow = null;
+                    String segNextAvailable = null;
+                    String segMessage = null;
+
+                    if (seg.techId != null && seg.techId > 0) {
+                        final long targetTid = seg.techId;
+                        Optional<Appointment> conflictOpt = dayAppointments.stream()
+                                .filter(a -> a.getNailTech() != null &&
                                         a.getNailTech().getId() != null &&
-                                        a.getNailTech().getId() == targetTid &&
-                                        hasOverlapWithBuffer(a, segStart, segEnd, effectiveBuffer)
-                                );
-                                if (segConflict) {
-                                    isAvailable = false;
-                                    conflictReason = "Booked";
-                                    break;
-                                }
-                            } else {
-                                // "Anyone Available" for this service segment
-                                boolean atLeastOneFree = tenantTechs.isEmpty() || tenantTechs.stream().anyMatch(t ->
-                                        dayAppointments.stream().noneMatch(a ->
-                                                a.getNailTech() != null &&
-                                                a.getNailTech().getId().equals(t.getId()) &&
-                                                hasOverlapWithBuffer(a, segStart, segEnd, effectiveBuffer)
-                                        )
-                                );
-                                if (!atLeastOneFree) {
-                                    isAvailable = false;
-                                    conflictReason = "Booked";
-                                    break;
-                                }
-                            }
-                        }
-                    } else if (techId != null) {
-                        // Single specified technician: check if this tech has any overlapping appointment (including turnover buffer)
-                        boolean techHasConflict = dayAppointments.stream().anyMatch(a -> {
-                            if (a.getNailTech() == null || !a.getNailTech().getId().equals(techId)) {
-                                return false;
-                            }
-                            return hasOverlapWithBuffer(a, slotStart, slotEnd, effectiveBuffer);
-                        });
-                        if (techHasConflict) {
+                                        a.getNailTech().getId().equals(targetTid) &&
+                                        hasOverlapWithBuffer(a, segStart, segEnd, effectiveBuffer))
+                                .findFirst();
+
+                        if (conflictOpt.isPresent()) {
+                            segAvailable = false;
                             isAvailable = false;
-                            conflictReason = "Booked";
-                        }
-                    } else if (techIds != null && !techIds.isEmpty()) {
-                        // Multiple technicians without explicit per-service durations: split duration sequentially across assigned technicians
-                        int numTechs = targetTechs.size();
-                        int perTechDuration = numTechs > 0 ? Math.max(15, effectiveDuration / numTechs) : effectiveDuration;
-                        LocalDateTime segCursor = slotStart;
-                        for (int idx = 0; idx < numTechs; idx++) {
-                            UserEntity t = targetTechs.get(idx);
-                            LocalDateTime segStart = segCursor;
-                            LocalDateTime segEnd = (idx == numTechs - 1) ? slotEnd : segStart.plusMinutes(perTechDuration);
-                            segCursor = segEnd;
-                            boolean busy = dayAppointments.stream().anyMatch(a ->
-                                    a.getNailTech() != null &&
-                                    a.getNailTech().getId().equals(t.getId()) &&
-                                    hasOverlapWithBuffer(a, segStart, segEnd, effectiveBuffer)
-                            );
-                            if (busy) {
-                                isAvailable = false;
-                                conflictReason = "Booked";
-                                break;
+                            Appointment ca = conflictOpt.get();
+                            LocalDateTime caStart = ca.getAppointmentTime();
+                            int caDur = (ca.getService() != null && ca.getService().getDurationMinutes() != null)
+                                    ? ca.getService().getDurationMinutes() : 45;
+                            LocalDateTime caBusyEnd = caStart.plusMinutes(caDur + effectiveBuffer);
+
+                            // Follow consecutive chain to calculate true next open time
+                            LocalDateTime nextOpen = caBusyEnd;
+                            boolean chained = true;
+                            while (chained) {
+                                final LocalDateTime checkTime = nextOpen;
+                                Optional<Appointment> nextConflict = dayAppointments.stream()
+                                        .filter(a -> a.getNailTech() != null &&
+                                                a.getNailTech().getId() != null &&
+                                                a.getNailTech().getId().equals(targetTid))
+                                        .filter(a -> a.getAppointmentTime() != null &&
+                                                !a.getAppointmentTime().isAfter(checkTime) &&
+                                                a.getAppointmentTime().plusMinutes(
+                                                        (a.getService() != null && a.getService().getDurationMinutes() != null
+                                                                ? a.getService().getDurationMinutes() : 45) + effectiveBuffer
+                                                ).isAfter(checkTime))
+                                        .findFirst();
+                                if (nextConflict.isPresent()) {
+                                    Appointment nc = nextConflict.get();
+                                    int ncDur = (nc.getService() != null && nc.getService().getDurationMinutes() != null)
+                                            ? nc.getService().getDurationMinutes() : 45;
+                                    nextOpen = nc.getAppointmentTime().plusMinutes(ncDur + effectiveBuffer);
+                                } else {
+                                    chained = false;
+                                }
                             }
+
+                            segBusyWindow = formatTime12Hour(caStart) + " – " + formatTime12Hour(caBusyEnd);
+                            segNextAvailable = formatTime12Hour(nextOpen);
+
+                            // Format: "Pedicure — Staff A: Booked 3:00 PM – 4:15 PM (Next available: 4:15 PM)"
+                            segMessage = seg.serviceName + " — " + seg.techName + ": Booked " + segBusyWindow + " (Next available: " + segNextAvailable + ")";
+                            conflictMessages.add(segMessage);
+                            if (staffBookedDesc == null) {
+                                staffBookedDesc = seg.techName + " booked " + segBusyWindow;
+                            }
+                        } else {
+                            segMessage = seg.serviceName + " — " + seg.techName + ": Available at " + formatTime12Hour(segStart);
                         }
                     } else {
-                        // "Anyone Available": available if AT LEAST ONE qualified technician is free
-                        boolean atLeastOneTechFree = targetTechs.stream().anyMatch(t ->
-                            dayAppointments.stream().noneMatch(a ->
-                                a.getNailTech() != null &&
-                                a.getNailTech().getId().equals(t.getId()) &&
-                                hasOverlapWithBuffer(a, slotStart, slotEnd, effectiveBuffer)
-                            )
+                        // "Anyone Available": check if at least one qualified technician is free
+                        boolean atLeastOneFree = tenantTechs.isEmpty() || tenantTechs.stream().anyMatch(t ->
+                                dayAppointments.stream().noneMatch(a ->
+                                        a.getNailTech() != null &&
+                                        a.getNailTech().getId() != null &&
+                                        a.getNailTech().getId().equals(t.getId()) &&
+                                        hasOverlapWithBuffer(a, segStart, segEnd, effectiveBuffer)
+                                )
                         );
-                        if (!atLeastOneTechFree && !targetTechs.isEmpty()) {
+                        if (!atLeastOneFree) {
+                            segAvailable = false;
                             isAvailable = false;
-                            conflictReason = "Booked";
+                            segMessage = seg.serviceName + " — Anyone Available: All specialists booked at " + formatTime12Hour(segStart);
+                            conflictMessages.add(segMessage);
+                            if (staffBookedDesc == null) {
+                                staffBookedDesc = "All staff booked";
+                            }
+                        } else {
+                            segMessage = seg.serviceName + " — Anyone Available: Specialist available at " + formatTime12Hour(segStart);
                         }
                     }
+
+                    Map<String, Object> segMap = new LinkedHashMap<>();
+                    segMap.put("serviceId", seg.serviceId);
+                    segMap.put("serviceName", seg.serviceName);
+                    segMap.put("techId", seg.techId);
+                    segMap.put("techName", seg.techName);
+                    segMap.put("windowStart", formatTime12Hour(segStart));
+                    segMap.put("windowEnd", formatTime12Hour(segEnd));
+                    segMap.put("available", segAvailable);
+                    segMap.put("busyWindow", segBusyWindow);
+                    segMap.put("nextAvailable", segNextAvailable);
+                    segMap.put("message", segMessage);
+                    staffBreakdown.add(segMap);
+                }
+
+                String conflictReason = null;
+                if (isPast) {
+                    conflictReason = "Slot has passed";
+                } else if (!conflictMessages.isEmpty()) {
+                    conflictReason = String.join("; ", conflictMessages);
+                } else if (!isAvailable) {
+                    conflictReason = "Booked";
                 }
 
                 Map<String, Object> slot = new LinkedHashMap<>();
@@ -357,6 +402,10 @@ public class AppointmentController {
                 slot.put("bufferMinutes", effectiveBuffer);
                 slot.put("available", isAvailable);
                 slot.put("isPast", isPast);
+                slot.put("staffBreakdown", staffBreakdown);
+                if (staffBookedDesc != null) {
+                    slot.put("staffBookedDesc", staffBookedDesc);
+                }
                 if (conflictReason != null) {
                     slot.put("reason", conflictReason);
                 }
@@ -364,13 +413,42 @@ public class AppointmentController {
             }
         }
 
-        return ResponseEntity.ok(Map.of(
-                "date", date,
-                "isClosed", false,
-                "durationMinutes", effectiveDuration,
-                "bufferMinutes", effectiveBuffer,
-                "availableSlots", slotResults
-        ));
+        // Identify earliest valid sequential window
+        Map<String, Object> earliestSlot = slotResults.stream()
+                .filter(s -> Boolean.TRUE.equals(s.get("available")))
+                .findFirst()
+                .orElse(null);
+
+        // Collect distinct staff conflict breakdowns for unbookable slots
+        List<Map<String, Object>> staffConflicts = new ArrayList<>();
+        for (Map<String, Object> s : slotResults) {
+            if (!Boolean.TRUE.equals(s.get("available")) && !Boolean.TRUE.equals(s.get("isPast"))) {
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> bList = (List<Map<String, Object>>) s.get("staffBreakdown");
+                if (bList != null && bList.stream().anyMatch(b -> Boolean.FALSE.equals(b.get("available")))) {
+                    Map<String, Object> sc = new LinkedHashMap<>();
+                    sc.put("time", s.get("label"));
+                    sc.put("timeRangeLabel", s.get("timeRangeLabel"));
+                    sc.put("staffBookedDesc", s.get("staffBookedDesc"));
+                    sc.put("reason", s.get("reason"));
+                    sc.put("breakdown", bList);
+                    staffConflicts.add(sc);
+                }
+            }
+        }
+
+        Map<String, Object> responseBody = new LinkedHashMap<>();
+        responseBody.put("date", date);
+        responseBody.put("isClosed", false);
+        responseBody.put("durationMinutes", effectiveDuration);
+        responseBody.put("bufferMinutes", effectiveBuffer);
+        if (earliestSlot != null) {
+            responseBody.put("earliestAvailableSlot", earliestSlot);
+        }
+        responseBody.put("staffConflicts", staffConflicts);
+        responseBody.put("availableSlots", slotResults);
+
+        return ResponseEntity.ok(responseBody);
     }
 
     private String formatTime12Hour(LocalDateTime dt) {
@@ -1315,5 +1393,13 @@ public class AppointmentController {
             return ResponseEntity.ok(result);
         }
         return ResponseEntity.ok(Map.of("message", "Reminder service not active", "remindersSent", 0));
+    }
+
+    private static class ServiceSegmentConfig {
+        Long serviceId;
+        String serviceName;
+        int durationMinutes;
+        Long techId;
+        String techName;
     }
 }

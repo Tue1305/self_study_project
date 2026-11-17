@@ -789,11 +789,11 @@
                                             <div class="small text-muted fw-semibold">Selected Time Window (Start – Est. End)</div>
                                             <div class="fw-bold text-pink" id="selectedTimeRangeDisplay">Please choose a time slot card below</div>
                                         </div>
-                                        <div class="form-check form-switch mb-0">
-                                            <input class="form-check-input" type="checkbox" id="hideUnavailableSlotsToggle" onchange="renderTimeSlotCardsGrid()">
-                                            <label class="form-check-label small text-muted" for="hideUnavailableSlotsToggle">Hide booked/passed</label>
-                                        </div>
+                                        <div id="activeStaffBadgeSlotHeader" class="small fw-semibold text-muted"></div>
                                     </div>
+                                </div>
+                                <div id="staffAvailabilityBreakdownContainer" class="col-12 d-none">
+                                    <!-- Dynamic Per-Staff Multi-Service Availability Breakdown -->
                                 </div>
                                 <div class="col-12">
                                     <label class="form-label fw-semibold mb-1">
@@ -1653,7 +1653,6 @@
         if (!grid) return;
 
         const selectedDate = document.getElementById('appointmentDate') ? document.getElementById('appointmentDate').value : '';
-        const hideUnavailable = document.getElementById('hideUnavailableSlotsToggle') && document.getElementById('hideUnavailableSlotsToggle').checked;
         const totalDuration = getTotalBookingDurationMinutes();
         const currentSelected = document.getElementById('appointmentTimeSlot') ? document.getElementById('appointmentTimeSlot').value : '';
 
@@ -1690,19 +1689,30 @@
             };
         });
 
+        // 1. Render multi-staff breakdown & "Staff booked" mini-descriptions
+        renderStaffAvailabilityBreakdown(bookingState.lastAvailabilityResponse, rawSlots, processedSlots);
+
+        // 2. Automatically hide past & booked slots (no manual toggle needed)
+        const visibleSlots = processedSlots.filter(s => s.available);
+
         // If previously selected slot is no longer available, clear selection
         if (currentSelected) {
-            const foundSel = processedSlots.find(s => s.value === currentSelected);
-            if (!foundSel || !foundSel.available) {
+            const foundSel = visibleSlots.find(s => s.value === currentSelected);
+            if (!foundSel) {
                 document.getElementById('appointmentTimeSlot').value = '';
                 bookingState.selectedTimeSlot = null;
                 bookingState.selectedTimeRangeLabel = null;
             }
         }
 
-        const visibleSlots = hideUnavailable ? processedSlots.filter(s => s.available) : processedSlots;
         if (visibleSlots.length === 0) {
-            grid.innerHTML = '<div class="text-muted small py-3 text-center" style="grid-column: 1 / -1;">All remaining slots for this date are booked or have passed. Please choose another date or technician.</div>';
+            grid.innerHTML = `
+                <div class="alert alert-light border text-center py-4 rounded-4" style="grid-column: 1 / -1;">
+                    <i class="bi bi-calendar-x text-muted fs-3 d-block mb-2"></i>
+                    <div class="fw-bold text-dark">No Available Time Slots For This Date</div>
+                    <div class="small text-muted mt-1">All remaining slots for this technician/schedule are booked or have passed. Please choose another date or select "Anyone Available".</div>
+                </div>
+            `;
             updateSummaryTimeWindowDisplay();
             return;
         }
@@ -1712,27 +1722,166 @@
 
         visibleSlots.forEach(slot => {
             const card = document.createElement('div');
-            const isSel = slot.available && activeVal === slot.value;
-            card.className = `time-slot-card ${slot.available ? '' : 'disabled'} ${isSel ? 'selected' : ''}`.trim();
+            const isSel = activeVal === slot.value;
+            card.className = `time-slot-card ${isSel ? 'selected' : ''}`.trim();
             card.setAttribute('data-slot-value', slot.value);
-
-            const statusBadge = slot.available
-                ? `<span class="slot-status-tag text-success"><i class="bi bi-check-circle-fill me-1"></i>Open</span>`
-                : `<span class="slot-status-tag text-danger">${slot.reason === 'Passed' ? 'Passed' : 'Booked'}</span>`;
 
             card.innerHTML = `
                 <div class="slot-start">${slot.label}</div>
                 <div class="slot-range">${slot.timeRangeLabel}</div>
-                ${statusBadge}
+                <span class="slot-status-tag text-success"><i class="bi bi-check-circle-fill me-1"></i>Available</span>
             `;
 
-            if (slot.available) {
-                card.onclick = () => selectTimeSlotCard(slot.value, slot.timeRangeLabel);
-            }
+            card.onclick = () => selectTimeSlotCard(slot.value, slot.timeRangeLabel);
             grid.appendChild(card);
         });
 
         updateSummaryTimeWindowDisplay();
+    }
+
+    function renderStaffAvailabilityBreakdown(apiResponse, rawSlots, processedSlots) {
+        const container = document.getElementById('staffAvailabilityBreakdownContainer');
+        if (!container) return;
+
+        const guest0 = bookingState.guests && bookingState.guests[0];
+        const guest0Services = (guest0 && Array.isArray(guest0.services)) ? guest0.services : [];
+        const isMultiService = guest0Services.length >= 2;
+
+        // Collect assigned staff
+        const assignedStaffList = [];
+        if (isMultiService && guest0.serviceStaffAssignments) {
+            guest0Services.forEach(s => {
+                const staffId = guest0.serviceStaffAssignments[s.id];
+                if (staffId && staffId !== 'anyone') {
+                    const foundTech = (bookingState.staffList || []).find(t => String(t.id) === String(staffId));
+                    if (foundTech) {
+                        assignedStaffList.push({
+                            serviceId: s.id,
+                            serviceName: s.name,
+                            techId: foundTech.id,
+                            techName: foundTech.name || foundTech.username
+                        });
+                    }
+                }
+            });
+        }
+
+        const conflicts = (apiResponse && Array.isArray(apiResponse.staffConflicts)) ? apiResponse.staffConflicts : [];
+        const earliestSlot = (apiResponse && apiResponse.earliestAvailableSlot) ? apiResponse.earliestAvailableSlot : null;
+
+        // Populate staff badge in time header
+        const staffBadgeHeader = document.getElementById('activeStaffBadgeSlotHeader');
+        if (staffBadgeHeader) {
+            if (assignedStaffList.length >= 2) {
+                staffBadgeHeader.innerHTML = `<span class="badge bg-light text-dark border"><i class="bi bi-people-fill text-pink me-1"></i>${assignedStaffList.map(a => a.techName).join(' &amp; ')}</span>`;
+            } else if (guest0 && guest0.selectedStaff && !guest0.selectedStaff.isAnyoneAvailable) {
+                staffBadgeHeader.innerHTML = `<span class="badge bg-light text-dark border"><i class="bi bi-person-fill text-pink me-1"></i>${guest0.selectedStaff.name}</span>`;
+            } else {
+                staffBadgeHeader.innerHTML = `<span class="badge bg-light text-dark border"><i class="bi bi-lightning-charge-fill text-pink me-1"></i>Anyone Available</span>`;
+            }
+        }
+
+        // Cache staff booked status for Step 2 badges
+        if (!bookingState.staffBookedInfo) bookingState.staffBookedInfo = {};
+        conflicts.forEach(c => {
+            if (Array.isArray(c.breakdown)) {
+                c.breakdown.forEach(b => {
+                    if (b.techId && !b.available) {
+                        bookingState.staffBookedInfo[b.techId] = b.busyWindow || 'Booked';
+                    }
+                });
+            }
+        });
+
+        // 1. Multi-Service with 2+ Specific Staff Assigned
+        if (isMultiService && assignedStaffList.length >= 2) {
+            if (conflicts.length > 0) {
+                // Get representative conflict slot to show the breakdown
+                const repConflict = conflicts[0];
+                const breakdownItems = repConflict.breakdown || [];
+
+                let breakdownItemsHtml = '';
+                breakdownItems.forEach(b => {
+                    const isAvail = Boolean(b.available);
+                    const sName = b.serviceName || 'Service';
+                    const tName = b.techName || 'Specialist';
+                    if (!isAvail) {
+                        breakdownItemsHtml += `
+                            <div class="p-2 px-3 rounded-3 bg-danger-subtle border border-danger-subtle d-flex flex-wrap align-items-center justify-content-between gap-2 small">
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="badge bg-danger text-white"><i class="bi bi-x-circle-fill me-1"></i>Staff Booked</span>
+                                    <span class="text-dark"><strong>${sName} — ${tName}:</strong> Booked ${b.busyWindow || ''}</span>
+                                </div>
+                                <span class="badge bg-success text-white"><i class="bi bi-clock-history me-1"></i>Next available: ${b.nextAvailable || 'Later'}</span>
+                            </div>
+                        `;
+                    } else {
+                        breakdownItemsHtml += `
+                            <div class="p-2 px-3 rounded-3 bg-success-subtle border border-success-subtle d-flex flex-wrap align-items-center justify-content-between gap-2 small">
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="badge bg-success text-white"><i class="bi bi-check-circle-fill me-1"></i>Available</span>
+                                    <span class="text-dark"><strong>${sName} — ${tName}:</strong> ${b.message || 'Available'}</span>
+                                </div>
+                                <span class="text-muted small">Open</span>
+                            </div>
+                        `;
+                    }
+                });
+
+                const earliestWindowLabel = earliestSlot ? (earliestSlot.timeRangeLabel || earliestSlot.label) : null;
+
+                container.innerHTML = `
+                    <div class="card border rounded-4 p-3 shadow-sm bg-white mb-3">
+                        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2 pb-2 border-bottom">
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="badge bg-pink text-white rounded-pill px-2 py-1"><i class="bi bi-people-fill me-1"></i>Specific Staff Schedule</span>
+                                <span class="small fw-bold text-dark">Individual Specialist Availability Breakdown</span>
+                            </div>
+                            ${earliestWindowLabel ? `<span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-1 fw-semibold"><i class="bi bi-check2-circle me-1"></i>Earliest Both Free: ${earliestWindowLabel}</span>` : ''}
+                        </div>
+                        <div class="small text-muted mb-2">
+                            Because you chose specific specialists per service, booking slots automatically align to when <strong>both specialists are sequentially free</strong>:
+                        </div>
+                        <div class="d-flex flex-column gap-2">
+                            ${breakdownItemsHtml}
+                        </div>
+                    </div>
+                `;
+                container.classList.remove('d-none');
+                return;
+            } else {
+                container.innerHTML = '';
+                container.classList.add('d-none');
+                return;
+            }
+        }
+
+        // 2. Single Service / Single Staff Assigned
+        const singleStaff = (guest0 && guest0.selectedStaff && !guest0.selectedStaff.isAnyoneAvailable) ? guest0.selectedStaff : null;
+        if (singleStaff || assignedStaffList.length === 1) {
+            const techName = singleStaff ? singleStaff.name : assignedStaffList[0].techName;
+            if (conflicts.length > 0) {
+                const rep = conflicts[0];
+                const busyDesc = rep.staffBookedDesc || (techName + ' is booked');
+                const b0 = (rep.breakdown && rep.breakdown[0]) ? rep.breakdown[0] : null;
+                const nextAvail = b0 ? b0.nextAvailable : null;
+
+                container.innerHTML = `
+                    <div class="alert alert-light border border-secondary-subtle py-2 px-3 rounded-3 mb-3 d-flex flex-wrap align-items-center justify-content-between gap-2 small">
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="badge bg-warning text-dark fw-bold"><i class="bi bi-person-x-fill me-1"></i>Staff Booked</span>
+                            <span class="text-dark"><strong>${busyDesc}</strong></span>
+                        </div>
+                        ${nextAvail ? `<span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1 fw-semibold"><i class="bi bi-clock-history me-1"></i>Next open slot: ${nextAvail}</span>` : ''}
+                    </div>
+                `;
+                container.classList.remove('d-none');
+                return;
+            }
+        }
+
+        container.innerHTML = '';
+        container.classList.add('d-none');
     }
 
     async function handleDateChange(selectedDate) {
@@ -1832,6 +1981,7 @@
                     return;
                 }
 
+                bookingState.lastAvailabilityResponse = data;
                 bookingState.availableSlotsCache = data.availableSlots || [];
                 renderTimeSlotCardsGrid();
                 return;
@@ -2364,6 +2514,27 @@
             const techs = response.ok ? await response.json() : [];
             bookingState.staffList = techs;
 
+            // Pre-fetch today's schedule conflicts if not cached
+            if (!bookingState.staffBookedInfo) {
+                try {
+                    const todayStr = getLocalTodayDateStr();
+                    const preResp = await fetch(`/api/appointments/available-slots?date=${todayStr}&durationMinutes=45`, {
+                        headers: getActiveTenantHeaders()
+                    });
+                    if (preResp.ok) {
+                        const preData = await preResp.json();
+                        bookingState.staffBookedInfo = {};
+                        (preData.staffConflicts || []).forEach(c => {
+                            (c.breakdown || []).forEach(b => {
+                                if (b.techId && !b.available) {
+                                    bookingState.staffBookedInfo[b.techId] = b.busyWindow || 'Booked';
+                                }
+                            });
+                        });
+                    }
+                } catch (ignored) {}
+            }
+
             renderStaffSelectionUI(currentGuest);
 
             // Update next buttons and labels
@@ -2433,6 +2604,10 @@
             // 2. Qualified staff cards
             qualifiedTechs.forEach(tech => {
                 const isSel = (assignedTechId === tech.id);
+                const isBooked = bookingState.staffBookedInfo && bookingState.staffBookedInfo[tech.id];
+                const bookedBadge = isBooked
+                    ? `<span class="badge bg-warning-subtle text-dark border border-warning-subtle ms-2 small"><i class="bi bi-clock-history me-1"></i>Staff booked</span>`
+                    : '';
                 const col = document.createElement('div');
                 col.className = 'col-md-6';
                 col.innerHTML = `
@@ -2442,7 +2617,7 @@
                         <div class="d-flex align-items-center gap-3">
                             <div class="staff-avatar"><i class="bi bi-person-fill"></i></div>
                             <div>
-                                <h5 class="fw-bold text-dark mb-0">${tech.name || tech.username}</h5>
+                                <h5 class="fw-bold text-dark mb-0 d-flex align-items-center flex-wrap">${tech.name || tech.username} ${bookedBadge}</h5>
                                 <small class="text-muted">${getStaffPronouns(tech)}</small>
                             </div>
                         </div>
@@ -2504,6 +2679,10 @@
                 // 2. Qualified staff cards for this specific service
                 qualifiedTechs.forEach(tech => {
                     const isTechAssigned = (assignedVal === tech.id);
+                    const isBooked = bookingState.staffBookedInfo && bookingState.staffBookedInfo[tech.id];
+                    const bookedBadge = isBooked
+                        ? `<span class="badge bg-warning-subtle text-dark border border-warning-subtle ms-2 small"><i class="bi bi-clock-history me-1"></i>Staff booked</span>`
+                        : '';
                     staffCardsHtml += `
                         <div class="col-md-6">
                             <div class="staff-card d-flex align-items-center justify-content-between ${isTechAssigned ? 'selected' : ''}"
@@ -2512,7 +2691,7 @@
                                 <div class="d-flex align-items-center gap-3">
                                     <div class="staff-avatar"><i class="bi bi-person-fill"></i></div>
                                     <div>
-                                        <h5 class="fw-bold text-dark mb-0">${tech.name || tech.username}</h5>
+                                        <h5 class="fw-bold text-dark mb-0 d-flex align-items-center flex-wrap">${tech.name || tech.username} ${bookedBadge}</h5>
                                         <small class="text-muted">${getStaffPronouns(tech)}</small>
                                     </div>
                                 </div>

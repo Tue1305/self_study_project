@@ -360,4 +360,71 @@ class AppointmentBookingFlowTest {
                 .andExpect(jsonPath("$.availableSlots[?(@.value == '13:30:00')].available").value(false))
                 .andExpect(jsonPath("$.availableSlots[?(@.value == '14:15:00')].available").value(true));
     }
+
+    @Test
+    void testMultiStaffAvailabilityBreakdownAndEarliestWindowAlignment() throws Exception {
+        // Service 1: Pedicure (60m) assigned to Staff A (techId=10, Tony)
+        // Service 2: Manicure (30m) assigned to Staff B (techId=20, Chloe)
+        // Tony is booked 15:00 to 16:00 (+15m turnover buffer -> 16:15)
+        // Chloe is completely free at 15:00 and afternoon
+        UserEntity tony = new UserEntity();
+        tony.setId(10L);
+        tony.setName("Tony");
+        tony.setTenantId("default");
+
+        UserEntity chloe = new UserEntity();
+        chloe.setId(20L);
+        chloe.setName("Chloe");
+        chloe.setTenantId("default");
+
+        ServiceEntity pediSvc = new ServiceEntity("default", "Pedicure Deluxe", "Pedi", new BigDecimal("55.00"), 60);
+        pediSvc.setId(101L);
+
+        ServiceEntity maniSvc = new ServiceEntity("default", "Express Manicure", "Mani", new BigDecimal("30.00"), 30);
+        maniSvc.setId(102L);
+
+        Appointment tonyAppt = new Appointment();
+        tonyAppt.setId(701L);
+        tonyAppt.setTenantId("default");
+        tonyAppt.setNailTech(tony);
+        tonyAppt.setService(pediSvc);
+        tonyAppt.setAppointmentTime(LocalDateTime.of(2026, 11, 20, 15, 0));
+        tonyAppt.setStatus(Appointment.AppointmentStatus.CONFIRMED);
+
+        when(userRepository.findByTenantIdAndId("default", 10L)).thenReturn(Optional.of(tony));
+        when(userRepository.findByTenantIdAndId("default", 20L)).thenReturn(Optional.of(chloe));
+        when(serviceRepository.findByTenantIdAndId("default", 101L)).thenReturn(Optional.of(pediSvc));
+        when(serviceRepository.findByTenantIdAndId("default", 102L)).thenReturn(Optional.of(maniSvc));
+        when(appointmentRepository.findByTenantIdAndAppointmentTimeBetween(
+                eq("default"), any(LocalDateTime.class), any(LocalDateTime.class)
+        )).thenReturn(List.of(tonyAppt));
+
+        mockMvc.perform(get("/api/appointments/available-slots")
+                        .header("X-Tenant-ID", "default")
+                        .param("date", "2026-11-20")
+                        .param("durationMinutes", "90")
+                        .param("bufferMinutes", "15")
+                        .param("serviceIds", "101,102")
+                        .param("serviceDurations", "60,30")
+                        .param("serviceTechIds", "10,20"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.isClosed").value(false))
+                // 3:00 PM candidate slot is NOT available because Tony is booked 3:00 - 4:15
+                .andExpect(jsonPath("$.availableSlots[?(@.value == '15:00:00')].available").value(false))
+                .andExpect(jsonPath("$.availableSlots[?(@.value == '15:00:00')].staffBookedDesc").value("Tony booked 3:00 PM – 4:15 PM"))
+                // Segment 0 (Tony, Pedicure) is booked with next available at 4:15 PM
+                .andExpect(jsonPath("$.availableSlots[?(@.value == '15:00:00')].staffBreakdown[0].techName").value("Tony"))
+                .andExpect(jsonPath("$.availableSlots[?(@.value == '15:00:00')].staffBreakdown[0].available").value(false))
+                .andExpect(jsonPath("$.availableSlots[?(@.value == '15:00:00')].staffBreakdown[0].busyWindow").value("3:00 PM – 4:15 PM"))
+                .andExpect(jsonPath("$.availableSlots[?(@.value == '15:00:00')].staffBreakdown[0].nextAvailable").value("4:15 PM"))
+                // Segment 1 (Chloe, Manicure) is available
+                .andExpect(jsonPath("$.availableSlots[?(@.value == '15:00:00')].staffBreakdown[1].techName").value("Chloe"))
+                .andExpect(jsonPath("$.availableSlots[?(@.value == '15:00:00')].staffBreakdown[1].available").value(true))
+                // 4:15 PM slot is the earliest open slot where BOTH are free
+                .andExpect(jsonPath("$.availableSlots[?(@.value == '16:15:00')].available").value(true))
+                .andExpect(jsonPath("$.availableSlots[?(@.value == '16:15:00')].timeRangeLabel").value("4:15 PM – 5:45 PM"))
+                .andExpect(jsonPath("$.availableSlots[?(@.value == '16:15:00')].staffBreakdown[0].available").value(true))
+                .andExpect(jsonPath("$.availableSlots[?(@.value == '16:15:00')].staffBreakdown[1].available").value(true))
+                .andExpect(jsonPath("$.staffConflicts[0].staffBookedDesc").value("Tony booked 3:00 PM – 4:15 PM"));
+    }
 }

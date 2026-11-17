@@ -808,6 +808,45 @@
         const [rescheduleData, setRescheduleData] = useState({ date: '', time: '10:00', techId: '', saving: false, error: null });
         const [now, setNow] = useState(() => new Date());
 
+        const [editNotesText, setEditNotesText] = useState('');
+        const [savingNotes, setSavingNotes] = useState(false);
+        const [notesSaveSuccess, setNotesSaveSuccess] = useState(false);
+        const [remindingAptId, setRemindingAptId] = useState(null);
+        const [customerPastVisits, setCustomerPastVisits] = useState([]);
+        const [loadingPastVisits, setLoadingPastVisits] = useState(false);
+
+        useEffect(() => {
+            if (selectedAppointment) {
+                setEditNotesText(selectedAppointment.notes || '');
+                setNotesSaveSuccess(false);
+                if (selectedAppointment.customerEmail) {
+                    setLoadingPastVisits(true);
+                    fetch(`/api/appointments/customer-history?email=${encodeURIComponent(selectedAppointment.customerEmail.trim())}`, {
+                        headers: {
+                            'X-Tenant-ID': activeTenant,
+                            ...(token ? { 'Authorization': 'Bearer ' + token } : {})
+                        }
+                    })
+                    .then(res => res.ok ? res.json() : null)
+                    .then(data => {
+                        if (data && Array.isArray(data.appointments)) {
+                            const past = data.appointments.filter(a => a.id !== selectedAppointment.id);
+                            setCustomerPastVisits(past);
+                        } else {
+                            setCustomerPastVisits([]);
+                        }
+                    })
+                    .catch(() => setCustomerPastVisits([]))
+                    .finally(() => setLoadingPastVisits(false));
+                } else {
+                    setCustomerPastVisits([]);
+                }
+            } else {
+                setCustomerPastVisits([]);
+                setEditNotesText('');
+            }
+        }, [selectedAppointment ? selectedAppointment.id : null]);
+
         const [walkInModal, setWalkInModal] = useState({
             isOpen: false,
             techId: null,
@@ -956,7 +995,7 @@
                     headers: {
                         'Content-Type': 'application/json',
                         'X-Tenant-ID': activeTenant,
-                        'Authorization': 'Bearer ' + token
+                        ...(token ? { 'Authorization': 'Bearer ' + token } : {})
                     },
                     body: JSON.stringify(payload)
                 });
@@ -997,7 +1036,7 @@
                     headers: {
                         'Content-Type': 'application/json',
                         'X-Tenant-ID': activeTenant,
-                        'Authorization': 'Bearer ' + token
+                        ...(token ? { 'Authorization': 'Bearer ' + token } : {})
                     },
                     body: JSON.stringify({
                         techId: targetTechId,
@@ -1165,27 +1204,106 @@
         };
 
         const handleUpdateStatus = async (aptId, newStatus, reason = '') => {
+            let effectiveReason = reason || statusReason;
+            if (newStatus === 'CANCELLED' && (!effectiveReason || !effectiveReason.trim())) {
+                const promptReason = prompt('Please enter the cancellation reason (e.g. Client called to cancel, Emergency, Weather, Late cancel):', 'Client requested');
+                if (promptReason === null) return; // Admin cancelled prompt
+                effectiveReason = promptReason.trim() || 'Client requested';
+            } else if (newStatus === 'NO_SHOW' && (!effectiveReason || !effectiveReason.trim())) {
+                effectiveReason = 'Customer did not show up';
+            }
+
             const url = `/api/appointments/${aptId}/status?status=${encodeURIComponent(newStatus)}${
-                reason ? `&reason=${encodeURIComponent(reason)}` : ''
+                effectiveReason ? `&reason=${encodeURIComponent(effectiveReason)}` : ''
             }&notifyCustomer=${notifyCustomer}`;
             try {
                 const res = await fetch(url, {
                     method: 'PATCH',
                     headers: {
                         'X-Tenant-ID': activeTenant,
-                        'Authorization': 'Bearer ' + token
+                        ...(token ? { 'Authorization': 'Bearer ' + token } : {})
                     }
                 });
+                const data = await res.json().catch(() => ({}));
                 if (res.ok) {
+                    if (data.appointment) {
+                        setAppointments(prev => prev.map(a => a.id === aptId ? data.appointment : a));
+                    }
                     setSelectedAppointment(null);
                     setStatusReason('');
                     setRescheduleBoxOpen(false);
-                    fetchScheduleData(true);
+                    setDragToast({
+                        type: 'success',
+                        message: data.message || `Status updated to ${newStatus} successfully.`
+                    });
+                    await fetchScheduleData(true);
                 } else {
-                    alert('Failed to update appointment status.');
+                    alert(data.message || 'Failed to update appointment status.');
                 }
             } catch (err) {
                 console.error('Error updating status:', err);
+                alert('Error updating status: ' + (err.message || 'Network error'));
+            }
+        };
+
+        const handleSendReminder = async (apt) => {
+            if (!apt) return;
+            setRemindingAptId(apt.id);
+            try {
+                const res = await fetch(`/api/appointments/${apt.id}/remind`, {
+                    method: 'POST',
+                    headers: {
+                        'X-Tenant-ID': activeTenant,
+                        ...(token ? { 'Authorization': 'Bearer ' + token } : {})
+                    }
+                });
+                const data = await res.json().catch(() => ({}));
+                if (res.ok && data.success !== false) {
+                    const sentAt = data.reminderSentAt || new Date().toISOString();
+                    if (selectedAppointment && selectedAppointment.id === apt.id) {
+                        setSelectedAppointment(prev => ({ ...prev, reminderSentAt: sentAt }));
+                    }
+                    setAppointments(prev => prev.map(a => a.id === apt.id ? { ...a, reminderSentAt: sentAt } : a));
+                    setDragToast({ type: 'success', message: `🔔 ${data.message || 'Reminder sent to customer!'}` });
+                } else {
+                    alert(data.message || 'Failed to send reminder.');
+                }
+            } catch (err) {
+                console.error('Error sending reminder:', err);
+                alert('Error sending reminder: ' + (err.message || 'Network error'));
+            } finally {
+                setRemindingAptId(null);
+            }
+        };
+
+        const handleSaveNotes = async () => {
+            if (!selectedAppointment) return;
+            setSavingNotes(true);
+            try {
+                const res = await fetch(`/api/appointments/${selectedAppointment.id}/notes`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Tenant-ID': activeTenant,
+                        ...(token ? { 'Authorization': 'Bearer ' + token } : {})
+                    },
+                    body: JSON.stringify({ notes: editNotesText })
+                });
+                const data = await res.json().catch(() => ({}));
+                if (res.ok) {
+                    const savedNotes = (data.appointment && data.appointment.notes !== undefined) ? data.appointment.notes : editNotesText;
+                    setSelectedAppointment(prev => ({ ...prev, notes: savedNotes }));
+                    setAppointments(prev => prev.map(a => a.id === selectedAppointment.id ? { ...a, notes: savedNotes } : a));
+                    setNotesSaveSuccess(true);
+                    setTimeout(() => setNotesSaveSuccess(false), 3000);
+                } else {
+                    alert(data.message || 'Failed to save notes.');
+                }
+            } catch (err) {
+                console.error('Error saving notes:', err);
+                alert('Error saving notes: ' + (err.message || 'Network error'));
+            } finally {
+                setSavingNotes(false);
             }
         };
 
@@ -1206,7 +1324,7 @@
                 const res = await fetch(url, {
                     headers: {
                         'X-Tenant-ID': activeTenant,
-                        'Authorization': 'Bearer ' + token
+                        ...(token ? { 'Authorization': 'Bearer ' + token } : {})
                     }
                 });
                 if (!res.ok) {
@@ -1251,7 +1369,7 @@
                     headers: {
                         'Content-Type': 'application/json',
                         'X-Tenant-ID': activeTenant,
-                        'Authorization': 'Bearer ' + token
+                        ...(token ? { 'Authorization': 'Bearer ' + token } : {})
                     },
                     body: JSON.stringify(payload)
                 });
@@ -1867,8 +1985,82 @@
                                     h('span', { className: 'small text-muted ms-2' }, `(Tech next free at ${freeStr} w/ ${TURNOVER_BUFFER_MINUTES}m buffer)`)
                                 );
                             })(),
-                            selectedAppointment.notes && h('p', { className: 'mb-2' }, h('strong', null, 'Notes: '), selectedAppointment.notes),
-                            h('p', { className: 'mb-3' }, h('strong', null, 'Status: '), h('span', { className: 'badge bg-secondary' }, selectedAppointment.status || 'PENDING')),
+                            /* Status & Remind Action Bar */
+                            h('div', { className: 'd-flex justify-content-between align-items-center mb-3 bg-light p-2 rounded-3 border flex-wrap gap-2' },
+                                h('div', { className: 'd-flex align-items-center gap-2' },
+                                    h('strong', { className: 'small text-secondary' }, 'Status:'),
+                                    h('span', { className: `badge ${selectedAppointment.status === 'CONFIRMED' ? 'bg-success' : selectedAppointment.status === 'COMPLETED' ? 'bg-primary' : selectedAppointment.status === 'CANCELLED' ? 'bg-danger' : selectedAppointment.status === 'NO_SHOW' ? 'bg-warning text-dark' : 'bg-secondary'}` }, selectedAppointment.status || 'PENDING')
+                                ),
+                                h('div', { className: 'd-flex align-items-center gap-2' },
+                                    selectedAppointment.reminderSentAt && h('span', { className: 'small text-muted', style: { fontSize: '0.74rem' } }, `Reminder sent: ${new Date(selectedAppointment.reminderSentAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`),
+                                    h('button', {
+                                        type: 'button',
+                                        className: 'btn btn-sm btn-outline-primary fw-semibold rounded-pill px-3 py-1 d-inline-flex align-items-center gap-1',
+                                        style: { fontSize: '0.78rem' },
+                                        disabled: remindingAptId === selectedAppointment.id || selectedAppointment.status === 'CANCELLED',
+                                        onClick: () => handleSendReminder(selectedAppointment)
+                                    }, remindingAptId === selectedAppointment.id ? 'Sending...' : [h('i', { className: 'bi bi-bell-fill text-warning' }), ' Remind Customer'])
+                                )
+                            ),
+
+                            /* Past Services Done by Customer */
+                            h('div', { className: 'mb-3 bg-light rounded-3 p-3 border' },
+                                h('div', { className: 'd-flex justify-content-between align-items-center mb-2' },
+                                    h('strong', { className: 'small text-dark d-flex align-items-center gap-1' }, [
+                                        h('i', { className: 'bi bi-clock-history text-pink' }),
+                                        'Past Services Done by Customer:'
+                                    ]),
+                                    h('span', { className: 'badge bg-white text-secondary border' },
+                                        loadingPastVisits ? 'Loading...' : `${customerPastVisits.length} prior visit${customerPastVisits.length === 1 ? '' : 's'}`
+                                    )
+                                ),
+                                loadingPastVisits ? h('div', { className: 'text-muted small py-1 text-center' }, 'Fetching customer visit history...') :
+                                (customerPastVisits.length === 0 ?
+                                    h('div', { className: 'text-muted small fst-italic' }, 'First-time client (No prior visit history recorded).') :
+                                    h('div', { className: 'd-flex flex-column gap-2', style: { maxHeight: '160px', overflowY: 'auto' } },
+                                        customerPastVisits.slice(0, 5).map(pv => {
+                                            const pvDate = pv.appointmentTime ? new Date(pv.appointmentTime).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : 'Past date';
+                                            const pvTech = pv.technicianName || (pv.nailTech ? (pv.nailTech.name || pv.nailTech.username) : 'Staff');
+                                            const pvSrv = pv.serviceName || (pv.service ? pv.service.name : 'Nail Service');
+                                            const pvStatus = pv.status || 'CONFIRMED';
+                                            return h('div', { key: pv.id, className: 'd-flex justify-content-between align-items-center bg-white p-2 rounded border small' },
+                                                h('div', null,
+                                                    h('div', { className: 'fw-bold text-dark' }, pvSrv),
+                                                    h('div', { className: 'text-muted', style: { fontSize: '0.75rem' } }, `${pvDate} with ${pvTech}`)
+                                                ),
+                                                h('span', { className: `badge ${pvStatus === 'CONFIRMED' ? 'bg-success' : pvStatus === 'COMPLETED' ? 'bg-primary' : pvStatus === 'CANCELLED' ? 'bg-danger' : pvStatus === 'NO_SHOW' ? 'bg-warning text-dark' : 'bg-secondary'}` }, pvStatus)
+                                            );
+                                        })
+                                    )
+                                )
+                            ),
+
+                            /* Admin Editable Notes Section */
+                            h('div', { className: 'mb-3 bg-light rounded-3 p-3 border' },
+                                h('div', { className: 'd-flex justify-content-between align-items-center mb-1' },
+                                    h('label', { className: 'form-label small fw-bold text-dark mb-0 d-flex align-items-center gap-1' }, [
+                                        h('i', { className: 'bi bi-pencil-square text-pink' }),
+                                        'Appointment & Client Notes (Admin Editable):'
+                                    ]),
+                                    notesSaveSuccess && h('span', { className: 'badge bg-success-subtle text-success border border-success-subtle' }, '✅ Saved!')
+                                ),
+                                h('textarea', {
+                                    className: 'form-control form-control-sm mt-1',
+                                    rows: 3,
+                                    placeholder: 'Type client preferences, service remarks, or special requests...',
+                                    value: editNotesText,
+                                    onChange: (e) => setEditNotesText(e.target.value)
+                                }),
+                                h('div', { className: 'd-flex justify-content-between align-items-center mt-2' },
+                                    h('span', { className: 'small text-muted', style: { fontSize: '0.75rem' } }, 'Edits are logged into customer audit history.'),
+                                    h('button', {
+                                        type: 'button',
+                                        className: 'btn btn-pink btn-sm px-3 fw-bold',
+                                        disabled: savingNotes,
+                                        onClick: handleSaveNotes
+                                    }, savingNotes ? 'Saving...' : '💾 Save Notes')
+                                )
+                            ),
 
                             /* Reschedule / Move Slot Accordion */
                             h('div', { className: 'mb-3' },
@@ -1977,17 +2169,20 @@
                         h('div', { className: 'modal-footer d-flex justify-content-between' },
                             h('div', { className: 'd-flex gap-2 flex-wrap' },
                                 h('button', {
-                                    className: 'btn btn-sm btn-outline-success fw-semibold',
+                                    type: 'button',
+                                    className: 'btn btn-sm btn-success fw-bold px-3 d-inline-flex align-items-center gap-1',
                                     onClick: () => handleUpdateStatus(selectedAppointment.id, 'CONFIRMED')
-                                }, 'Confirm'),
+                                }, [h('i', { className: 'bi bi-check2-circle' }), ' Confirm (Customer Arrived)']),
                                 h('button', {
-                                    className: 'btn btn-sm btn-outline-danger fw-semibold',
+                                    type: 'button',
+                                    className: 'btn btn-sm btn-outline-danger fw-semibold px-3 d-inline-flex align-items-center gap-1',
                                     onClick: () => handleUpdateStatus(selectedAppointment.id, 'CANCELLED', statusReason)
-                                }, 'Cancel'),
+                                }, [h('i', { className: 'bi bi-x-circle' }), ' Cancel']),
                                 h('button', {
-                                    className: 'btn btn-sm btn-outline-warning text-dark fw-semibold',
+                                    type: 'button',
+                                    className: 'btn btn-sm btn-outline-warning text-dark fw-semibold px-3 d-inline-flex align-items-center gap-1',
                                     onClick: () => handleUpdateStatus(selectedAppointment.id, 'NO_SHOW', statusReason)
-                                }, 'Mark No-Show')
+                                }, [h('i', { className: 'bi bi-person-x' }), ' Mark No-Show'])
                             ),
                             h('button', {
                                 type: 'button',

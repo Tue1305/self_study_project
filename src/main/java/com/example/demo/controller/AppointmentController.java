@@ -93,7 +93,98 @@ public class AppointmentController {
     @GetMapping
     public List<Appointment> getAllAppointments(HttpServletRequest request) {
         String tenantId = tenantContextResolver.resolveTenantId(request);
+        try {
+            autoMarkNoShowAppointments(tenantId);
+        } catch (Exception e) {
+            // Log but don't prevent appointments fetch
+        }
         return appointmentRepository.findAllByTenantId(tenantId);
+    }
+
+    /**
+     * Automatically scans for any PENDING appointments past their scheduled time by 15+ minutes
+     * and marks them as NO_SHOW, logging into customer history.
+     */
+    @Transactional
+    public List<Appointment> autoMarkNoShowAppointments(String tenantId) {
+        LocalDateTime cutoff = LocalDateTime.now().minusMinutes(15);
+        List<Appointment> candidateList = (tenantId != null && !tenantId.isBlank() && !"all".equalsIgnoreCase(tenantId))
+                ? appointmentRepository.findAllByTenantId(tenantId)
+                : appointmentRepository.findAll();
+
+        List<Appointment> autoMarked = new ArrayList<>();
+        for (Appointment apt : candidateList) {
+            if (apt.getAppointmentTime() != null &&
+                apt.getAppointmentTime().isBefore(cutoff) &&
+                apt.getStatus() == Appointment.AppointmentStatus.PENDING) {
+
+                apt.setStatus(Appointment.AppointmentStatus.NO_SHOW);
+                String existingNotes = apt.getNotes() != null ? apt.getNotes().trim() : "";
+                String noShowTag = "[Auto NO_SHOW: 15+ minutes past scheduled time without arrival]";
+                apt.setNotes(existingNotes.isEmpty() ? noShowTag : existingNotes + " | " + noShowTag);
+                Appointment saved = appointmentRepository.save(apt);
+                autoMarked.add(saved);
+
+                if (auditService != null) {
+                    Customer customer = null;
+                    if (apt.getCustomerEmail() != null && !apt.getCustomerEmail().isBlank()) {
+                        customer = customerRepository.findByTenantIdAndEmail(apt.getTenantId(), apt.getCustomerEmail().trim()).orElse(null);
+                    }
+                    String serviceName = (apt.getService() != null && apt.getService().getName() != null)
+                            ? apt.getService().getName() : "Nail Service";
+                    String staffName = (apt.getNailTech() != null)
+                            ? (apt.getNailTech().getName() != null ? apt.getNailTech().getName() : apt.getNailTech().getUsername())
+                            : "Anyone Available";
+
+                    auditService.logActivity(
+                            apt.getTenantId(),
+                            customer != null ? customer.getId() : null,
+                            saved.getId(),
+                            saved.getCustomerName(),
+                            saved.getCustomerEmail(),
+                            saved.getCustomerPhone(),
+                            "NO_SHOW",
+                            "SYSTEM: AUTO_NO_SHOW",
+                            "Automatically marked NO_SHOW: 15+ minutes passed since " + apt.getAppointmentTime() +
+                                    " for " + serviceName + " with " + staffName
+                    );
+                }
+            }
+        }
+        return autoMarked;
+    }
+
+    @PostMapping("/auto-no-show")
+    public ResponseEntity<?> runAutoNoShowScan(HttpServletRequest request) {
+        String tenantId = tenantContextResolver.resolveTenantId(request);
+        List<Appointment> updated = autoMarkNoShowAppointments(tenantId);
+        return ResponseEntity.ok(Map.of(
+                "message", "Auto-scan for 15+ minute overdue appointments completed.",
+                "markedCount", updated.size(),
+                "appointments", updated
+        ));
+    }
+
+    @GetMapping("/customer-history")
+    public ResponseEntity<?> getCustomerAppointmentHistory(
+            @RequestParam String email,
+            HttpServletRequest request
+    ) {
+        String tenantId = tenantContextResolver.resolveTenantId(request);
+        if (email == null || email.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Email parameter is required."));
+        }
+        if (auditService != null) {
+            Map<String, Object> history = auditService.getCustomerHistoryByEmail(tenantId, email.trim());
+            if (history != null) {
+                return ResponseEntity.ok(history);
+            }
+        }
+        return ResponseEntity.ok(Map.of(
+                "appointments", List.of(),
+                "activityLogs", List.of(),
+                "reliability", Map.of("totalBooked", 0, "totalConfirmed", 0, "totalCompleted", 0, "totalCancelled", 0, "totalNoShows", 0)
+        ));
     }
 
     /**
@@ -947,6 +1038,7 @@ public class AppointmentController {
             Map<String, Object> responseBody = new LinkedHashMap<>();
             Appointment primary = savedAppointments.isEmpty() ? null : savedAppointments.get(0);
             responseBody.put("id", primary != null ? primary.getId() : null);
+            responseBody.put("cancellationToken", primary != null ? primary.getCancellationToken() : null);
             responseBody.put("tenantId", tenantId);
             responseBody.put("appointmentTime", bookingRequest.getAppointmentTime());
             responseBody.put("estimatedEndTime", estimatedEndTime.toString());
@@ -1167,59 +1259,183 @@ public class AppointmentController {
         final String finalReason = effectiveReason != null ? effectiveReason.trim() : null;
         final boolean finalShouldNotify = shouldNotify;
 
-        return appointmentRepository.findByTenantIdAndId(tenantId, id)
-                .map(appointment -> {
-                    try {
-                        Appointment.AppointmentStatus newStatus = Appointment.AppointmentStatus.valueOf(finalStatus.toUpperCase());
-                        appointment.setStatus(newStatus);
-                        if (finalReason != null && !finalReason.isBlank()) {
-                            String existingNotes = appointment.getNotes() != null ? appointment.getNotes().trim() : "";
-                            String reasonTag = "[" + newStatus.name() + " Reason: " + finalReason + "]";
-                            appointment.setNotes(existingNotes.isEmpty() ? reasonTag : existingNotes + " | " + reasonTag);
-                        }
-                        Appointment updated = appointmentRepository.save(appointment);
+        Optional<Appointment> apptOpt = appointmentRepository.findByTenantIdAndId(tenantId, id);
+        if (apptOpt.isEmpty()) {
+            apptOpt = appointmentRepository.findById(id);
+        }
 
-                        // Look up customer record to link customer_id
-                        Customer customer = null;
-                        if (appointment.getCustomerEmail() != null && !appointment.getCustomerEmail().isBlank()) {
-                            customer = customerRepository.findByTenantIdAndEmail(tenantId, appointment.getCustomerEmail().trim()).orElse(null);
-                        }
+        if (apptOpt.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", "Appointment not found for ID: " + id));
+        }
 
-                        if (auditService != null) {
-                            String performedBy = auditService.resolvePerformedBy("ADMIN");
-                            auditService.logActivity(
-                                    tenantId,
-                                    customer != null ? customer.getId() : null,
-                                    updated.getId(),
-                                    updated.getCustomerName(),
-                                    updated.getCustomerEmail(),
-                                    updated.getCustomerPhone(),
-                                    newStatus.name(),
-                                    performedBy,
-                                    finalReason != null ? finalReason : ("Status changed to " + newStatus.name())
-                            );
-                        }
+        Appointment appointment = apptOpt.get();
+        try {
+            Appointment.AppointmentStatus newStatus = Appointment.AppointmentStatus.valueOf(finalStatus.toUpperCase());
+            appointment.setStatus(newStatus);
 
-                        if (finalShouldNotify && notificationService != null) {
-                            try {
-                                if (newStatus == Appointment.AppointmentStatus.CANCELLED) {
-                                    notificationService.sendCancellationNotice(updated, finalReason);
-                                }
-                            } catch (Exception ignored) {
-                            }
-                        }
+            String serviceName = (appointment.getService() != null && appointment.getService().getName() != null)
+                    ? appointment.getService().getName() : "Nail Service";
+            String staffName = (appointment.getNailTech() != null)
+                    ? (appointment.getNailTech().getName() != null ? appointment.getNailTech().getName() : appointment.getNailTech().getUsername())
+                    : "Anyone Available";
 
-                        return ResponseEntity.ok(Map.of(
-                                "message", "Appointment status updated successfully",
-                                "status", newStatus.name(),
-                                "appointment", updated
-                        ));
-                    } catch (IllegalArgumentException e) {
-                        return ResponseEntity.badRequest().body(Map.of("message", "Invalid status value provided: " + finalStatus));
+            String auditDescription;
+            String noteTag;
+
+            if (newStatus == Appointment.AppointmentStatus.CONFIRMED) {
+                auditDescription = "Customer arrived & confirmed for " + serviceName + " with " + staffName +
+                        (finalReason != null && !finalReason.isBlank() ? " | " + finalReason : "");
+                noteTag = "[CONFIRMED: Customer arrived for " + serviceName + " with " + staffName +
+                        (finalReason != null && !finalReason.isBlank() ? " | " + finalReason : "") + "]";
+            } else if (newStatus == Appointment.AppointmentStatus.CANCELLED) {
+                String why = (finalReason != null && !finalReason.isBlank()) ? finalReason : "Cancelled by salon administrator";
+                auditDescription = "Cancelled: " + why;
+                noteTag = "[CANCELLED Reason: " + why + "]";
+            } else if (newStatus == Appointment.AppointmentStatus.NO_SHOW) {
+                String why = (finalReason != null && !finalReason.isBlank()) ? finalReason : "Customer did not show up (Marked by admin)";
+                auditDescription = "Marked NO_SHOW: " + why;
+                noteTag = "[NO_SHOW Reason: " + why + "]";
+            } else if (newStatus == Appointment.AppointmentStatus.COMPLETED) {
+                auditDescription = "Service completed: " + serviceName + " with " + staffName +
+                        (finalReason != null && !finalReason.isBlank() ? " | " + finalReason : "");
+                noteTag = "[COMPLETED: " + serviceName + " with " + staffName + "]";
+            } else {
+                auditDescription = "Status changed to " + newStatus.name() +
+                        (finalReason != null && !finalReason.isBlank() ? " (" + finalReason + ")" : "");
+                noteTag = "[" + newStatus.name() + " Reason: " + (finalReason != null ? finalReason : "Status updated") + "]";
+            }
+
+            String existingNotes = appointment.getNotes() != null ? appointment.getNotes().trim() : "";
+            appointment.setNotes(existingNotes.isEmpty() ? noteTag : existingNotes + " | " + noteTag);
+
+            Appointment updated = appointmentRepository.save(appointment);
+
+            // Look up customer record to link customer_id
+            Customer customer = null;
+            if (appointment.getCustomerEmail() != null && !appointment.getCustomerEmail().isBlank()) {
+                customer = customerRepository.findByTenantIdAndEmail(appointment.getTenantId(), appointment.getCustomerEmail().trim()).orElse(null);
+            }
+
+            if (auditService != null) {
+                String performedBy = auditService.resolvePerformedBy("ADMIN");
+                auditService.logActivity(
+                        updated.getTenantId(),
+                        customer != null ? customer.getId() : null,
+                        updated.getId(),
+                        updated.getCustomerName(),
+                        updated.getCustomerEmail(),
+                        updated.getCustomerPhone(),
+                        newStatus.name(),
+                        performedBy,
+                        auditDescription
+                );
+            }
+
+            if (finalShouldNotify && notificationService != null) {
+                try {
+                    if (newStatus == Appointment.AppointmentStatus.CANCELLED) {
+                        notificationService.sendCancellationNotice(updated, finalReason);
                     }
-                })
-                .orElse(ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body(Map.of("message", "Appointment not found")));
+                } catch (Exception ignored) {
+                }
+            }
+
+            return ResponseEntity.ok(Map.of(
+                    "message", "Appointment status updated successfully to " + newStatus.name(),
+                    "status", newStatus.name(),
+                    "appointment", updated
+            ));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Invalid status value provided: " + finalStatus));
+        }
+    }
+
+    /**
+     * Admin freely updates the appointment notes without changing status.
+     */
+    @Transactional
+    @PatchMapping("/{id}/notes")
+    public ResponseEntity<?> updateAppointmentNotes(
+            @PathVariable Long id,
+            @RequestBody(required = false) Map<String, Object> body,
+            @RequestParam(required = false) String notes,
+            HttpServletRequest request
+    ) {
+        String tenantId = tenantContextResolver.resolveTenantId(request);
+        Optional<Appointment> apptOpt = appointmentRepository.findByTenantIdAndId(tenantId, id);
+        if (apptOpt.isEmpty()) {
+            apptOpt = appointmentRepository.findById(id);
+        }
+        if (apptOpt.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", "Appointment not found for ID: " + id));
+        }
+
+        Appointment appointment = apptOpt.get();
+        String effectiveNotes = notes;
+        if (body != null && body.containsKey("notes")) {
+            effectiveNotes = String.valueOf(body.get("notes"));
+        }
+        appointment.setNotes(effectiveNotes != null ? effectiveNotes.trim() : "");
+        Appointment saved = appointmentRepository.save(appointment);
+
+        if (auditService != null) {
+            Customer customer = null;
+            if (saved.getCustomerEmail() != null && !saved.getCustomerEmail().isBlank()) {
+                customer = customerRepository.findByTenantIdAndEmail(saved.getTenantId(), saved.getCustomerEmail().trim()).orElse(null);
+            }
+            String performedBy = auditService.resolvePerformedBy("ADMIN");
+            auditService.logActivity(
+                    saved.getTenantId(),
+                    customer != null ? customer.getId() : null,
+                    saved.getId(),
+                    saved.getCustomerName(),
+                    saved.getCustomerEmail(),
+                    saved.getCustomerPhone(),
+                    "NOTE_UPDATED",
+                    performedBy,
+                    "Admin edited notes: " + (saved.getNotes().isEmpty() ? "[Cleared]" : saved.getNotes())
+            );
+        }
+
+        return ResponseEntity.ok(Map.of(
+                "message", "Notes updated successfully",
+                "appointment", saved
+        ));
+    }
+
+    /**
+     * Sends a reminder notification to a specific appointment customer.
+     */
+    @PostMapping("/{id}/remind")
+    public ResponseEntity<?> sendSingleReminder(
+            @PathVariable Long id,
+            HttpServletRequest request
+    ) {
+        String tenantId = tenantContextResolver.resolveTenantId(request);
+        Optional<Appointment> apptOpt = appointmentRepository.findByTenantIdAndId(tenantId, id);
+        if (apptOpt.isEmpty()) {
+            apptOpt = appointmentRepository.findById(id);
+        }
+        if (apptOpt.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", "Appointment not found for ID: " + id));
+        }
+
+        Appointment appointment = apptOpt.get();
+        String performedBy = (auditService != null) ? auditService.resolvePerformedBy("ADMIN") : "ADMIN";
+        if (reminderService != null) {
+            Map<String, Object> result = reminderService.sendSingleAppointmentReminder(appointment, performedBy);
+            return ResponseEntity.ok(result);
+        } else if (notificationService != null) {
+            notificationService.sendAppointmentReminder(appointment);
+            appointment.setReminderSentAt(LocalDateTime.now());
+            appointmentRepository.save(appointment);
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "Reminder sent successfully to " + appointment.getCustomerName(),
+                    "reminderSentAt", appointment.getReminderSentAt()
+            ));
+        }
+        return ResponseEntity.ok(Map.of("success", false, "message", "Notification service unavailable"));
     }
 
     @GetMapping("/by-token/{token}")

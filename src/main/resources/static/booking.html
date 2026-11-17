@@ -796,6 +796,13 @@
                                 </div>
                             </div>
 
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" id="smsConsentCheck" checked>
+                                <label class="form-check-label small text-muted" for="smsConsentCheck">
+                                    <i class="bi bi-chat-dots-fill text-pink me-1"></i>Send me booking confirmation, live schedule updates, and 24-hr reminder notifications via SMS &amp; Email.
+                                </label>
+                            </div>
+
                             <div class="row g-3 mb-3">
                                 <div class="col-md-5">
                                     <label for="appointmentDate" class="form-label fw-semibold">Appointment Date <span class="text-danger">*</span></label>
@@ -850,8 +857,37 @@
                             </div>
 
                             <div class="mb-4" id="appointmentNotesWrapper">
-                                <label for="appointmentNotes" class="form-label fw-semibold"><span id="guestNotesLabel">Guest 1 Notes / Special Requests</span> <span class="text-muted fw-normal">(Optional)</span></label>
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <label for="appointmentNotes" class="form-label fw-semibold mb-0"><span id="guestNotesLabel">Guest 1 Notes / Special Requests</span> <span class="text-muted fw-normal">(Optional)</span></label>
+                                    <span class="small text-muted d-none d-sm-inline">Tap to add quick notes:</span>
+                                </div>
+                                <!-- Quick Preference & Intake Chips -->
+                                <div class="d-flex flex-wrap gap-2 mb-2 pt-1">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill py-0 px-2" style="font-size: 0.8rem;" onclick="appendNoteChip('Existing Gel/Acrylic soak-off needed (+15 mins)')">+ Soak-Off Needed</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill py-0 px-2" style="font-size: 0.8rem;" onclick="appendNoteChip('Bringing nail art design reference photo')">+ Design Reference</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill py-0 px-2" style="font-size: 0.8rem;" onclick="appendNoteChip('Almond nail shape preference')">+ Almond Shape</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill py-0 px-2" style="font-size: 0.8rem;" onclick="appendNoteChip('Square nail shape preference')">+ Square Shape</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill py-0 px-2" style="font-size: 0.8rem;" onclick="appendNoteChip('Sensitive cuticles / gentle care needed')">+ Sensitive Cuticles</button>
+                                </div>
                                 <textarea class="form-control" id="appointmentNotes" rows="3" placeholder="e.g., Nail shape preference, design reference, or allergies..."></textarea>
+                            </div>
+
+                            <!-- Policy & In-Salon Payment Clarity Banner -->
+                            <div class="card bg-light border-0 rounded-4 p-3 mb-4">
+                                <div class="d-flex align-items-start gap-3 small text-muted">
+                                    <div class="d-inline-flex p-2 rounded-circle bg-white text-pink shadow-sm">
+                                        <i class="bi bi-shield-check fs-5"></i>
+                                    </div>
+                                    <div>
+                                        <div class="fw-bold text-dark fs-6 mb-1">Complimentary Cancellation &amp; In-Salon Payment</div>
+                                        <div class="mb-1 text-secondary">
+                                            <strong>Cancellation Policy:</strong> Free cancellations and reschedules up to 24 hours prior to appointment time via your self-service portal link.
+                                        </div>
+                                        <div class="text-secondary">
+                                            <strong>Payment:</strong> Pay in salon upon service completion (Credit Card, Debit, Apple Pay, or Cash). Taxes and tips calculated at checkout.
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
 
                             <div class="d-flex justify-content-between align-items-center pt-2">
@@ -875,7 +911,7 @@
                         <h3 class="fw-bold text-dark mb-2">Appointment Confirmed!</h3>
                         <p class="text-muted mb-4" id="confirmationThankYouText">Thank you for booking with Jenny's Nail Studio. Here is your reservation summary:</p>
 
-                        <div class="card bg-light border-0 rounded-4 text-start mx-auto mb-4" style="max-width: 520px;">
+                        <div class="card bg-light border-0 rounded-4 text-start mx-auto mb-4" style="max-width: 580px;">
                             <div class="card-body p-4" id="confirmationReceipt">
                                 <!-- Populated dynamically on booking success -->
                             </div>
@@ -1610,6 +1646,26 @@
                 document.getElementById('customerEmail').value = activeUser;
                 if (bookingState.guests[0]) bookingState.guests[0].customerEmail = activeUser;
             }
+
+            // Asynchronously fetch rich profile info (name & phone number) for logged-in user
+            fetch('/api/users/me', {
+                headers: { 'Authorization': 'Bearer ' + token }
+            })
+            .then(res => res.ok ? res.json() : null)
+            .then(profile => {
+                if (!profile) return;
+                if (profile.name && profile.name.trim()) {
+                    const nameEl = document.getElementById('customerName');
+                    if (nameEl) nameEl.value = profile.name.trim();
+                    if (bookingState.guests[0]) bookingState.guests[0].customerName = profile.name.trim();
+                }
+                if (profile.phoneNumber && profile.phoneNumber.trim()) {
+                    const phoneEl = document.getElementById('customerPhone');
+                    if (phoneEl) phoneEl.value = profile.phoneNumber.trim();
+                    if (bookingState.guests[0]) bookingState.guests[0].customerPhone = profile.phoneNumber.trim();
+                }
+            })
+            .catch(() => {});
         } else {
             authNav.innerHTML = `
                 <a href="/" class="nav-link fw-semibold text-dark">Home</a>
@@ -3780,6 +3836,47 @@
             : '10:00:00';
         const timeRangeFormatted = bookingState.selectedTimeRangeLabel || formatTime24ToRangeLabel(rawTime24, totalDuration || 45);
 
+        // Location & Tenant contact details
+        const tenantKey = (bookingState.tenantConfig && bookingState.tenantConfig.tenantKey) || 'default';
+        const salonName = (bookingState.tenantConfig && bookingState.tenantConfig.salonName) || "Jenny's Nail Studio";
+        const salonAddress = (bookingState.tenantConfig && bookingState.tenantConfig.address)
+            || (tenantKey.toLowerCase().includes('luxe')
+                ? '789 Ocean Blvd, Private Suite 400, Miami Beach, FL 33139'
+                : '123 Beauty Lane, Suite 100, New York, NY 10001');
+        const supportPhone = (bookingState.tenantConfig && bookingState.tenantConfig.phone)
+            || (tenantKey.toLowerCase().includes('luxe') ? '(555) 987-6543' : '(555) 123-4567');
+        const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(salonName + ', ' + salonAddress)}`;
+
+        // Manage reservation link
+        const cancelToken = savedBooking.cancellationToken
+            || (savedBooking.appointments && savedBooking.appointments[0] ? savedBooking.appointments[0].cancellationToken : null);
+        const manageUrl = cancelToken
+            ? `${window.location.origin}/manage-booking?token=${encodeURIComponent(cancelToken)}&action=manage`
+            : null;
+
+        // Calendar date math
+        const validDt = isNaN(dt.getTime()) ? new Date() : dt;
+        const validEnd = new Date(validDt.getTime() + (totalDuration || 45) * 60000);
+        const calendarSummary = bookingState.guests.map((g, i) => {
+            const sNames = g.services.map(s => s.name).join(', ');
+            return `Guest ${i + 1} (${g.customerName}): ${sNames}`;
+        }).join(' | ');
+        const eventTitle = `${salonName} Appointment - #${savedBooking.id || 'NEW'}`;
+        const eventDetails = `Booking Reference #${savedBooking.id || 'NEW'} at ${salonName}\nServices: ${calendarSummary}\nLocation: ${salonAddress}\nSupport: ${supportPhone}${manageUrl ? `\nManage/Reschedule: ${manageUrl}` : ''}`;
+        const googleCalUrl = generateGoogleCalendarUrl(eventTitle, eventDetails, salonAddress, validDt, validEnd);
+
+        // Cache for .ics export
+        window._currentConfirmedBooking = {
+            savedBooking,
+            payload,
+            eventTitle,
+            eventDetails,
+            salonAddress,
+            salonName,
+            validDt,
+            validEnd
+        };
+
         receipt.innerHTML = `
             <div class="d-flex justify-content-between border-bottom pb-2 mb-3">
                 <span class="text-muted">Booking Reference</span>
@@ -3803,13 +3900,190 @@
                 <span class="text-muted">Time Window (Est. End)</span>
                 <span class="fw-bold text-pink">${timeRangeFormatted} (${totalDuration} mins)</span>
             </div>
-            <div class="d-flex justify-content-between pt-2 fs-5">
+            <div class="d-flex justify-content-between pt-2 pb-3 border-bottom fs-5">
                 <span class="fw-bold text-dark">Grand Total</span>
                 <span class="fw-bold text-pink">$${grandTotal.toFixed(2)} (${totalDuration} mins)</span>
             </div>
+
+            <!-- Salon Location & Directions -->
+            <div class="py-3 border-bottom">
+                <div class="d-flex justify-content-between align-items-start gap-2">
+                    <div>
+                        <div class="text-muted small fw-semibold text-uppercase" style="letter-spacing: 0.5px;">Location &amp; Contact</div>
+                        <div class="fw-bold text-dark fs-6">${salonName}</div>
+                        <div class="text-secondary small mb-1"><i class="bi bi-geo-alt me-1 text-pink"></i>${salonAddress}</div>
+                        <div class="text-muted small"><i class="bi bi-telephone me-1 text-pink"></i>${supportPhone}</div>
+                    </div>
+                    <a href="${mapsUrl}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline-pink rounded-pill px-3 mt-1 text-nowrap">
+                        <i class="bi bi-map me-1"></i>Directions
+                    </a>
+                </div>
+            </div>
+
+            <!-- Add to Calendar Options -->
+            <div class="py-3 border-bottom">
+                <div class="text-muted small fw-semibold text-uppercase mb-2" style="letter-spacing: 0.5px;">Add to Your Calendar</div>
+                <div class="d-flex flex-wrap gap-2">
+                    <a href="${googleCalUrl}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline-secondary rounded-pill px-3 d-inline-flex align-items-center gap-1">
+                        <i class="bi bi-calendar-plus text-danger"></i> Google Calendar
+                    </a>
+                    <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3 d-inline-flex align-items-center gap-1" onclick="downloadConfirmedIcs()">
+                        <i class="bi bi-calendar2-event text-primary"></i> Apple / Outlook (.ics)
+                    </button>
+                </div>
+            </div>
+
+            <!-- Self-Service Manage / Reschedule Portal Link -->
+            ${manageUrl ? `
+            <div class="pt-3">
+                <div class="p-3 bg-white rounded-3 border border-pink-subtle">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <div class="d-inline-flex p-2 rounded-circle bg-light text-pink">
+                            <i class="bi bi-link-45deg fs-5"></i>
+                        </div>
+                        <div>
+                            <div class="fw-bold text-dark small">Self-Service Manage Portal</div>
+                            <div class="text-muted" style="font-size: 0.78rem;">Reschedule or cancel online up to 24 hours prior</div>
+                        </div>
+                    </div>
+                    <div class="input-group input-group-sm mb-2">
+                        <input type="text" class="form-control font-monospace text-truncate bg-light" id="manageBookingUrlInput" readonly value="${manageUrl}">
+                        <button class="btn btn-pink fw-semibold" type="button" id="copyManageLinkBtn" onclick="copyManageLink()">
+                            <i class="bi bi-clipboard me-1"></i> Copy Link
+                        </button>
+                        <a href="${manageUrl}" target="_blank" class="btn btn-outline-secondary">
+                            <i class="bi bi-box-arrow-up-right me-1"></i> Open
+                        </a>
+                    </div>
+                    <div class="text-muted" style="font-size: 0.75rem;">
+                        <i class="bi bi-shield-check text-success me-1"></i>Bookmark or save this private link to review or adjust your booking anytime.
+                    </div>
+                </div>
+            </div>
+            ` : ''}
         `;
 
         confirmPanel.classList.remove('d-none');
+    }
+
+    const renderConfirmationScreen = showConfirmationScreen;
+
+    function formatGoogleCalendarDate(d) {
+        if (!d || isNaN(d.getTime())) d = new Date();
+        return d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+    }
+
+    function generateGoogleCalendarUrl(title, details, location, dtStart, dtEnd) {
+        const startStr = formatGoogleCalendarDate(dtStart);
+        const endStr = formatGoogleCalendarDate(dtEnd);
+        const params = new URLSearchParams({
+            action: 'TEMPLATE',
+            text: title || 'Salon Appointment',
+            dates: `${startStr}/${endStr}`,
+            details: details || '',
+            location: location || ''
+        });
+        return `https://calendar.google.com/calendar/render?${params.toString()}`;
+    }
+
+    function downloadConfirmedIcs() {
+        if (!window._currentConfirmedBooking) return;
+        const b = window._currentConfirmedBooking;
+        const startIso = formatGoogleCalendarDate(new Date(b.validDt));
+        const endIso = formatGoogleCalendarDate(new Date(b.validEnd));
+        const nowIso = formatGoogleCalendarDate(new Date());
+
+        const cleanDesc = (b.eventDetails || '').replace(/\r?\n/g, '\\n').replace(/,/g, '\\,');
+        const cleanTitle = (b.eventTitle || 'Salon Appointment').replace(/,/g, '\\,');
+        const cleanLoc = (b.salonAddress || '').replace(/,/g, '\\,');
+
+        const icsData = [
+            'BEGIN:VCALENDAR',
+            'VERSION:2.0',
+            'PRODID:-//Jennys Nail Studio//Booking System//EN',
+            'CALSCALE:GREGORIAN',
+            'METHOD:PUBLISH',
+            'BEGIN:VEVENT',
+            `UID:${Date.now()}-${b.savedBooking && b.savedBooking.id ? b.savedBooking.id : 'appt'}@jennysnailstudio.com`,
+            `DTSTAMP:${nowIso}`,
+            `DTSTART:${startIso}`,
+            `DTEND:${endIso}`,
+            `SUMMARY:${cleanTitle}`,
+            `DESCRIPTION:${cleanDesc}`,
+            `LOCATION:${cleanLoc}`,
+            'STATUS:CONFIRMED',
+            'END:VEVENT',
+            'END:VCALENDAR'
+        ].join('\r\n');
+
+        const blob = new Blob([icsData], { type: 'text/calendar;charset=utf-8' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `appointment-${b.savedBooking && b.savedBooking.id ? b.savedBooking.id : 'booking'}.ics`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(link.href), 1500);
+    }
+
+    function copyManageLink() {
+        const input = document.getElementById('manageBookingUrlInput');
+        if (!input || !input.value) return;
+        const btn = document.getElementById('copyManageLinkBtn');
+
+        const applyFeedback = () => {
+            if (!btn) return;
+            const orig = btn.innerHTML;
+            btn.innerHTML = '<i class="bi bi-check2 me-1"></i> Copied!';
+            btn.classList.add('btn-success');
+            btn.classList.remove('btn-pink');
+            setTimeout(() => {
+                btn.innerHTML = orig;
+                btn.classList.remove('btn-success');
+                btn.classList.add('btn-pink');
+            }, 2500);
+        };
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(input.value)
+                .then(applyFeedback)
+                .catch(() => {
+                    input.select();
+                    input.setSelectionRange(0, 99999);
+                    try {
+                        document.execCommand('copy');
+                        applyFeedback();
+                    } catch (e) {
+                        console.warn('Copy failed', e);
+                    }
+                });
+        } else {
+            input.select();
+            input.setSelectionRange(0, 99999);
+            try {
+                document.execCommand('copy');
+                applyFeedback();
+            } catch (e) {
+                console.warn('Copy fallback failed', e);
+            }
+        }
+    }
+
+    function appendNoteChip(text) {
+        const notesInput = document.getElementById('appointmentNotes');
+        if (!notesInput) return;
+        const currentVal = notesInput.value.trim();
+        if (!currentVal) {
+            notesInput.value = text;
+        } else if (currentVal.includes(text)) {
+            return;
+        } else {
+            notesInput.value = currentVal + '; ' + text;
+        }
+        const guest = bookingState.guests[bookingState.detailsGuestIndex];
+        if (guest) {
+            guest.notes = notesInput.value.trim();
+        }
     }
 
     function resetWizard() {

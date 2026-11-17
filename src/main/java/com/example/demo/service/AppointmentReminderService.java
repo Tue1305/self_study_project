@@ -144,4 +144,54 @@ public class AppointmentReminderService {
 
         return summary;
     }
+
+    /**
+     * Dispatches a single reminder notification to the specified appointment.
+     */
+    @Transactional
+    public Map<String, Object> sendSingleAppointmentReminder(Appointment appt, String performedBy) {
+        if (appt == null) {
+            return Map.of("success", false, "message", "Appointment not found");
+        }
+        if (appt.getStatus() == Appointment.AppointmentStatus.CANCELLED) {
+            return Map.of("success", false, "message", "Cannot send reminder for cancelled appointment.");
+        }
+        try {
+            if (notificationService != null) {
+                notificationService.sendAppointmentReminder(appt);
+            }
+
+            appt.setReminderSentAt(LocalDateTime.now());
+            Appointment saved = appointmentRepository.save(appt);
+
+            if (auditService != null) {
+                Customer customer = null;
+                if (saved.getCustomerEmail() != null && !saved.getCustomerEmail().isBlank()) {
+                    customer = customerRepository.findByTenantIdAndEmail(saved.getTenantId(), saved.getCustomerEmail().trim()).orElse(null);
+                }
+                auditService.logActivity(
+                        saved.getTenantId(),
+                        customer != null ? customer.getId() : null,
+                        saved.getId(),
+                        saved.getCustomerName(),
+                        saved.getCustomerEmail(),
+                        saved.getCustomerPhone(),
+                        "REMINDER_SENT",
+                        performedBy != null ? performedBy : "ADMIN",
+                        "Manual appointment reminder dispatched to customer via SMS/Email"
+                );
+            }
+
+            return Map.of(
+                    "success", true,
+                    "message", "Reminder sent successfully to " + saved.getCustomerName(),
+                    "reminderSentAt", saved.getReminderSentAt(),
+                    "appointmentId", saved.getId()
+            );
+        } catch (Exception ex) {
+            logger.warn("[AppointmentReminderService] Failed to dispatch single reminder for appointment #{}: {}",
+                    appt.getId(), ex.getMessage());
+            return Map.of("success", false, "message", "Failed to send reminder: " + ex.getMessage());
+        }
+    }
 }

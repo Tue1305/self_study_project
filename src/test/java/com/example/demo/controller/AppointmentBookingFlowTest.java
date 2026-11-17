@@ -32,6 +32,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -613,5 +614,175 @@ class AppointmentBookingFlowTest {
 
         org.junit.jupiter.api.Assertions.assertNotNull(savedRef.get().getNailTech());
         org.junit.jupiter.api.Assertions.assertEquals(20L, savedRef.get().getNailTech().getId());
+    }
+
+    @Test
+    void testUpdateStatusConfirmedLogsStaffAndService() throws Exception {
+        ServiceEntity svc = new ServiceEntity("default", "Gel Manicure Deluxe", "Mani", new BigDecimal("45.00"), 45);
+        svc.setId(101L);
+        UserEntity tony = new UserEntity();
+        tony.setId(7L);
+        tony.setName("Tony");
+
+        Appointment appt = new Appointment();
+        appt.setId(501L);
+        appt.setTenantId("default");
+        appt.setCustomerName("Sarah Connor");
+        appt.setCustomerEmail("sarah@example.com");
+        appt.setCustomerPhone("(555) 777-9999");
+        appt.setAppointmentTime(LocalDateTime.of(2026, 11, 20, 14, 0));
+        appt.setService(svc);
+        appt.setNailTech(tony);
+        appt.setStatus(Appointment.AppointmentStatus.PENDING);
+
+        when(appointmentRepository.findByTenantIdAndId("default", 501L)).thenReturn(Optional.of(appt));
+        when(appointmentRepository.save(any(Appointment.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        mockMvc.perform(patch("/api/appointments/501/status")
+                        .header("X-Tenant-ID", "default")
+                        .param("status", "CONFIRMED"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CONFIRMED"))
+                .andExpect(jsonPath("$.appointment.notes").value(org.hamcrest.Matchers.containsString("Customer arrived for Gel Manicure Deluxe with Tony")));
+
+        org.junit.jupiter.api.Assertions.assertEquals(Appointment.AppointmentStatus.CONFIRMED, appt.getStatus());
+        org.junit.jupiter.api.Assertions.assertTrue(appt.getNotes().contains("Tony"));
+    }
+
+    @Test
+    void testUpdateStatusCancelledWithReason() throws Exception {
+        ServiceEntity svc = new ServiceEntity("default", "Pedicure", "Pedi", new BigDecimal("50.00"), 45);
+        svc.setId(102L);
+
+        Appointment appt = new Appointment();
+        appt.setId(502L);
+        appt.setTenantId("default");
+        appt.setCustomerName("John Doe");
+        appt.setCustomerEmail("john@example.com");
+        appt.setCustomerPhone("(555) 123-4567");
+        appt.setAppointmentTime(LocalDateTime.of(2026, 11, 20, 15, 0));
+        appt.setService(svc);
+        appt.setStatus(Appointment.AppointmentStatus.PENDING);
+
+        when(appointmentRepository.findByTenantIdAndId("default", 502L)).thenReturn(Optional.of(appt));
+        when(appointmentRepository.save(any(Appointment.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        mockMvc.perform(patch("/api/appointments/502/status")
+                        .header("X-Tenant-ID", "default")
+                        .param("status", "CANCELLED")
+                        .param("reason", "Client called sick with fever"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CANCELLED"))
+                .andExpect(jsonPath("$.appointment.notes").value(org.hamcrest.Matchers.containsString("Client called sick with fever")));
+
+        org.junit.jupiter.api.Assertions.assertEquals(Appointment.AppointmentStatus.CANCELLED, appt.getStatus());
+    }
+
+    @Test
+    void testUpdateStatusNoShow() throws Exception {
+        ServiceEntity svc = new ServiceEntity("default", "Manicure", "Mani", new BigDecimal("35.00"), 30);
+        svc.setId(103L);
+
+        Appointment appt = new Appointment();
+        appt.setId(503L);
+        appt.setTenantId("default");
+        appt.setCustomerName("Emily Blunt");
+        appt.setCustomerEmail("emily@example.com");
+        appt.setCustomerPhone("(555) 987-6543");
+        appt.setAppointmentTime(LocalDateTime.of(2026, 11, 20, 16, 0));
+        appt.setService(svc);
+        appt.setStatus(Appointment.AppointmentStatus.PENDING);
+
+        when(appointmentRepository.findByTenantIdAndId("default", 503L)).thenReturn(Optional.of(appt));
+        when(appointmentRepository.save(any(Appointment.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        mockMvc.perform(patch("/api/appointments/503/status")
+                        .header("X-Tenant-ID", "default")
+                        .param("status", "NO_SHOW")
+                        .param("reason", "Did not arrive and no answer on phone"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("NO_SHOW"))
+                .andExpect(jsonPath("$.appointment.notes").value(org.hamcrest.Matchers.containsString("Did not arrive and no answer on phone")));
+
+        org.junit.jupiter.api.Assertions.assertEquals(Appointment.AppointmentStatus.NO_SHOW, appt.getStatus());
+    }
+
+    @Test
+    void testAutoMarkNoShowAppointmentsOverdue15Minutes() throws Exception {
+        ServiceEntity svc = new ServiceEntity("default", "Quick Polish", "Mani", new BigDecimal("20.00"), 30);
+        svc.setId(104L);
+
+        Appointment overdueAppt = new Appointment();
+        overdueAppt.setId(504L);
+        overdueAppt.setTenantId("default");
+        overdueAppt.setCustomerName("Late Guest");
+        overdueAppt.setCustomerEmail("late@example.com");
+        overdueAppt.setCustomerPhone("(555) 000-1111");
+        // Overdue by 45 minutes
+        overdueAppt.setAppointmentTime(LocalDateTime.now().minusMinutes(45));
+        overdueAppt.setService(svc);
+        overdueAppt.setStatus(Appointment.AppointmentStatus.PENDING);
+
+        when(appointmentRepository.findAllByTenantId("default")).thenReturn(List.of(overdueAppt));
+        when(appointmentRepository.save(any(Appointment.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        mockMvc.perform(post("/api/appointments/auto-no-show")
+                        .header("X-Tenant-ID", "default"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.markedCount").value(1));
+
+        org.junit.jupiter.api.Assertions.assertEquals(Appointment.AppointmentStatus.NO_SHOW, overdueAppt.getStatus());
+        org.junit.jupiter.api.Assertions.assertTrue(overdueAppt.getNotes().contains("Auto NO_SHOW: 15+ minutes past scheduled time"));
+    }
+
+    @Test
+    void testAdminCanFreelyEditNotes() throws Exception {
+        Appointment appt = new Appointment();
+        appt.setId(505L);
+        appt.setTenantId("default");
+        appt.setCustomerName("Maria Santos");
+        appt.setCustomerEmail("maria@example.com");
+        appt.setCustomerPhone("(555) 222-3333");
+        appt.setNotes("Old notes");
+
+        when(appointmentRepository.findByTenantIdAndId("default", 505L)).thenReturn(Optional.of(appt));
+        when(appointmentRepository.save(any(Appointment.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        String notesJson = "{\"notes\": \"Prefers short square nails with lavender tint.\"}";
+
+        mockMvc.perform(patch("/api/appointments/505/notes")
+                        .header("X-Tenant-ID", "default")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(notesJson))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.appointment.notes").value("Prefers short square nails with lavender tint."));
+
+        org.junit.jupiter.api.Assertions.assertEquals("Prefers short square nails with lavender tint.", appt.getNotes());
+    }
+
+    @Test
+    void testSendSingleReminder() throws Exception {
+        ServiceEntity svc = new ServiceEntity("default", "Manicure", "Mani", new BigDecimal("35.00"), 30);
+        svc.setId(106L);
+
+        Appointment appt = new Appointment();
+        appt.setId(506L);
+        appt.setTenantId("default");
+        appt.setCustomerName("Kelly Green");
+        appt.setCustomerEmail("kelly@example.com");
+        appt.setCustomerPhone("(555) 333-4444");
+        appt.setAppointmentTime(LocalDateTime.now().plusHours(3));
+        appt.setService(svc);
+        appt.setStatus(Appointment.AppointmentStatus.CONFIRMED);
+
+        when(appointmentRepository.findByTenantIdAndId("default", 506L)).thenReturn(Optional.of(appt));
+        when(appointmentRepository.save(any(Appointment.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        mockMvc.perform(post("/api/appointments/506/remind")
+                        .header("X-Tenant-ID", "default"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+
+        org.junit.jupiter.api.Assertions.assertNotNull(appt.getReminderSentAt());
     }
 }

@@ -201,20 +201,27 @@ public class DataInitializer implements CommandLineRunner {
 
         if (showcaseRepository.count() == 0) {
             showcaseRepository.saveAll(List.of(
-                    new ShowcaseItem("Short Almond Chrome", "Milky white base with iridescent pearl chrome dust finish.", "gel", "Gel-X", "@NailArtistry", "1 hr 15 mins", "nail_collection/nail4.png"),
-                    new ShowcaseItem("Hand-Painted Botanical", "Matte nude background with fine line leaf detail and gold foil highlights.", "art", "Custom Art", "@NailArtistry", "1 hr 45 mins", "nail_collection/nail5.png"),
-                    new ShowcaseItem("Coffin French Ombre", "Classic pink-and-white gradient extended coffin sculpt.", "acrylic", "Acrylic", "@NailArtistry", "1 hr 30 mins", "nail_collection/nail6.png"),
-                    new ShowcaseItem("3D Y2K Jelly Sculpt", "Translucent pink jelly base layered with raised 3D gel swirls and charms.", "art", "Custom Art", "@NailArtistry", "2 hrs", "nail_collection/nail7.png"),
-                    new ShowcaseItem("3D Y2K Jelly Sculpt", "Translucent pink jelly base layered with raised 3D gel swirls and charms.", "art", "Custom Art", "@NailArtistry", "2 hrs", "nail_collection/nail8.png"),
-                    new ShowcaseItem("3D Y2K Jelly Sculpt", "Translucent pink jelly base layered with raised 3D gel swirls and charms.", "art", "Custom Art", "@NailArtistry", "2 hrs", "nail_collection/nail1.png"),
-                    new ShowcaseItem("3D Y2K Jelly Sculpt", "Translucent pink jelly base layered with raised 3D gel swirls and charms.", "art", "Custom Art", "@NailArtistry", "2 hrs", "nail_collection/nail10.png"),
-                    new ShowcaseItem("3D Y2K Jelly Sculpt", "Translucent pink jelly base layered with raised 3D gel swirls and charms.", "art", "Custom Art", "@NailArtistry", "2 hrs", "nail_collection/nail11.png"),
-                    new ShowcaseItem("3D Y2K Jelly Sculpt", "Translucent pink jelly base layered with raised 3D gel swirls and charms.", "art", "Custom Art", "@NailArtistry", "2 hrs", "nail_collection/nail12.png"),
-                    new ShowcaseItem("3D Y2K Jelly Sculpt", "Translucent pink jelly base layered with raised 3D gel swirls and charms.", "art", "Custom Art", "@NailArtistry", "2 hrs", "nail_collection/nail13.png"),
-                    new ShowcaseItem("3D Y2K Jelly Sculpt", "Translucent pink jelly base layered with raised 3D gel swirls and charms.", "art", "Custom Art", "@NailArtistry", "2 hrs", "nail_collection/nail2.png"),
-                    new ShowcaseItem("3D Y2K Jelly Sculpt", "Translucent pink jelly base layered with raised 3D gel swirls and charms.", "art", "Custom Art", "@NailArtistry", "2 hrs", "nail_collection/nail3.png")
+                    new ShowcaseItem("default", "Short Almond Chrome", "Milky white base with iridescent pearl chrome dust finish.", "gel", "Gel-X", "@NailArtistry", "1 hr 15 mins", "nail_collection/nail4.png"),
+                    new ShowcaseItem("default", "Hand-Painted Botanical", "Matte nude background with fine line leaf detail and gold foil highlights.", "art", "Custom Art", "@NailArtistry", "1 hr 45 mins", "nail_collection/nail5.png"),
+                    new ShowcaseItem("default", "Coffin French Ombre", "Classic pink-and-white gradient extended coffin sculpt.", "acrylic", "Acrylic", "@NailArtistry", "1 hr 30 mins", "nail_collection/nail6.png"),
+                    new ShowcaseItem("default", "3D Y2K Jelly Sculpt", "Translucent pink jelly base layered with raised 3D gel swirls and charms.", "art", "Custom Art", "@NailArtistry", "2 hrs", "nail_collection/nail7.png"),
+                    new ShowcaseItem("default", "Glazed Donut Nails", "Neutral nude chrome finish with signature pearlescent shine.", "gel", "Gel-X", "@NailArtistry", "1 hr 15 mins", "nail_collection/nail8.png"),
+                    new ShowcaseItem("default", "Cherry Red French", "Deep burgundy red tips with ultra-glossy gel topcoat.", "art", "Custom Art", "@NailArtistry", "1 hr 30 mins", "nail_collection/nail1.png"),
+                    new ShowcaseItem("default", "Aura Velvet Polish", "Magnetic magenta velvet aura centered on natural overlay.", "art", "Custom Art", "@NailArtistry", "1 hr 45 mins", "nail_collection/nail10.png"),
+                    new ShowcaseItem("default", "Pastel Rainbow Swirls", "Matte pastel multi-color hand-painted swirl pattern.", "art", "Custom Art", "@NailArtistry", "2 hrs", "nail_collection/nail11.png"),
+                    new ShowcaseItem("default", "Tortoiseshell Accents", "Warm amber tortoiseshell feature nails with gold metallic cuffs.", "art", "Custom Art", "@NailArtistry", "1 hr 45 mins", "nail_collection/nail12.png"),
+                    new ShowcaseItem("default", "Silver Micro-Glitter Stiletto", "Tapered stiletto shape with silver reflective glitter fade.", "acrylic", "Acrylic", "@NailArtistry", "2 hrs", "nail_collection/nail13.png"),
+                    new ShowcaseItem("default", "Frosted Lilac Cat-Eye", "Lavender magnetic velvet shimmer with micro-crystal accents.", "gel", "Gel-X", "@NailArtistry", "1 hr 30 mins", "nail_collection/nail2.png"),
+                    new ShowcaseItem("default", "Monochrome Line Art", "Minimalist abstract black-and-white fine line geometry.", "art", "Custom Art", "@NailArtistry", "1 hr 15 mins", "nail_collection/nail3.png")
             ));
-            System.out.println("✅ Default showcase items seeded into the database!");
+
+            // Seed distinct showcase items for Luxe salon tenant
+            showcaseRepository.saveAll(List.of(
+                    new ShowcaseItem("luxe", "Luxe Royal Gold Leaf Sculpt", "Opulent 24k gold leaf foil embedded over milky blush stiletto sculpt.", "acrylic", "Luxe Signature", "@LuxeArtisan", "2 hrs", "nail_collection/nail6.png"),
+                    new ShowcaseItem("luxe", "Platinum Mirror Chrome", "Flawless mirror-finish liquid platinum chrome with crystal cuticles.", "gel", "Luxe Gel-X", "@LuxeArtisan", "1 hr 30 mins", "nail_collection/nail4.png"),
+                    new ShowcaseItem("luxe", "Emerald Velvet Cat-Eye", "Deep royal emerald velvet cat-eye shimmer on tapered square overlay.", "art", "Custom Art", "@LuxeArtisan", "1 hr 45 mins", "nail_collection/nail7.png")
+            ));
+            System.out.println("✅ Default & Luxe showcase items seeded into the database!");
         }
     }
 

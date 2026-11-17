@@ -2,7 +2,8 @@ package com.example.demo.controller;
 
 import com.example.demo.entity.ShowcaseItem;
 import com.example.demo.repository.ShowcaseRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.example.demo.service.TenantContextResolver;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -17,17 +18,23 @@ import java.util.Optional;
 @CrossOrigin(origins = "*")
 public class ShowcaseController {
 
-    @Autowired
-    private ShowcaseRepository showcaseRepository;
+    private final ShowcaseRepository showcaseRepository;
+    private final TenantContextResolver tenantContextResolver;
+
+    public ShowcaseController(ShowcaseRepository showcaseRepository, TenantContextResolver tenantContextResolver) {
+        this.showcaseRepository = showcaseRepository;
+        this.tenantContextResolver = tenantContextResolver;
+    }
 
     @GetMapping
-    public List<ShowcaseItem> getAllShowcaseItems() {
-        return showcaseRepository.findAllByOrderByIdAsc();
+    public List<ShowcaseItem> getAllShowcaseItems(HttpServletRequest request) {
+        String tenantId = tenantContextResolver.resolveTenantId(request);
+        return showcaseRepository.findAllByTenantIdOrderByIdAsc(tenantId);
     }
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ADMIN')")
     @PostMapping
-    public ResponseEntity<?> createShowcaseItem(@RequestBody ShowcaseItem item) {
+    public ResponseEntity<?> createShowcaseItem(@RequestBody ShowcaseItem item, HttpServletRequest request) {
         if (item.getTitle() == null || item.getTitle().isBlank()
                 || item.getImageUrl() == null || item.getImageUrl().isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("message", "Title and picture are required."));
@@ -45,14 +52,18 @@ public class ShowcaseController {
             item.setDuration("1 hr 30 mins");
         }
 
+        String tenantId = tenantContextResolver.resolveTenantId(request);
+        item.setTenantId(tenantId);
+
         ShowcaseItem saved = showcaseRepository.save(item);
         return ResponseEntity.ok(saved);
     }
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ADMIN')")
     @PutMapping("/{id}")
-    public ResponseEntity<?> updateShowcaseItem(@PathVariable Long id, @RequestBody ShowcaseItem updated) {
-        Optional<ShowcaseItem> optional = showcaseRepository.findById(id);
+    public ResponseEntity<?> updateShowcaseItem(@PathVariable Long id, @RequestBody ShowcaseItem updated, HttpServletRequest request) {
+        String tenantId = tenantContextResolver.resolveTenantId(request);
+        Optional<ShowcaseItem> optional = showcaseRepository.findByTenantIdAndId(tenantId, id);
         if (optional.isEmpty()) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(Map.of("message", "Showcase item not found."));
@@ -85,12 +96,14 @@ public class ShowcaseController {
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ADMIN')")
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> deleteShowcaseItem(@PathVariable Long id) {
-        if (!showcaseRepository.existsById(id)) {
+    public ResponseEntity<?> deleteShowcaseItem(@PathVariable Long id, HttpServletRequest request) {
+        String tenantId = tenantContextResolver.resolveTenantId(request);
+        Optional<ShowcaseItem> optional = showcaseRepository.findByTenantIdAndId(tenantId, id);
+        if (optional.isEmpty()) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(Map.of("message", "Showcase item not found."));
         }
-        showcaseRepository.deleteById(id);
+        showcaseRepository.delete(optional.get());
         return ResponseEntity.ok(Map.of("message", "Showcase item deleted successfully."));
     }
 }

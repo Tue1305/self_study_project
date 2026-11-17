@@ -718,6 +718,35 @@
             error: null
         });
 
+        const [dispatchingReminders, setDispatchingReminders] = useState(false);
+        const [reminderNotice, setReminderNotice] = useState(null);
+
+        const handleDispatchReminders = async () => {
+            setDispatchingReminders(true);
+            setReminderNotice(null);
+            try {
+                const headers = {
+                    'Content-Type': 'application/json',
+                    'X-Tenant-ID': activeTenant,
+                    ...(token ? { 'Authorization': 'Bearer ' + token } : {})
+                };
+                const res = await fetch('/api/appointments/dispatch-reminders', { method: 'POST', headers });
+                const data = await res.json().catch(() => ({}));
+                if (res.ok) {
+                    const count = data.remindersSent ?? 0;
+                    setReminderNotice({ type: 'success', message: `✅ 24h Reminder sweep complete: ${count} reminder(s) dispatched.` });
+                    await fetchScheduleData(true);
+                } else {
+                    setReminderNotice({ type: 'danger', message: data.message || 'Failed to dispatch reminders.' });
+                }
+            } catch (err) {
+                setReminderNotice({ type: 'danger', message: err.message || 'Network error dispatching reminders.' });
+            } finally {
+                setDispatchingReminders(false);
+                setTimeout(() => setReminderNotice(null), 6000);
+            }
+        };
+
         // Real-time useEffect timer updating the timeline indicator
         useEffect(() => {
             setNow(new Date());
@@ -1099,8 +1128,23 @@
                             const [y, m, d] = e.target.value.split('-').map(Number);
                             if (y && m && d) setSelectedDate(new Date(y, m - 1, d));
                         }
-                    })
+                    }),
+                    h('button', {
+                        type: 'button',
+                        className: 'btn btn-outline-primary btn-sm px-3 fw-semibold d-flex align-items-center gap-1 shadow-sm',
+                        title: 'Scan appointments within next 24 hours and send reminder SMS/Email to confirmed guests',
+                        onClick: handleDispatchReminders,
+                        disabled: dispatchingReminders
+                    },
+                        dispatchingReminders ? '🔔 Dispatching...' : '🔔 Dispatch 24h Reminders'
+                    )
                 )
+            ),
+
+            /* Reminder Notice Alert */
+            reminderNotice && h('div', { className: `alert alert-${reminderNotice.type} border-0 rounded-0 m-0 px-4 py-2 small d-flex align-items-center justify-content-between` },
+                h('span', null, reminderNotice.message),
+                h('button', { type: 'button', className: 'btn-close btn-close-sm', onClick: () => setReminderNotice(null) })
             ),
 
             /* Sunday Closed Notice */

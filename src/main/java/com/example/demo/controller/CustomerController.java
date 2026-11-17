@@ -32,8 +32,9 @@ public class CustomerController {
     private com.example.demo.service.TenantContextResolver tenantContextResolver;
 
     @GetMapping
-    public List<Customer> getAllCustomers() {
-        return customerService.getAllCustomers();
+    public List<Customer> getAllCustomers(jakarta.servlet.http.HttpServletRequest request) {
+        String tenantId = tenantContextResolver.resolveTenantId(request);
+        return customerService.getAllCustomers(tenantId);
     }
 
     @GetMapping("/{customerId}/history")
@@ -51,10 +52,18 @@ public class CustomerController {
     }
 
     @PostMapping
-    public ResponseEntity<?> createCustomer(@RequestBody Customer customer) {
+    public ResponseEntity<?> createCustomer(
+            @RequestBody Customer customer,
+            jakarta.servlet.http.HttpServletRequest request
+    ) {
         if (customer.getName() == null || customer.getName().isBlank()
                 || customer.getEmail() == null || customer.getEmail().isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("message", "Name and email are required."));
+        }
+
+        String tenantId = tenantContextResolver.resolveTenantId(request);
+        if (customer.getTenantId() == null || customer.getTenantId().isBlank()) {
+            customer.setTenantId(tenantId);
         }
 
         Optional<Customer> existing = customerRepository.findByEmail(customer.getEmail().trim());

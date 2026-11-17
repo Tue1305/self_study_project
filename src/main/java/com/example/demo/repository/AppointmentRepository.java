@@ -22,6 +22,19 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
 
     List<Appointment> findByTenantIdAndAppointmentTimeBetween(String tenantId, LocalDateTime start, LocalDateTime end);
 
+    List<Appointment> findByAppointmentTimeBetweenAndReminderSentAtIsNullAndStatusNot(
+            LocalDateTime start,
+            LocalDateTime end,
+            Appointment.AppointmentStatus excludedStatus
+    );
+
+    List<Appointment> findByTenantIdAndAppointmentTimeBetweenAndReminderSentAtIsNullAndStatusNot(
+            String tenantId,
+            LocalDateTime start,
+            LocalDateTime end,
+            Appointment.AppointmentStatus excludedStatus
+    );
+
     boolean existsByTenantIdAndNailTechIdAndAppointmentTimeAndStatusNot(
             String tenantId,
             Long nailTechId,

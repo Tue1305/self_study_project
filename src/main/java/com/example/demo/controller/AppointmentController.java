@@ -12,6 +12,7 @@ import com.example.demo.repository.ServiceRepository;
 import com.example.demo.repository.UserRepository;
 import com.example.demo.service.TenantContextResolver;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -42,6 +43,12 @@ public class AppointmentController {
     private final TenantContextResolver tenantContextResolver;
     private final AppointmentAuditService auditService;
     private final NotificationService notificationService;
+    private com.example.demo.service.AppointmentReminderService reminderService;
+
+    @Autowired(required = false)
+    public void setReminderService(com.example.demo.service.AppointmentReminderService reminderService) {
+        this.reminderService = reminderService;
+    }
 
     private static final java.util.regex.Pattern STRICT_EMAIL_PATTERN =
             java.util.regex.Pattern.compile("^[a-zA-Z0-9_+&*-]+(?:\\.[a-zA-Z0-9_+&*-]+)*@(?:[a-zA-Z0-9-]+\\.)+[a-zA-Z]{2,}$");
@@ -419,13 +426,39 @@ public class AppointmentController {
             }
             resolvedTech = tenantTech.get();
 
-            boolean hasConflict = !Boolean.TRUE.equals(bookingRequest.getManualOverride()) &&
-                    appointmentRepository.existsByTenantIdAndNailTechIdAndAppointmentTimeAndStatusNot(
+            boolean hasConflict = false;
+            if (!Boolean.TRUE.equals(bookingRequest.getManualOverride())) {
+                boolean exactConflict = appointmentRepository.existsByTenantIdAndNailTechIdAndAppointmentTimeAndStatusNot(
+                        tenantId, techId, bookingRequest.getAppointmentTime(), Appointment.AppointmentStatus.CANCELLED);
+                if (exactConflict) {
+                    hasConflict = true;
+                } else {
+                    int estDuration = 45;
+                    if (bookingRequest.getService() != null && bookingRequest.getService().getId() != null) {
+                        estDuration = serviceRepository.findByTenantIdAndId(tenantId, bookingRequest.getService().getId())
+                                .map(s -> s.getDurationMinutes() != null && s.getDurationMinutes() > 0 ? s.getDurationMinutes() : 45)
+                                .orElse(45);
+                    } else if (bookingRequest.getServiceIds() != null && !bookingRequest.getServiceIds().isEmpty()) {
+                        estDuration = serviceRepository.findByTenantIdAndId(tenantId, bookingRequest.getServiceIds().get(0))
+                                .map(s -> s.getDurationMinutes() != null && s.getDurationMinutes() > 0 ? s.getDurationMinutes() : 45)
+                                .orElse(45);
+                    }
+                    LocalDateTime bookingSlotEnd = bookingRequest.getAppointmentTime().plusMinutes(estDuration);
+
+                    List<Appointment> dayAppts = appointmentRepository.findByTenantIdAndAppointmentTimeBetween(
                             tenantId,
-                            techId,
-                            bookingRequest.getAppointmentTime(),
-                            Appointment.AppointmentStatus.CANCELLED
+                            bookingRequest.getAppointmentTime().toLocalDate().atStartOfDay(),
+                            bookingRequest.getAppointmentTime().toLocalDate().plusDays(1).atStartOfDay()
                     );
+
+                    if (dayAppts != null) {
+                        hasConflict = dayAppts.stream()
+                                .filter(a -> a.getStatus() != Appointment.AppointmentStatus.CANCELLED)
+                                .filter(a -> a.getNailTech() != null && a.getNailTech().getId().equals(techId))
+                                .anyMatch(a -> hasOverlapWithBuffer(a, bookingRequest.getAppointmentTime(), bookingSlotEnd, 15));
+                    }
+                }
+            }
             if (hasConflict) {
                 return ResponseEntity.status(HttpStatus.CONFLICT)
                         .body(Map.of("message", "This technician is already booked at the selected time slot. Please choose another time or technician."));
@@ -989,7 +1022,7 @@ public class AppointmentController {
                     .filter(a -> !a.getId().equals(appt.getId()))
                     .filter(a -> a.getStatus() != Appointment.AppointmentStatus.CANCELLED)
                     .filter(a -> a.getNailTech() != null && a.getNailTech().getId().equals(appt.getNailTech().getId()))
-                    .anyMatch(a -> hasOverlap(a, newTime, newSlotEnd));
+                    .anyMatch(a -> hasOverlapWithBuffer(a, newTime, newSlotEnd, 15));
 
             if (conflict) {
                 return ResponseEntity.status(HttpStatus.CONFLICT)
@@ -1106,7 +1139,7 @@ public class AppointmentController {
                     .filter(a -> !a.getId().equals(appt.getId()))
                     .filter(a -> a.getStatus() != Appointment.AppointmentStatus.CANCELLED)
                     .filter(a -> a.getNailTech() != null && a.getNailTech().getId().equals(appt.getNailTech().getId()))
-                    .anyMatch(a -> hasOverlap(a, newTime, newSlotEnd));
+                    .anyMatch(a -> hasOverlapWithBuffer(a, newTime, newSlotEnd, 15));
 
             if (conflict) {
                 return ResponseEntity.status(HttpStatus.CONFLICT)
@@ -1164,5 +1197,16 @@ public class AppointmentController {
                 "status", "CONFIRMED",
                 "appointment", updated
         ));
+    }
+
+    @PostMapping({"/dispatch-reminders", "/admin/dispatch-reminders"})
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ADMIN')")
+    public ResponseEntity<?> dispatchReminders(HttpServletRequest request) {
+        String tenantId = tenantContextResolver.resolveTenantId(request);
+        if (reminderService != null) {
+            Map<String, Object> result = reminderService.dispatchUpcomingReminders(tenantId);
+            return ResponseEntity.ok(result);
+        }
+        return ResponseEntity.ok(Map.of("message", "Reminder service not active", "remindersSent", 0));
     }
 }

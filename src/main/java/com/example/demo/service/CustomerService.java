@@ -18,6 +18,20 @@ public class CustomerService {
         return customerRepository.findAll();
     }
 
+    public List<Customer> getAllCustomers(String tenantId) {
+        if (tenantId == null || tenantId.isBlank() || "all".equalsIgnoreCase(tenantId)) {
+            return customerRepository.findAll();
+        }
+        String cleanTenant = tenantId.trim().toLowerCase();
+        List<Customer> tenantCustomers = customerRepository.findByTenantId(cleanTenant);
+        if (tenantCustomers.isEmpty() && "default".equalsIgnoreCase(cleanTenant)) {
+            return customerRepository.findAll().stream()
+                    .filter(c -> c.getTenantId() == null || "default".equalsIgnoreCase(c.getTenantId()))
+                    .toList();
+        }
+        return tenantCustomers;
+    }
+
     public void saveCustomer(Customer customer) {
         customerRepository.save(customer);
     }
@@ -61,6 +75,9 @@ public class CustomerService {
 
             customer.setName(displayName);
             customer.setEmail(email);
+            if (user.getTenantId() != null && !user.getTenantId().isBlank()) {
+                customer.setTenantId(user.getTenantId().trim().toLowerCase());
+            }
             if (phone != null && !phone.isBlank()) {
                 customer.setPhone(phone.trim());
             }

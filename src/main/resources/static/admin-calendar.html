@@ -402,8 +402,8 @@
     <div class="container-fluid">
         <span class="navbar-brand fw-bold text-dark fs-5 d-flex align-items-center gap-2">
             <i class="bi bi-shield-lock-fill text-pink"></i>
-            <span id="portalBrandTitle">Jenny's Admin Portal</span>
-            <span id="tenantPill" class="badge bg-secondary ms-1">DEFAULT</span>
+            <span id="portalBrandTitle">Admin Portal</span>
+            <span id="tenantPill" class="badge ms-1" style="background-color: var(--bs-primary-pink); font-size: 0.75rem; letter-spacing: 0.05em; font-weight: 700;">Jenny</span>
         </span>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#adminNav">
             <span class="navbar-toggler-icon"></span>
@@ -442,6 +442,7 @@
         </div>
     </div>
 </header>
+<script>if (window.TenantTheme && TenantTheme.syncAdminElements) TenantTheme.syncAdminElements();</script>
 
 <!-- Main Container -->
 <main class="container-fluid px-4 my-4 flex-grow-1">
@@ -545,12 +546,15 @@
                     }, activeTenant);
                 }
                 document.getElementById('pageTitle').innerText = `Daily Staff Timeline - ${name}`;
-                document.getElementById('portalBrandTitle').innerText = `${name} Portal`;
+                document.getElementById('portalBrandTitle').innerText = 'Admin Portal';
                 document.getElementById('footerCopyright').innerHTML = `&copy; ${name} — Appointment Management System`;
 
                 const pill = document.getElementById('tenantPill');
                 if (pill) {
-                    pill.innerText = activeTenant.toUpperCase();
+                    const displayName = (typeof TenantTheme !== 'undefined' && TenantTheme.getTenantDisplayName)
+                        ? TenantTheme.getTenantDisplayName(activeTenant, name)
+                        : (activeTenant === 'luxe' ? 'Luxe' : 'Jenny');
+                    pill.innerText = displayName;
                     pill.style.backgroundColor = primaryColor;
                     pill.classList.remove('bg-secondary');
                 }

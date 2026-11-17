@@ -143,4 +143,76 @@ class TenantThemeFilterTest {
 
         assertTrue(chain.getRequest() != null);
     }
+
+    @Test
+    @DisplayName("Replaces portalBrandTitle with 'Admin Portal' and tenantPill with 'Luxe' for Luxe tenant")
+    void testInjectsAdminPortalAndLuxeTenantPill() throws ServletException, IOException {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/admin/calendar");
+        request.addHeader("X-Tenant-ID", "luxe");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        String rawHtml = """
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Admin Calendar</title>
+                    <style id="tenant-theme-vars"></style>
+                </head>
+                <body>
+                    <span id="portalBrandTitle">Jenny's Admin Portal</span>
+                    <span id="tenantPill" class="badge bg-secondary ms-1">DEFAULT</span>
+                </body>
+                </html>
+                """;
+
+        FilterChain chain = (req, res) -> {
+            res.setContentType("text/html");
+            res.getOutputStream().write(rawHtml.getBytes(StandardCharsets.UTF_8));
+        };
+
+        filter.doFilter(request, response, chain);
+
+        assertEquals(HttpServletResponse.SC_OK, response.getStatus());
+        String modifiedHtml = response.getContentAsString();
+
+        assertTrue(modifiedHtml.contains("<span id=\"portalBrandTitle\">Admin Portal</span>"));
+        assertTrue(modifiedHtml.contains("<span id=\"tenantPill\" class=\"badge ms-1\" style=\"background-color: #00b4d8; font-size: 0.75rem; letter-spacing: 0.05em; font-weight: 700;\">Luxe</span>"));
+        assertFalse(modifiedHtml.contains("Jenny's Admin Portal"));
+        assertFalse(modifiedHtml.contains(">DEFAULT<"));
+    }
+
+    @Test
+    @DisplayName("Replaces portalBrandTitle with 'Admin Portal' and tenantPill with 'Jenny' for Default tenant")
+    void testInjectsAdminPortalAndJennyTenantPill() throws ServletException, IOException {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/admin/dashboard");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        String rawHtml = """
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Admin Dashboard</title>
+                    <style id="tenant-theme-vars"></style>
+                </head>
+                <body>
+                    <span id="portalBrandTitle">Admin Portal</span>
+                    <span id="tenantPill" class="badge ms-1">DEFAULT</span>
+                </body>
+                </html>
+                """;
+
+        FilterChain chain = (req, res) -> {
+            res.setContentType("text/html");
+            res.getOutputStream().write(rawHtml.getBytes(StandardCharsets.UTF_8));
+        };
+
+        filter.doFilter(request, response, chain);
+
+        assertEquals(HttpServletResponse.SC_OK, response.getStatus());
+        String modifiedHtml = response.getContentAsString();
+
+        assertTrue(modifiedHtml.contains("<span id=\"portalBrandTitle\">Admin Portal</span>"));
+        assertTrue(modifiedHtml.contains("<span id=\"tenantPill\" class=\"badge ms-1\" style=\"background-color: #e91e63; font-size: 0.75rem; letter-spacing: 0.05em; font-weight: 700;\">Jenny</span>"));
+        assertFalse(modifiedHtml.contains(">DEFAULT<"));
+    }
 }

@@ -42,6 +42,16 @@ public class TenantThemeFilter extends OncePerRequestFilter {
             Pattern.CASE_INSENSITIVE
     );
 
+    private static final Pattern PORTAL_BRAND_PATTERN = Pattern.compile(
+            "<span id=[\"']portalBrandTitle[\"'][^>]*>.*?</span>",
+            Pattern.CASE_INSENSITIVE
+    );
+
+    private static final Pattern TENANT_PILL_PATTERN = Pattern.compile(
+            "<span id=[\"']tenantPill[\"'][^>]*>.*?</span>",
+            Pattern.CASE_INSENSITIVE
+    );
+
     private final TenantContextResolver tenantContextResolver;
     private final TenantConfigRepository tenantConfigRepository;
 
@@ -155,16 +165,61 @@ public class TenantThemeFilter extends OncePerRequestFilter {
         );
 
         Matcher matcher = THEME_VARS_PATTERN.matcher(html);
+        String processedHtml;
         if (matcher.find()) {
-            return matcher.replaceFirst(Matcher.quoteReplacement(themeStyle));
+            processedHtml = matcher.replaceFirst(Matcher.quoteReplacement(themeStyle));
+        } else {
+            Matcher headMatcher = HEAD_OPEN_PATTERN.matcher(html);
+            if (headMatcher.find()) {
+                processedHtml = headMatcher.replaceFirst("$0\n    " + Matcher.quoteReplacement(themeStyle));
+            } else {
+                processedHtml = html;
+            }
         }
 
-        Matcher headMatcher = HEAD_OPEN_PATTERN.matcher(html);
-        if (headMatcher.find()) {
-            return headMatcher.replaceFirst("$0\n    " + Matcher.quoteReplacement(themeStyle));
+        // Ensure portal brand title is always "Admin Portal" on admin pages
+        Matcher brandMatcher = PORTAL_BRAND_PATTERN.matcher(processedHtml);
+        if (brandMatcher.find()) {
+            processedHtml = brandMatcher.replaceAll("<span id=\"portalBrandTitle\">Admin Portal</span>");
         }
 
-        return html;
+        // Ensure tenant pill displays the actual tenant name with active primary color
+        Matcher pillMatcher = TENANT_PILL_PATTERN.matcher(processedHtml);
+        if (pillMatcher.find()) {
+            String tenantDisplayName = deriveTenantDisplayName(tenantId, configOpt);
+            String replacementPill = String.format(
+                    "<span id=\"tenantPill\" class=\"badge ms-1\" style=\"background-color: %s; font-size: 0.75rem; letter-spacing: 0.05em; font-weight: 700;\">%s</span>",
+                    primaryColor,
+                    tenantDisplayName
+            );
+            processedHtml = pillMatcher.replaceAll(Matcher.quoteReplacement(replacementPill));
+        }
+
+        return processedHtml;
+    }
+
+    public static String deriveTenantDisplayName(String tenantId, Optional<TenantConfig> configOpt) {
+        String key = (tenantId != null) ? tenantId.trim().toLowerCase() : "";
+        if ("luxe".equals(key)) {
+            return "Luxe";
+        }
+        if ("default".equals(key) || key.isBlank()) {
+            return "Jenny";
+        }
+        if (configOpt != null && configOpt.isPresent()) {
+            TenantConfig cfg = configOpt.get();
+            if (cfg.getSalonName() != null && !cfg.getSalonName().isBlank()) {
+                String salon = cfg.getSalonName().trim();
+                if (!salon.toLowerCase().contains("nail")) {
+                    return salon;
+                }
+                String[] parts = salon.split("[\\s'’]");
+                if (parts.length > 0 && parts[0].length() > 1) {
+                    return parts[0];
+                }
+            }
+        }
+        return key.substring(0, 1).toUpperCase() + key.substring(1).toLowerCase();
     }
 
     public static String darkenHex(String hex, int percent) {

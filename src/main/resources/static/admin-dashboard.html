@@ -106,13 +106,18 @@
         <span class="navbar-brand fw-bold text-dark fs-5 d-flex align-items-center gap-2">
             <i class="bi bi-shield-lock-fill text-pink"></i>
             <span id="portalBrandTitle">Admin Portal</span>
-            <span id="tenantPill" class="badge bg-secondary tenant-badge ms-1">DEFAULT</span>
+            <span id="tenantPill" class="badge ms-1" style="background-color: var(--bs-primary-pink); font-size: 0.75rem; letter-spacing: 0.05em; font-weight: 700;">Jenny</span>
         </span>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#adminNav">
             <span class="navbar-toggler-icon"></span>
         </button>
         <div class="collapse navbar-collapse" id="adminNav">
             <ul class="navbar-nav me-auto mb-2 mb-lg-0 ms-lg-4 gap-1">
+                <li class="nav-item">
+                    <a id="navDashboardLink" class="nav-link btn btn-pink text-white btn-sm px-3 fw-semibold me-1" href="/admin/dashboard">
+                        <i class="bi bi-speedometer2 me-1"></i> Dashboard
+                    </a>
+                </li>
                 <li class="nav-item">
                     <a id="navCalendarLink" class="nav-link btn btn-light btn-sm px-3 fw-semibold text-dark me-1" href="/admin/calendar">
                         <i class="bi bi-calendar-week me-1"></i> Calendar
@@ -140,6 +145,7 @@
         </div>
     </div>
 </header>
+<script>if (window.TenantTheme && TenantTheme.syncAdminElements) TenantTheme.syncAdminElements();</script>
 
 <!-- Main Dashboard Container -->
 <main class="container my-5 flex-grow-1">
@@ -379,13 +385,16 @@
         }
 
         document.getElementById('pageTitle').innerText = `Admin Dashboard - ${salonName}`;
-        document.getElementById('portalBrandTitle').innerText = `${salonName} Portal`;
+        document.getElementById('portalBrandTitle').innerText = 'Admin Portal';
         document.getElementById('hubGreeting').innerText = `Welcome to ${salonName} Admin Hub`;
         document.getElementById('footerCopyright').innerHTML = `&copy; ${salonName} — Admin Management Panel`;
 
         const tenantPill = document.getElementById('tenantPill');
         if (tenantPill) {
-            tenantPill.innerText = tenantKey.toUpperCase();
+            const displayName = (typeof TenantTheme !== 'undefined' && TenantTheme.getTenantDisplayName)
+                ? TenantTheme.getTenantDisplayName(tenantKey, salonName)
+                : (tenantKey === 'luxe' ? 'Luxe' : 'Jenny');
+            tenantPill.innerText = displayName;
             tenantPill.style.backgroundColor = primaryColor;
             tenantPill.classList.remove('bg-secondary');
         }
@@ -396,13 +405,21 @@
             document.documentElement.style.setProperty('--bs-primary-pink', '#00b4d8');
             document.documentElement.style.setProperty('--bs-secondary-color', '#03045e');
             document.getElementById('pageTitle').innerText = "Admin Dashboard - Luxe Nail & Spa Sanctuary";
-            document.getElementById('portalBrandTitle').innerText = "Luxe Nail & Spa Portal";
+            document.getElementById('portalBrandTitle').innerText = "Admin Portal";
             document.getElementById('hubGreeting').innerText = "Welcome to Luxe Nail & Spa Admin Hub";
             document.getElementById('footerCopyright').innerHTML = "&copy; Luxe Nail & Spa Sanctuary — Admin Management Panel";
             const pill = document.getElementById('tenantPill');
             if (pill) {
-                pill.innerText = "LUXE";
+                pill.innerText = "Luxe";
                 pill.style.backgroundColor = '#00b4d8';
+                pill.classList.remove('bg-secondary');
+            }
+        } else {
+            document.getElementById('portalBrandTitle').innerText = "Admin Portal";
+            const pill = document.getElementById('tenantPill');
+            if (pill) {
+                pill.innerText = "Jenny";
+                pill.style.backgroundColor = '#e91e63';
                 pill.classList.remove('bg-secondary');
             }
         }

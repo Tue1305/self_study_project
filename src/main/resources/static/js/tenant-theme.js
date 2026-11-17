@@ -70,6 +70,54 @@ const TenantTheme = (function() {
         return `rgba(${(num >> 16) & 255}, ${(num >> 8) & 255}, ${num & 255}, ${alpha})`;
     }
 
+    function getTenantDisplayName(tenantKey, salonName) {
+        const key = (tenantKey || '').trim().toLowerCase();
+        if (key === 'luxe') return 'Luxe';
+        if (key === 'default' || !key) return 'Jenny';
+        if (salonName && !salonName.toLowerCase().includes('nail')) {
+            return salonName;
+        }
+        if (salonName) {
+            const firstWord = salonName.split(/[\s'’]/)[0];
+            if (firstWord && firstWord.length > 1) return firstWord;
+        }
+        return key.charAt(0).toUpperCase() + key.slice(1);
+    }
+
+    function syncAdminElements(tenantId, theme) {
+        const tenant = (tenantId || resolveTenantId()).trim().toLowerCase();
+        const brandEl = document.getElementById('portalBrandTitle');
+        if (brandEl) {
+            brandEl.textContent = 'Admin Portal';
+        }
+
+        const pill = document.getElementById('tenantPill');
+        if (pill) {
+            let salon = theme ? theme.salonName : null;
+            let primary = theme ? theme.primaryColor : null;
+            if (!primary) {
+                try {
+                    const cached = localStorage.getItem('tenant_theme_' + tenant);
+                    if (cached) {
+                        const parsed = JSON.parse(cached);
+                        salon = salon || parsed.salonName;
+                        primary = parsed.primaryColor;
+                    }
+                } catch (e) {}
+            }
+            if (!primary) {
+                primary = (tenant === 'luxe') ? '#00b4d8' : '#e91e63';
+            }
+            const displayName = getTenantDisplayName(tenant, salon);
+            pill.textContent = displayName;
+            pill.style.backgroundColor = primary;
+            pill.classList.remove('bg-secondary');
+            pill.style.fontSize = '0.75rem';
+            pill.style.letterSpacing = '0.05em';
+            pill.style.fontWeight = '700';
+        }
+    }
+
     function applyThemeToDom(theme, tenantId) {
         if (!theme) return;
         const tenant = (tenantId || resolveTenantId()).trim().toLowerCase();
@@ -91,6 +139,8 @@ const TenantTheme = (function() {
             rootStyle.setProperty('--font-family', font);
             rootStyle.setProperty('--tenant-font-family', font);
         }
+
+        syncAdminElements(tenant, theme);
 
         // Cache in localStorage for subsequent page navigation
         try {
@@ -198,11 +248,18 @@ const TenantTheme = (function() {
         syncPreload,
         syncFromApi,
         getAuthHeaders,
-        cleanPath
+        cleanPath,
+        getTenantDisplayName,
+        syncAdminElements
     };
 })();
 
-// Immediately trigger synchronous pre-load if executing in browser
+// Immediately trigger synchronous pre-load and navigation sync if executing in browser
 if (typeof window !== 'undefined' && typeof document !== 'undefined') {
     TenantTheme.syncPreload();
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => TenantTheme.syncAdminElements());
+    } else {
+        TenantTheme.syncAdminElements();
+    }
 }

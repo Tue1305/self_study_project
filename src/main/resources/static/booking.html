@@ -393,6 +393,30 @@
         .time-slot-card.disabled .slot-sub-label {
             color: #dc2626;
         }
+        .time-slot-card.booked {
+            background: #fff8f8;
+            border-color: #fecdd3;
+            color: #be123c;
+            cursor: pointer;
+        }
+        .time-slot-card.booked:hover {
+            border-color: #fb7185;
+            background: #ffe4e6;
+            transform: translateY(-1px);
+        }
+        .time-slot-card.booked .slot-range-text {
+            color: #9f1239;
+        }
+        .time-slot-card.booked .slot-sub-label {
+            color: #e11d48;
+            font-weight: 600;
+        }
+        .service-timeslot-block {
+            transition: all 0.2s ease;
+        }
+        .service-timeslot-block:hover {
+            border-color: #fbcfe8 !important;
+        }
     </style>
 </head>
 <body class="bg-light d-flex flex-column min-vh-100">
@@ -795,8 +819,26 @@
                                 <div id="staffAvailabilityBreakdownContainer" class="col-12 d-none">
                                     <!-- Dynamic Per-Staff Multi-Service Availability Breakdown -->
                                 </div>
-                                <div class="col-12">
-                                    <label class="form-label fw-semibold mb-1">
+                                <div class="col-12" id="slotModeSelectorContainer" style="display: none;">
+                                    <div class="d-flex flex-wrap justify-content-between align-items-center mb-2">
+                                        <label class="form-label fw-bold mb-0 text-dark">
+                                            <i class="bi bi-clock-history text-pink me-1"></i>Select Time Slot for Each Specialist &amp; Service
+                                        </label>
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            <button type="button" class="btn btn-outline-pink active" id="btnModePerService" onclick="toggleSlotSelectionMode('per-service')">Each Staff Time Slot</button>
+                                            <button type="button" class="btn btn-outline-secondary" id="btnModeCombined" onclick="toggleSlotSelectionMode('combined')">Combined Window</button>
+                                        </div>
+                                    </div>
+                                    <div class="small text-muted mb-3">Choose an individual appointment slot for each technician, or switch to a combined window.</div>
+                                </div>
+                                <div class="col-12" id="perServiceSlotsContainer" style="display: none;">
+                                    <!-- Per-Service & Staff Slot Cards rendered dynamically -->
+                                </div>
+                                <div class="col-12" id="combinedSlotsContainer">
+                                    <div id="singleServiceStatusBanner" class="alert alert-light border border-warning-subtle rounded-3 p-3 mb-3 d-none">
+                                        <!-- Interactive Tony is booked banner -->
+                                    </div>
+                                    <label class="form-label fw-semibold mb-1" id="combinedSlotsLabel">
                                         Choose an Available Time Slot Card <span class="text-danger">*</span>
                                         <span class="small fw-normal text-muted ms-1" id="slotDurationBufferHint">(Includes service duration + 15m turnover buffer check)</span>
                                     </label>
@@ -888,7 +930,8 @@
             customerEmail: '',
             notes: '',
             selectedStaff: null, // { id, name, isAnyoneAvailable }
-            serviceStaffAssignments: {} // { [serviceId]: techId }
+            serviceStaffAssignments: {}, // { [serviceId]: techId }
+            serviceTimeSlots: {} // { [serviceId]: '15:00:00' }
         };
     }
 
@@ -903,7 +946,9 @@
         selectedStaff: null,   // Shared / overall technician
         selectedStation: null, // string name e.g. 'Private Zen Suite A'
         servicesList: [],
-        staffList: []
+        staffList: [],
+        serviceTimeSlots: {}, // { [serviceId]: '15:00:00' }
+        slotSelectionMode: 'per-service' // 'per-service' or 'combined'
     };
 
     const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
@@ -1616,6 +1661,37 @@
         const slotVal = document.getElementById('appointmentTimeSlot') ? document.getElementById('appointmentTimeSlot').value : '';
         const totalDuration = getTotalBookingDurationMinutes();
 
+        const guest0 = bookingState.guests && bookingState.guests[0];
+        const guest0Services = (guest0 && Array.isArray(guest0.services)) ? guest0.services : [];
+        const isMultiService = guest0Services.length >= 2;
+        const customSlots = bookingState.serviceTimeSlots || {};
+        const chosenSlotKeys = Object.keys(customSlots);
+
+        if (isMultiService && chosenSlotKeys.length > 0 && bookingState.slotSelectionMode !== 'combined') {
+            const parts = [];
+            guest0Services.forEach(s => {
+                const sSlot = customSlots[String(s.id)];
+                if (sSlot) {
+                    const techId = guest0.serviceStaffAssignments ? guest0.serviceStaffAssignments[s.id] : undefined;
+                    const tech = (techId && techId !== 'anyone') ? (bookingState.staffList || []).find(t => String(t.id) === String(techId)) : null;
+                    const techName = tech ? (tech.name || tech.username) : 'Anyone';
+                    parts.push(`${s.name} (${techName}): ${formatTime24ToRangeLabel(sSlot, s.durationMinutes || 45)}`);
+                }
+            });
+
+            if (parts.length > 0) {
+                const summaryText = parts.join(' | ');
+                if (selectedRangeBadge) {
+                    selectedRangeBadge.textContent = summaryText;
+                    selectedRangeBadge.classList.remove('d-none');
+                }
+                if (summaryTimeEl) {
+                    summaryTimeEl.textContent = dateVal ? `${dateVal} • ${summaryText}` : summaryText;
+                }
+                return;
+            }
+        }
+
         if (slotVal) {
             const rangeText = bookingState.selectedTimeRangeLabel || formatTime24ToRangeLabel(slotVal, totalDuration);
             if (selectedRangeBadge) {
@@ -1635,6 +1711,27 @@
         }
     }
 
+    function toggleSlotSelectionMode(mode) {
+        bookingState.slotSelectionMode = mode;
+        const btnPer = document.getElementById('btnModePerService');
+        const btnComb = document.getElementById('btnModeCombined');
+        const perContainer = document.getElementById('perServiceSlotsContainer');
+        const combContainer = document.getElementById('combinedSlotsContainer');
+
+        if (mode === 'per-service') {
+            if (btnPer) { btnPer.classList.add('active', 'btn-pink'); btnPer.classList.remove('btn-outline-pink'); }
+            if (btnComb) { btnComb.classList.remove('active', 'btn-pink'); btnComb.classList.add('btn-outline-secondary'); }
+            if (perContainer) perContainer.style.display = 'block';
+            if (combContainer) combContainer.style.display = 'none';
+        } else {
+            if (btnComb) { btnComb.classList.add('active', 'btn-pink'); btnComb.classList.remove('btn-outline-secondary'); }
+            if (btnPer) { btnPer.classList.remove('active', 'btn-pink'); btnPer.classList.add('btn-outline-pink'); }
+            if (perContainer) perContainer.style.display = 'none';
+            if (combContainer) combContainer.style.display = 'block';
+        }
+        updateSummaryTimeWindowDisplay();
+    }
+
     function selectTimeSlotCard(value24, rangeLabel) {
         hideAlert();
         const hiddenInput = document.getElementById('appointmentTimeSlot');
@@ -1648,8 +1745,320 @@
         updateSummaryTimeWindowDisplay();
     }
 
+    function selectTimeSlotCardByLabel(timeLabel) {
+        const grid = document.getElementById('timeSlotsGrid');
+        if (!grid) return;
+        const cards = Array.from(grid.querySelectorAll('.time-slot-card:not(.booked)'));
+        const matched = cards.find(c => {
+            const startText = c.querySelector('.slot-start');
+            return startText && startText.textContent.trim() === timeLabel.trim();
+        });
+        if (matched) {
+            matched.click();
+        }
+    }
+
+    function selectServiceTimeSlot(srvId, slotValue, rangeLabel, durationMinutes) {
+        hideAlert();
+        if (!bookingState.serviceTimeSlots) bookingState.serviceTimeSlots = {};
+        bookingState.serviceTimeSlots[srvId] = slotValue;
+
+        if (bookingState.guests[0]) {
+            if (!bookingState.guests[0].serviceTimeSlots) bookingState.guests[0].serviceTimeSlots = {};
+            bookingState.guests[0].serviceTimeSlots[srvId] = slotValue;
+        }
+
+        const srvGrid = document.getElementById(`srvSlotsGrid_${srvId}`);
+        if (srvGrid) {
+            srvGrid.querySelectorAll('.time-slot-card').forEach(card => {
+                card.classList.toggle('selected', card.getAttribute('data-slot-value') === slotValue);
+            });
+        }
+
+        const badge = document.getElementById(`srvBadge_${srvId}`);
+        if (badge) {
+            badge.textContent = rangeLabel || formatTime24ToRangeLabel(slotValue, durationMinutes || 45);
+        }
+
+        updateOverallTimeSlotFromPerService();
+        updateSummaryTimeWindowDisplay();
+    }
+
+    function selectServiceTimeSlotByLabel(srvId, timeLabel) {
+        const srvGrid = document.getElementById(`srvSlotsGrid_${srvId}`);
+        if (!srvGrid) return;
+        const cards = Array.from(srvGrid.querySelectorAll('.time-slot-card:not(.booked)'));
+        const matched = cards.find(c => {
+            const startText = c.querySelector('.slot-start');
+            return startText && startText.textContent.trim() === timeLabel.trim();
+        });
+        if (matched) {
+            matched.click();
+        }
+    }
+
+    function updateOverallTimeSlotFromPerService() {
+        const srvSlots = Object.values(bookingState.serviceTimeSlots).filter(Boolean);
+        if (srvSlots.length > 0) {
+            const sorted = [...srvSlots].sort();
+            bookingState.selectedTimeSlot = sorted[0];
+            const hiddenInput = document.getElementById('appointmentTimeSlot');
+            if (hiddenInput) hiddenInput.value = sorted[0];
+        }
+    }
+
+    async function switchTechToAnyoneAndSelect(srvId, slotValue) {
+        hideAlert();
+        const guest0 = bookingState.guests && bookingState.guests[0];
+        if (guest0) {
+            if (!guest0.serviceStaffAssignments) guest0.serviceStaffAssignments = {};
+            guest0.serviceStaffAssignments[srvId] = 'anyone';
+        }
+        bookingState.pendingSelectSlot = { srvId: srvId, slotValue: slotValue };
+
+        const dateInput = document.getElementById('appointmentDate');
+        if (dateInput && dateInput.value) {
+            await handleDateChange(dateInput.value);
+        }
+    }
+
+    function showServiceSlotConflict(srvId, slot, techName) {
+        const banner = document.getElementById(`srvStatusBanner_${srvId}`);
+        const textEl = document.getElementById(`srvStatusText_${srvId}`);
+        const btnsEl = document.getElementById(`srvActionButtons_${srvId}`);
+        if (!banner || !textEl || !btnsEl) return;
+
+        const tName = techName || 'This specialist';
+        const nextAvail = slot.nextAvailable || 'later';
+        const msg = slot.statusMessage || `${tName} is booked at this time. The next available is ${nextAvail}, or choose Anyone Available at ${slot.label}`;
+        textEl.textContent = msg;
+
+        btnsEl.innerHTML = `
+            <button type="button" class="btn btn-sm btn-pink rounded-pill px-3 fw-bold" onclick="switchTechToAnyoneAndSelect('${srvId}', '${slot.value}')">
+                <i class="bi bi-lightning-charge-fill me-1"></i>Choose Anyone Available at ${slot.label}
+            </button>
+            ${slot.nextAvailable ? `
+            <button type="button" class="btn btn-sm btn-outline-pink rounded-pill px-3 fw-bold" onclick="selectServiceTimeSlotByLabel('${srvId}', '${slot.nextAvailable}')">
+                <i class="bi bi-check-circle me-1"></i>Next Available: ${slot.nextAvailable}
+            </button>` : ''}
+        `;
+        banner.classList.remove('d-none');
+        banner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    function showSingleServiceSlotConflict(slot) {
+        const banner = document.getElementById('singleServiceStatusBanner');
+        if (!banner) return;
+
+        const guest0 = bookingState.guests && bookingState.guests[0];
+        const staff = guest0 ? guest0.selectedStaff : bookingState.selectedStaff;
+        const tName = (staff && !staff.isAnyoneAvailable) ? staff.name : (slot.staffBookedDesc || 'Specialist');
+        const nextAvail = slot.nextAvailable || (slot.staffBreakdown && slot.staffBreakdown[0] ? slot.staffBreakdown[0].nextAvailable : null) || 'later';
+
+        banner.innerHTML = `
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                <div class="d-flex align-items-center gap-2 small">
+                    <span class="badge bg-warning text-dark fw-bold"><i class="bi bi-clock-history me-1"></i>Schedule Notice</span>
+                    <span class="text-dark">
+                        <strong>${tName} is booked at ${slot.label}.</strong> The next available is <strong>${nextAvail}</strong>, or choose Anyone Available at ${slot.label}.
+                    </span>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-sm btn-pink rounded-pill px-3 fw-bold" onclick="switchSingleTechToAnyone('${slot.value}')">
+                        <i class="bi bi-lightning-charge-fill me-1"></i>Anyone Available at ${slot.label}
+                    </button>
+                    ${nextAvail && nextAvail !== 'later' ? `
+                    <button type="button" class="btn btn-sm btn-outline-pink rounded-pill px-3 fw-bold" onclick="selectTimeSlotCardByLabel('${nextAvail}')">
+                        <i class="bi bi-check-circle me-1"></i>Next Available: ${nextAvail}
+                    </button>` : ''}
+                </div>
+            </div>
+        `;
+        banner.classList.remove('d-none');
+        banner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    async function switchSingleTechToAnyone(slotValue) {
+        hideAlert();
+        bookingState.selectedStaff = { id: null, name: 'Anyone Available', isAnyoneAvailable: true };
+        if (bookingState.guests[0]) {
+            bookingState.guests[0].selectedStaff = { id: null, name: 'Anyone Available', isAnyoneAvailable: true };
+            if (bookingState.guests[0].serviceStaffAssignments) {
+                Object.keys(bookingState.guests[0].serviceStaffAssignments).forEach(k => {
+                    bookingState.guests[0].serviceStaffAssignments[k] = 'anyone';
+                });
+            }
+        }
+        bookingState.pendingSelectSlot = { slotValue: slotValue };
+        const dateInput = document.getElementById('appointmentDate');
+        if (dateInput && dateInput.value) {
+            await handleDateChange(dateInput.value);
+        }
+    }
+
+    function renderSingleServiceStatusNotice(apiResponse, rawSlots) {
+        const banner = document.getElementById('singleServiceStatusBanner');
+        if (!banner) return;
+
+        const guest0 = bookingState.guests && bookingState.guests[0];
+        const staff = guest0 ? guest0.selectedStaff : bookingState.selectedStaff;
+        if (!staff || staff.isAnyoneAvailable) {
+            banner.innerHTML = '';
+            banner.classList.add('d-none');
+            return;
+        }
+
+        const tName = staff.name || 'Specialist';
+        const conflicts = (apiResponse && Array.isArray(apiResponse.staffConflicts)) ? apiResponse.staffConflicts : [];
+        if (conflicts.length > 0) {
+            const firstConf = conflicts[0];
+            const b0 = (firstConf.breakdown && firstConf.breakdown[0]) ? firstConf.breakdown[0] : {};
+            const nextAvail = b0.nextAvailable || 'later';
+            const slotLabel = firstConf.time || 'this timeslot';
+
+            banner.innerHTML = `
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                    <div class="d-flex align-items-center gap-2 small">
+                        <span class="badge bg-warning text-dark fw-bold"><i class="bi bi-clock-history me-1"></i>Schedule Notice</span>
+                        <span class="text-dark">
+                            <strong>${tName} is booked at ${slotLabel}.</strong> The next available is <strong>${nextAvail}</strong>, or choose Anyone Available at ${slotLabel}.
+                        </span>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-sm btn-pink rounded-pill px-3 fw-bold" onclick="switchSingleTechToAnyone('${firstConf.time}')">
+                            <i class="bi bi-lightning-charge-fill me-1"></i>Anyone Available at ${slotLabel}
+                        </button>
+                        ${nextAvail && nextAvail !== 'later' ? `
+                        <button type="button" class="btn btn-sm btn-outline-pink rounded-pill px-3 fw-bold" onclick="selectTimeSlotCardByLabel('${nextAvail}')">
+                            <i class="bi bi-check-circle me-1"></i>Next Available: ${nextAvail}
+                        </button>` : ''}
+                    </div>
+                </div>
+            `;
+            banner.classList.remove('d-none');
+        } else {
+            banner.innerHTML = '';
+            banner.classList.add('d-none');
+        }
+    }
+
+    function renderPerServiceSlotCards(servicesAvail, guest0Services) {
+        const perContainer = document.getElementById('perServiceSlotsContainer');
+        if (!perContainer) return;
+        perContainer.innerHTML = '';
+
+        const selectedDate = document.getElementById('appointmentDate') ? document.getElementById('appointmentDate').value : '';
+        const isToday = (selectedDate === getLocalTodayDateStr());
+        const nowPlusBuffer = new Date(Date.now() + 15 * 60 * 1000);
+
+        servicesAvail.forEach((seg, srvIdx) => {
+            const srvId = String(seg.serviceId);
+            const currentSelectedSlot = (bookingState.serviceTimeSlots && bookingState.serviceTimeSlots[srvId]) || '';
+
+            const cardBlock = document.createElement('div');
+            cardBlock.className = 'service-timeslot-block card border rounded-4 p-3 mb-3 bg-white shadow-sm';
+            cardBlock.id = `srvBlock_${srvId}`;
+
+            const conflictSlot = (seg.slots || []).find(s => !s.available && !s.isPast);
+
+            cardBlock.innerHTML = `
+                <div class="d-flex flex-wrap justify-content-between align-items-center mb-2 pb-2 border-bottom gap-2">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge bg-pink text-white rounded-pill px-2 py-1">Service ${srvIdx + 1}</span>
+                        <strong class="text-dark fs-6">${seg.serviceName}</strong>
+                        <span class="badge bg-light text-muted border">${seg.durationMinutes} mins</span>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge bg-light text-dark border">
+                            <i class="bi bi-person-fill text-pink me-1"></i>${seg.techName || 'Anyone Available'}
+                        </span>
+                        <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1" id="srvBadge_${srvId}">
+                            ${currentSelectedSlot ? formatTime24ToRangeLabel(currentSelectedSlot, seg.durationMinutes) : 'Please pick a time'}
+                        </span>
+                    </div>
+                </div>
+                <div id="srvStatusBanner_${srvId}" class="alert alert-light border border-warning-subtle rounded-3 p-3 mb-3 ${conflictSlot ? '' : 'd-none'}">
+                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                        <div class="d-flex align-items-center gap-2 small">
+                            <span class="badge bg-warning text-dark fw-bold"><i class="bi bi-clock-history me-1"></i>Notice</span>
+                            <span class="text-dark" id="srvStatusText_${srvId}">
+                                ${conflictSlot ? (conflictSlot.statusMessage || `${seg.techName} is booked at this time. The next available is ${conflictSlot.nextAvailable || 'later'}, or choose Anyone Available at ${conflictSlot.label}`) : ''}
+                            </span>
+                        </div>
+                        <div class="d-flex gap-2" id="srvActionButtons_${srvId}">
+                            ${conflictSlot ? `
+                                <button type="button" class="btn btn-sm btn-pink rounded-pill px-3 fw-bold" onclick="switchTechToAnyoneAndSelect('${srvId}', '${conflictSlot.value}')">
+                                    <i class="bi bi-lightning-charge-fill me-1"></i>Anyone at ${conflictSlot.label}
+                                </button>
+                                ${conflictSlot.nextAvailable ? `
+                                <button type="button" class="btn btn-sm btn-outline-pink rounded-pill px-3 fw-bold" onclick="selectServiceTimeSlotByLabel('${srvId}', '${conflictSlot.nextAvailable}')">
+                                    <i class="bi bi-check-circle me-1"></i>Next: ${conflictSlot.nextAvailable}
+                                </button>` : ''}
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
+                <div class="small fw-semibold text-muted mb-2">Available Time Slots for ${seg.serviceName} (${seg.techName}):</div>
+                <div class="time-slots-grid" id="srvSlotsGrid_${srvId}">
+                </div>
+            `;
+
+            const srvGrid = cardBlock.querySelector(`#srvSlotsGrid_${srvId}`);
+            const rawSegSlots = Array.isArray(seg.slots) ? seg.slots : [];
+            let renderedSlotCount = 0;
+
+            rawSegSlots.forEach(slot => {
+                let isAvail = Boolean(slot.available);
+                if (isToday && slot.value) {
+                    const parts = slot.value.split(':');
+                    const slotDateObj = new Date();
+                    slotDateObj.setHours(parseInt(parts[0], 10), parseInt(parts[1] || '0', 10), 0, 0);
+                    if (slotDateObj < nowPlusBuffer) {
+                        return;
+                    }
+                } else if (slot.isPast) {
+                    return;
+                }
+
+                renderedSlotCount++;
+                const card = document.createElement('div');
+                const isSelected = currentSelectedSlot === slot.value;
+
+                if (isAvail) {
+                    card.className = `time-slot-card ${isSelected ? 'selected' : ''}`.trim();
+                    card.setAttribute('data-slot-value', slot.value);
+                    card.innerHTML = `
+                        <div class="slot-start">${slot.label}</div>
+                        <div class="slot-range">${slot.timeRangeLabel}</div>
+                        <span class="slot-status-tag text-success"><i class="bi bi-check-circle-fill me-1"></i>Available</span>
+                    `;
+                    card.onclick = () => selectServiceTimeSlot(srvId, slot.value, slot.timeRangeLabel, seg.durationMinutes);
+                } else {
+                    card.className = 'time-slot-card booked';
+                    card.setAttribute('data-slot-value', slot.value);
+                    card.innerHTML = `
+                        <div class="slot-start">${slot.label}</div>
+                        <div class="slot-range">${slot.timeRangeLabel}</div>
+                        <span class="slot-status-tag text-danger"><i class="bi bi-person-x-fill me-1"></i>Booked</span>
+                    `;
+                    card.onclick = () => showServiceSlotConflict(srvId, slot, seg.techName);
+                }
+                srvGrid.appendChild(card);
+            });
+
+            if (renderedSlotCount === 0) {
+                srvGrid.innerHTML = '<div class="text-muted small py-3 text-center" style="grid-column: 1 / -1;">No available time slots on this date.</div>';
+            }
+
+            perContainer.appendChild(cardBlock);
+        });
+    }
+
     function renderTimeSlotCardsGrid() {
         const grid = document.getElementById('timeSlotsGrid');
+        const modeSelector = document.getElementById('slotModeSelectorContainer');
+        const perContainer = document.getElementById('perServiceSlotsContainer');
+        const combContainer = document.getElementById('combinedSlotsContainer');
         if (!grid) return;
 
         const selectedDate = document.getElementById('appointmentDate') ? document.getElementById('appointmentDate').value : '';
@@ -1657,22 +2066,37 @@
         const currentSelected = document.getElementById('appointmentTimeSlot') ? document.getElementById('appointmentTimeSlot').value : '';
 
         const rawSlots = Array.isArray(bookingState.availableSlotsCache) ? bookingState.availableSlotsCache : [];
-        if (rawSlots.length === 0) {
-            grid.innerHTML = '<div class="text-muted small py-3 text-center" style="grid-column: 1 / -1;">No time slots available for this date.</div>';
-            return;
-        }
-
         const isToday = (selectedDate === getLocalTodayDateStr());
         const nowPlusBuffer = new Date(Date.now() + 15 * 60 * 1000);
 
-        // Enrich slots with real-time browser clock check for Today
+        const guest0 = bookingState.guests && bookingState.guests[0];
+        const guest0Services = (guest0 && Array.isArray(guest0.services)) ? guest0.services : [];
+        const isMultiService = guest0Services.length >= 2;
+        const apiResponse = bookingState.lastAvailabilityResponse;
+        const servicesAvail = (apiResponse && Array.isArray(apiResponse.servicesAvailability)) ? apiResponse.servicesAvailability : [];
+
+        // 1. If 2+ services exist and servicesAvailability is returned, provide Per-Service & Staff Time Slot option
+        if (isMultiService && servicesAvail.length >= 2) {
+            if (modeSelector) modeSelector.style.display = 'block';
+            renderPerServiceSlotCards(servicesAvail, guest0Services);
+            toggleSlotSelectionMode(bookingState.slotSelectionMode || 'per-service');
+        } else {
+            if (modeSelector) modeSelector.style.display = 'none';
+            if (perContainer) perContainer.style.display = 'none';
+            if (combContainer) combContainer.style.display = 'block';
+        }
+
+        // 2. Render Single Service Status Notice if technician is booked at candidate slot
+        renderSingleServiceStatusNotice(apiResponse, rawSlots);
+
+        // 3. Process combined slots
         const processedSlots = rawSlots.map(slot => {
             let isAvailable = Boolean(slot.available);
             let reason = slot.reason || null;
             if (isToday && slot.value) {
                 const parts = slot.value.split(':');
                 const slotDateObj = new Date();
-                slotDateObj.setHours( parseInt(parts[0], 10), parseInt(parts[1] || '0', 10), 0, 0 );
+                slotDateObj.setHours(parseInt(parts[0], 10), parseInt(parts[1] || '0', 10), 0, 0);
                 if (slotDateObj < nowPlusBuffer) {
                     isAvailable = false;
                     reason = 'Passed';
@@ -1689,16 +2113,13 @@
             };
         });
 
-        // 1. Render multi-staff breakdown & "Staff booked" mini-descriptions
-        renderStaffAvailabilityBreakdown(bookingState.lastAvailabilityResponse, rawSlots, processedSlots);
+        renderStaffAvailabilityBreakdown(apiResponse, rawSlots, processedSlots);
 
-        // 2. Automatically hide past & booked slots (no manual toggle needed)
         const visibleSlots = processedSlots.filter(s => s.available);
 
-        // If previously selected slot is no longer available, clear selection
         if (currentSelected) {
             const foundSel = visibleSlots.find(s => s.value === currentSelected);
-            if (!foundSel) {
+            if (!foundSel && (!isMultiService || bookingState.slotSelectionMode === 'combined')) {
                 document.getElementById('appointmentTimeSlot').value = '';
                 bookingState.selectedTimeSlot = null;
                 bookingState.selectedTimeRangeLabel = null;
@@ -1720,19 +2141,33 @@
         grid.innerHTML = '';
         const activeVal = document.getElementById('appointmentTimeSlot').value;
 
-        visibleSlots.forEach(slot => {
+        processedSlots.forEach(slot => {
+            if (slot.reason === 'Passed' || (slot.isPast && !slot.available)) {
+                return;
+            }
+
             const card = document.createElement('div');
             const isSel = activeVal === slot.value;
-            card.className = `time-slot-card ${isSel ? 'selected' : ''}`.trim();
-            card.setAttribute('data-slot-value', slot.value);
 
-            card.innerHTML = `
-                <div class="slot-start">${slot.label}</div>
-                <div class="slot-range">${slot.timeRangeLabel}</div>
-                <span class="slot-status-tag text-success"><i class="bi bi-check-circle-fill me-1"></i>Available</span>
-            `;
-
-            card.onclick = () => selectTimeSlotCard(slot.value, slot.timeRangeLabel);
+            if (slot.available) {
+                card.className = `time-slot-card ${isSel ? 'selected' : ''}`.trim();
+                card.setAttribute('data-slot-value', slot.value);
+                card.innerHTML = `
+                    <div class="slot-start">${slot.label}</div>
+                    <div class="slot-range">${slot.timeRangeLabel}</div>
+                    <span class="slot-status-tag text-success"><i class="bi bi-check-circle-fill me-1"></i>Available</span>
+                `;
+                card.onclick = () => selectTimeSlotCard(slot.value, slot.timeRangeLabel);
+            } else {
+                card.className = 'time-slot-card booked';
+                card.setAttribute('data-slot-value', slot.value);
+                card.innerHTML = `
+                    <div class="slot-start">${slot.label}</div>
+                    <div class="slot-range">${slot.timeRangeLabel}</div>
+                    <span class="slot-status-tag text-danger"><i class="bi bi-person-x-fill me-1"></i>Booked</span>
+                `;
+                card.onclick = () => showSingleServiceSlotConflict(slot);
+            }
             grid.appendChild(card);
         });
 
@@ -1984,6 +2419,16 @@
                 bookingState.lastAvailabilityResponse = data;
                 bookingState.availableSlotsCache = data.availableSlots || [];
                 renderTimeSlotCardsGrid();
+
+                if (bookingState.pendingSelectSlot) {
+                    const { srvId, slotValue } = bookingState.pendingSelectSlot;
+                    bookingState.pendingSelectSlot = null;
+                    if (srvId && slotValue) {
+                        selectServiceTimeSlot(srvId, slotValue);
+                    } else if (slotValue) {
+                        selectTimeSlotCard(slotValue);
+                    }
+                }
                 return;
             }
         } catch (e) {
@@ -3232,6 +3677,7 @@
             service: (primaryGuest.services && primaryGuest.services.length > 0)
                 ? { id: primaryGuest.services[0].id }
                 : null,
+            serviceTimeSlots: bookingState.serviceTimeSlots || {},
             guests: bookingState.guests.map((g, idx) => ({
                 guestNumber: idx + 1,
                 customerName: g.customerName,
@@ -3239,7 +3685,8 @@
                 customerEmail: g.customerEmail,
                 notes: g.notes,
                 serviceIds: g.services.map(s => s.id),
-                serviceStaffAssignments: g.serviceStaffAssignments || {}
+                serviceStaffAssignments: g.serviceStaffAssignments || {},
+                serviceTimeSlots: g.serviceTimeSlots || bookingState.serviceTimeSlots || {}
             }))
         };
 
@@ -3301,8 +3748,10 @@
                     ? bookingState.staffList.find(t => t.id === assignedId)
                     : null;
                 const techText = assignedTech ? ` &bull; <span class="text-secondary">${assignedTech.name || assignedTech.username}</span>` : '';
+                const customSlot = (g.serviceTimeSlots && g.serviceTimeSlots[s.id]) || (bookingState.serviceTimeSlots && bookingState.serviceTimeSlots[s.id]);
+                const timeText = customSlot ? ` &bull; <span class="badge bg-light text-pink border">${formatTime24ToRangeLabel(customSlot, s.durationMinutes || 45)}</span>` : '';
                 return `<li class="d-flex justify-content-between small py-1">
-                    <span>${s.name} (${s.durationMinutes || 45} mins)${techText}</span>
+                    <span>${s.name} (${s.durationMinutes || 45} mins)${techText}${timeText}</span>
                     <span class="fw-semibold text-pink">$${Number(s.price || 0).toFixed(2)}</span>
                 </li>`;
             }).join('');

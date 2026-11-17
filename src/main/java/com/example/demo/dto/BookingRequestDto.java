@@ -31,6 +31,7 @@ public class BookingRequestDto {
     private ServiceEntity service;
     private List<Long> serviceIds = new ArrayList<>();
     private java.util.Map<String, Long> serviceStaffAssignments = new java.util.HashMap<>();
+    private java.util.Map<String, String> serviceTimeSlots = new java.util.HashMap<>();
     private Boolean manualOverride = false;
 
     public static class GuestBookingItem {
@@ -42,6 +43,7 @@ public class BookingRequestDto {
         private List<Long> serviceIds = new ArrayList<>();
         private List<ServiceEntity> services = new ArrayList<>();
         private java.util.Map<String, Long> serviceStaffAssignments = new java.util.HashMap<>();
+        private java.util.Map<String, String> serviceTimeSlots = new java.util.HashMap<>();
 
         public GuestBookingItem() {
         }
@@ -108,6 +110,14 @@ public class BookingRequestDto {
 
         public void setServiceStaffAssignments(java.util.Map<String, Long> serviceStaffAssignments) {
             this.serviceStaffAssignments = serviceStaffAssignments != null ? serviceStaffAssignments : new java.util.HashMap<>();
+        }
+
+        public java.util.Map<String, String> getServiceTimeSlots() {
+            return serviceTimeSlots;
+        }
+
+        public void setServiceTimeSlots(java.util.Map<String, String> serviceTimeSlots) {
+            this.serviceTimeSlots = serviceTimeSlots != null ? serviceTimeSlots : new java.util.HashMap<>();
         }
     }
 
@@ -200,6 +210,14 @@ public class BookingRequestDto {
 
     public void setServiceStaffAssignments(java.util.Map<String, Long> serviceStaffAssignments) {
         this.serviceStaffAssignments = serviceStaffAssignments != null ? serviceStaffAssignments : new java.util.HashMap<>();
+    }
+
+    public java.util.Map<String, String> getServiceTimeSlots() {
+        return serviceTimeSlots;
+    }
+
+    public void setServiceTimeSlots(java.util.Map<String, String> serviceTimeSlots) {
+        this.serviceTimeSlots = serviceTimeSlots != null ? serviceTimeSlots : new java.util.HashMap<>();
     }
 
     public Boolean getManualOverride() {

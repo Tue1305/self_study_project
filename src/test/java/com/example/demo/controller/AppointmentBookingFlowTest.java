@@ -393,6 +393,7 @@ class AppointmentBookingFlowTest {
 
         when(userRepository.findByTenantIdAndId("default", 10L)).thenReturn(Optional.of(tony));
         when(userRepository.findByTenantIdAndId("default", 20L)).thenReturn(Optional.of(chloe));
+        when(userRepository.findAllByTenantIdAndRole("default", "ROLE_NAIL_TECH")).thenReturn(List.of(tony, chloe));
         when(serviceRepository.findByTenantIdAndId("default", 101L)).thenReturn(Optional.of(pediSvc));
         when(serviceRepository.findByTenantIdAndId("default", 102L)).thenReturn(Optional.of(maniSvc));
         when(appointmentRepository.findByTenantIdAndAppointmentTimeBetween(
@@ -425,6 +426,100 @@ class AppointmentBookingFlowTest {
                 .andExpect(jsonPath("$.availableSlots[?(@.value == '16:15:00')].timeRangeLabel").value("4:15 PM – 5:45 PM"))
                 .andExpect(jsonPath("$.availableSlots[?(@.value == '16:15:00')].staffBreakdown[0].available").value(true))
                 .andExpect(jsonPath("$.availableSlots[?(@.value == '16:15:00')].staffBreakdown[1].available").value(true))
-                .andExpect(jsonPath("$.staffConflicts[0].staffBookedDesc").value("Tony booked 3:00 PM – 4:15 PM"));
+                .andExpect(jsonPath("$.staffConflicts[0].staffBookedDesc").value("Tony booked 3:00 PM – 4:15 PM"))
+                // Per-service availability breakdown allowing selection of each staff/service timeslot
+                .andExpect(jsonPath("$.servicesAvailability[0].serviceName").value("Pedicure Deluxe"))
+                .andExpect(jsonPath("$.servicesAvailability[0].techName").value("Tony"))
+                .andExpect(jsonPath("$.servicesAvailability[0].slots[?(@.value == '15:00:00')].available").value(false))
+                .andExpect(jsonPath("$.servicesAvailability[0].slots[?(@.value == '15:00:00')].statusMessage").value("Tony is booked at this time. The next available is 4:15 PM, or choose Anyone Available at 3:00 PM"))
+                .andExpect(jsonPath("$.servicesAvailability[0].slots[?(@.value == '15:00:00')].anyoneAvailableAtSlot").value(true))
+                .andExpect(jsonPath("$.servicesAvailability[1].serviceName").value("Express Manicure"))
+                .andExpect(jsonPath("$.servicesAvailability[1].techName").value("Chloe"))
+                .andExpect(jsonPath("$.servicesAvailability[1].slots[?(@.value == '15:00:00')].available").value(true));
+    }
+
+    @Test
+    void testMultiServiceBookingWithPerServiceTimeSlots() throws Exception {
+        UserEntity tony = new UserEntity();
+        tony.setId(10L);
+        tony.setName("Tony");
+        tony.setTenantId("default");
+
+        UserEntity chloe = new UserEntity();
+        chloe.setId(20L);
+        chloe.setName("Chloe");
+        chloe.setTenantId("default");
+
+        ServiceEntity mani = new ServiceEntity("default", "Manicure", "Mani", new BigDecimal("35.00"), 30);
+        mani.setId(101L);
+        ServiceEntity pedi = new ServiceEntity("default", "Pedicure", "Pedi", new BigDecimal("45.00"), 45);
+        pedi.setId(102L);
+
+        when(userRepository.findByTenantIdAndId("default", 10L)).thenReturn(Optional.of(tony));
+        when(userRepository.findByTenantIdAndId("default", 20L)).thenReturn(Optional.of(chloe));
+        when(serviceRepository.findByTenantIdAndId("default", 101L)).thenReturn(Optional.of(mani));
+        when(serviceRepository.findByTenantIdAndId("default", 102L)).thenReturn(Optional.of(pedi));
+        when(customerRepository.findByEmail("jane@example.com")).thenReturn(Optional.empty());
+        when(customerRepository.save(any(Customer.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        java.util.List<Appointment> savedList = new java.util.ArrayList<>();
+        when(appointmentRepository.save(any(Appointment.class))).thenAnswer(inv -> {
+            Appointment a = inv.getArgument(0);
+            if (a.getId() == null) a.setId((long) (300 + savedList.size()));
+            savedList.add(a);
+            return a;
+        });
+
+        // Customer books Manicure with Tony at 15:00 and Pedicure with Chloe at 15:30
+        String payload = """
+                {
+                  "appointmentTime": "2026-11-20T15:00:00",
+                  "customerName": "Jane Doe",
+                  "customerEmail": "jane@example.com",
+                  "customerPhone": "(555) 123-4567",
+                  "serviceIds": [101, 102],
+                  "serviceTimeSlots": {
+                    "101": "15:00:00",
+                    "102": "15:30:00"
+                  },
+                  "guests": [
+                    {
+                      "guestNumber": 1,
+                      "customerName": "Jane Doe",
+                      "customerEmail": "jane@example.com",
+                      "customerPhone": "(555) 123-4567",
+                      "serviceIds": [101, 102],
+                      "serviceStaffAssignments": {
+                        "101": 10,
+                        "102": 20
+                      },
+                      "serviceTimeSlots": {
+                        "101": "15:00:00",
+                        "102": "15:30:00"
+                      }
+                    }
+                  ]
+                }
+                """;
+
+        mockMvc.perform(post("/api/bookings")
+                        .header("X-Tenant-ID", "default")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.appointments.length()").value(2));
+
+        // Verify that Service 1 (Manicure) was saved with Tony at 15:00
+        org.junit.jupiter.api.Assertions.assertEquals(2, savedList.size());
+        Appointment appt1 = savedList.get(0);
+        org.junit.jupiter.api.Assertions.assertEquals(101L, appt1.getService().getId());
+        org.junit.jupiter.api.Assertions.assertEquals(10L, appt1.getNailTech().getId());
+        org.junit.jupiter.api.Assertions.assertEquals(LocalDateTime.of(2026, 11, 20, 15, 0), appt1.getAppointmentTime());
+
+        // Verify that Service 2 (Pedicure) was saved with Chloe at 15:30
+        Appointment appt2 = savedList.get(1);
+        org.junit.jupiter.api.Assertions.assertEquals(102L, appt2.getService().getId());
+        org.junit.jupiter.api.Assertions.assertEquals(20L, appt2.getNailTech().getId());
+        org.junit.jupiter.api.Assertions.assertEquals(LocalDateTime.of(2026, 11, 20, 15, 30), appt2.getAppointmentTime());
     }
 }

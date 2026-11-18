@@ -65,6 +65,17 @@
             box-shadow: 0 2px 5px rgba(233, 30, 99, 0.15);
         }
 
+        /* Subtle greyed out placeholder styling across all browsers */
+        ::placeholder,
+        ::-webkit-input-placeholder,
+        ::-moz-placeholder,
+        :-ms-input-placeholder,
+        .form-control::placeholder {
+            color: #9ca3af !important;
+            -webkit-text-fill-color: #9ca3af !important;
+            opacity: 0.65 !important;
+        }
+
         /* Wizard Stepper Styles */
         .wizard-stepper {
             display: flex;
@@ -549,7 +560,7 @@
                                     </div>
                                     <div class="col-md-7">
                                         <label for="portalRescheduleReason" class="form-label fw-semibold small">Reason for Rescheduling (Optional)</label>
-                                        <input type="text" class="form-control" id="portalRescheduleReason" placeholder="e.g., Schedule change, personal conflict">
+                                        <input type="text" class="form-control" id="portalRescheduleReason" placeholder="">
                                     </div>
                                     <div class="col-12">
                                         <div class="d-flex justify-content-between align-items-center mb-2">
@@ -780,17 +791,17 @@
                             <div class="row g-3 mb-3">
                                 <div class="col-md-6">
                                     <label for="customerName" class="form-label fw-semibold"><span id="guestNameLabel">Guest 1 Full Name</span> <span class="text-danger">*</span></label>
-                                    <input type="text" class="form-control" id="customerName" required placeholder="Jane Doe">
+                                    <input type="text" class="form-control" id="customerName" required placeholder="">
                                 </div>
                                 <div class="col-md-6">
                                     <label for="customerPhone" class="form-label fw-semibold"><span id="guestPhoneLabel">Guest 1 Phone Number</span> <span class="text-danger">*</span></label>
-                                    <input type="tel" class="form-control" id="customerPhone" required placeholder="(555) 000-0000">
+                                    <input type="tel" class="form-control" id="customerPhone" required placeholder="">
                                 </div>
                             </div>
 
                             <div class="mb-3">
-                                <label for="customerEmail" class="form-label fw-semibold"><span id="guestEmailLabel">Guest 1 Email Address</span> <span class="text-danger">*</span></label>
-                                <input type="email" class="form-control" id="customerEmail" required placeholder="jane@example.com" oninput="validateEmailField(this)">
+                                <label for="customerEmail" class="form-label fw-semibold"><span id="guestEmailLabel">Guest 1 Email Address</span> <span class="text-muted fw-normal small">(Optional)</span></label>
+                                <input type="email" class="form-control" id="customerEmail" placeholder="" oninput="validateEmailField(this)">
                                 <div id="emailValidationError" class="text-danger small mt-1 d-none">
                                     <i class="bi bi-exclamation-circle me-1"></i>Please enter a valid email address with a proper domain (e.g. name@example.com).
                                 </div>
@@ -799,7 +810,7 @@
                             <div class="form-check mb-3">
                                 <input class="form-check-input" type="checkbox" id="smsConsentCheck" checked>
                                 <label class="form-check-label small text-muted" for="smsConsentCheck">
-                                    <i class="bi bi-chat-dots-fill text-pink me-1"></i>Send me booking confirmation, live schedule updates, and 24-hr reminder notifications via SMS &amp; Email.
+                                    <i class="bi bi-chat-dots-fill text-pink me-1"></i>Send me booking confirmation, live schedule updates, and 24-hr reminder notifications via SMS &amp; Email (if provided).
                                 </label>
                             </div>
 
@@ -869,7 +880,7 @@
                                     <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill py-0 px-2" style="font-size: 0.8rem;" onclick="appendNoteChip('Square nail shape preference')">+ Square Shape</button>
                                     <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill py-0 px-2" style="font-size: 0.8rem;" onclick="appendNoteChip('Sensitive cuticles / gentle care needed')">+ Sensitive Cuticles</button>
                                 </div>
-                                <textarea class="form-control" id="appointmentNotes" rows="3" placeholder="e.g., Nail shape preference, design reference, or allergies..."></textarea>
+                                <textarea class="form-control" id="appointmentNotes" rows="3" placeholder=""></textarea>
                             </div>
 
                             <!-- Policy & In-Salon Payment Clarity Banner -->
@@ -1788,6 +1799,45 @@
         updateSummaryTimeWindowDisplay();
     }
 
+    function autoPopulateSequentialServiceSlots(startValue24) {
+        if (!startValue24 || !startValue24.includes(':')) return;
+        if (!bookingState.serviceTimeSlots) bookingState.serviceTimeSlots = {};
+        const guest0 = bookingState.guests && bookingState.guests[0];
+        const services = (guest0 && Array.isArray(guest0.services)) ? guest0.services : [];
+        if (services.length === 0) return;
+
+        const parts = startValue24.split(':');
+        let currentMinutes = parseInt(parts[0], 10) * 60 + parseInt(parts[1] || '0', 10);
+
+        services.forEach((srv) => {
+            const h = Math.floor(currentMinutes / 60);
+            const m = currentMinutes % 60;
+            const curVal = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`;
+            const dur = Number(srv.durationMinutes || 45);
+
+            bookingState.serviceTimeSlots[String(srv.id)] = curVal;
+            if (guest0) {
+                if (!guest0.serviceTimeSlots) guest0.serviceTimeSlots = {};
+                guest0.serviceTimeSlots[String(srv.id)] = curVal;
+            }
+
+            const srvGrid = document.getElementById(`srvSlotsGrid_${srv.id}`);
+            if (srvGrid) {
+                srvGrid.querySelectorAll('.time-slot-card').forEach(card => {
+                    card.classList.toggle('selected', card.getAttribute('data-slot-value') === curVal);
+                });
+            }
+            const badge = document.getElementById(`srvBadge_${srv.id}`);
+            if (badge) {
+                badge.textContent = formatTime24ToRangeLabel(curVal, dur);
+            }
+
+            currentMinutes += dur;
+        });
+
+        updateOverallTimeSlotFromPerService();
+    }
+
     function selectTimeSlotCard(value24, rangeLabel) {
         hideAlert();
         const hiddenInput = document.getElementById('appointmentTimeSlot');
@@ -1798,6 +1848,10 @@
         document.querySelectorAll('#timeSlotsGrid .time-slot-card').forEach(card => {
             card.classList.toggle('selected', card.getAttribute('data-slot-value') === value24);
         });
+
+        // Auto-assign sequential slots for multi-service bookings
+        autoPopulateSequentialServiceSlots(value24);
+
         updateSummaryTimeWindowDisplay();
     }
 
@@ -1817,11 +1871,12 @@
     function selectServiceTimeSlot(srvId, slotValue, rangeLabel, durationMinutes) {
         hideAlert();
         if (!bookingState.serviceTimeSlots) bookingState.serviceTimeSlots = {};
-        bookingState.serviceTimeSlots[srvId] = slotValue;
+        bookingState.serviceTimeSlots[String(srvId)] = slotValue;
 
-        if (bookingState.guests[0]) {
-            if (!bookingState.guests[0].serviceTimeSlots) bookingState.guests[0].serviceTimeSlots = {};
-            bookingState.guests[0].serviceTimeSlots[srvId] = slotValue;
+        const guest0 = bookingState.guests && bookingState.guests[0];
+        if (guest0) {
+            if (!guest0.serviceTimeSlots) guest0.serviceTimeSlots = {};
+            guest0.serviceTimeSlots[String(srvId)] = slotValue;
         }
 
         const srvGrid = document.getElementById(`srvSlotsGrid_${srvId}`);
@@ -1834,6 +1889,40 @@
         const badge = document.getElementById(`srvBadge_${srvId}`);
         if (badge) {
             badge.textContent = rangeLabel || formatTime24ToRangeLabel(slotValue, durationMinutes || 45);
+        }
+
+        // Cascade sequential slots to any unselected subsequent services for this guest
+        if (guest0 && Array.isArray(guest0.services)) {
+            const currentIdx = guest0.services.findIndex(s => String(s.id) === String(srvId));
+            if (currentIdx >= 0) {
+                const parts = slotValue.split(':');
+                let nextMinutes = parseInt(parts[0], 10) * 60 + parseInt(parts[1] || '0', 10) + Number(durationMinutes || 45);
+                for (let i = currentIdx + 1; i < guest0.services.length; i++) {
+                    const nextSrv = guest0.services[i];
+                    const nextKey = String(nextSrv.id);
+                    if (!bookingState.serviceTimeSlots[nextKey]) {
+                        const h = Math.floor(nextMinutes / 60);
+                        const m = nextMinutes % 60;
+                        const nextVal = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`;
+                        const nextDur = Number(nextSrv.durationMinutes || 45);
+
+                        bookingState.serviceTimeSlots[nextKey] = nextVal;
+                        guest0.serviceTimeSlots[nextKey] = nextVal;
+
+                        const nextGrid = document.getElementById(`srvSlotsGrid_${nextKey}`);
+                        if (nextGrid) {
+                            nextGrid.querySelectorAll('.time-slot-card').forEach(card => {
+                                card.classList.toggle('selected', card.getAttribute('data-slot-value') === nextVal);
+                            });
+                        }
+                        const nextBadge = document.getElementById(`srvBadge_${nextKey}`);
+                        if (nextBadge) {
+                            nextBadge.textContent = formatTime24ToRangeLabel(nextVal, nextDur);
+                        }
+                        nextMinutes += nextDur;
+                    }
+                }
+            }
         }
 
         updateOverallTimeSlotFromPerService();
@@ -1868,7 +1957,8 @@
         const guest0 = bookingState.guests && bookingState.guests[0];
         if (guest0) {
             if (!guest0.serviceStaffAssignments) guest0.serviceStaffAssignments = {};
-            guest0.serviceStaffAssignments[srvId] = 'anyone';
+            guest0.serviceStaffAssignments[srvId] = null;
+            checkMultiServiceStaffCompletion(guest0);
         }
         bookingState.pendingSelectSlot = { srvId: srvId, slotValue: slotValue };
 
@@ -1941,7 +2031,7 @@
             bookingState.guests[0].selectedStaff = { id: null, name: 'Anyone Available', isAnyoneAvailable: true };
             if (bookingState.guests[0].serviceStaffAssignments) {
                 Object.keys(bookingState.guests[0].serviceStaffAssignments).forEach(k => {
-                    bookingState.guests[0].serviceStaffAssignments[k] = 'anyone';
+                    bookingState.guests[0].serviceStaffAssignments[k] = null;
                 });
             }
         }
@@ -2731,15 +2821,12 @@
         const effectiveCatId = catId || getCategoryForService(found);
         const activeGuest = bookingState.guests[bookingState.activeGuestIndex] || bookingState.guests[0];
 
-        // Single Selection per Category Rule:
-        // Choosing a new option within the same category automatically replaces the previously selected service in that category.
+        // Multi-service selection: clicking toggles service on or off for the active guest
         const existingIdx = activeGuest.services.findIndex(s => s.id === found.id);
         if (existingIdx >= 0) {
             // Clicking the already selected service toggles it off
             activeGuest.services.splice(existingIdx, 1);
         } else {
-            // Remove any other service in the same category, then add the new service
-            activeGuest.services = activeGuest.services.filter(s => getCategoryForService(s) !== effectiveCatId);
             activeGuest.services.push(found);
         }
 
@@ -3141,6 +3228,13 @@
             singleContainer.classList.add('d-none');
             multiContainer.classList.remove('d-none');
             categoryCardsContainer.innerHTML = '';
+
+            // Default any unassigned services to 'Anyone Available' (null) so user can proceed or customize freely
+            guestServices.forEach(s => {
+                if (!currentGuest.serviceStaffAssignments.hasOwnProperty(s.id)) {
+                    currentGuest.serviceStaffAssignments[s.id] = null;
+                }
+            });
 
             guestServices.forEach((srv, srvIdx) => {
                 const catId = getCategoryForService(srv);
@@ -3663,8 +3757,13 @@
     function validateEmailField(input) {
         const val = (input ? input.value : document.getElementById('customerEmail').value).trim();
         const errEl = document.getElementById('emailValidationError');
+        if (val.length === 0) {
+            document.getElementById('customerEmail').classList.remove('is-invalid');
+            if (errEl) errEl.classList.add('d-none');
+            return true;
+        }
         const isValid = STRICT_EMAIL_REGEX.test(val);
-        if (val.length > 0 && !isValid) {
+        if (!isValid) {
             document.getElementById('customerEmail').classList.add('is-invalid');
             if (errEl) errEl.classList.remove('d-none');
         } else {
@@ -3685,13 +3784,13 @@
         const selectedDate = document.getElementById('appointmentDate').value;
         const selectedTime = document.getElementById('appointmentTimeSlot').value;
 
-        if (!currentGuest.customerName || !currentGuest.customerPhone || !currentGuest.customerEmail) {
-            showAlert(`Please fill in Full Name, Phone Number, and Email Address for Guest ${activeIdx + 1}.`);
+        if (!currentGuest.customerName || !currentGuest.customerPhone) {
+            showAlert(`Please fill in Full Name and Phone Number for Guest ${activeIdx + 1}.`);
             return;
         }
 
-        if (!STRICT_EMAIL_REGEX.test(currentGuest.customerEmail)) {
-            showAlert(`Please enter a valid email address for Guest ${activeIdx + 1} (e.g. name@example.com).`);
+        if (currentGuest.customerEmail && currentGuest.customerEmail.trim().length > 0 && !STRICT_EMAIL_REGEX.test(currentGuest.customerEmail.trim())) {
+            showAlert(`Please enter a valid email address for Guest ${activeIdx + 1} (e.g. name@example.com) or leave it blank.`);
             validateEmailField(document.getElementById('customerEmail'));
             document.getElementById('customerEmail').focus();
             return;
@@ -3715,12 +3814,34 @@
         submitBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Submitting...`;
 
         const primaryGuest = bookingState.guests[0] || {};
+
+        // If primary guest has multiple services, make sure all services have sequential time slots assigned
+        if (selectedTime && primaryGuest.services && primaryGuest.services.length > 1) {
+            autoPopulateSequentialServiceSlots(selectedTime);
+        }
+
+        const isAnyonePrimary = (bookingState.selectedStaff && bookingState.selectedStaff.isAnyoneAvailable)
+            || (primaryGuest.selectedStaff && primaryGuest.selectedStaff.isAnyoneAvailable)
+            || (!bookingState.selectedStaff || !bookingState.selectedStaff.id);
+
+        const cleanServiceStaffAssignments = (assignments) => {
+            const clean = {};
+            if (assignments) {
+                Object.entries(assignments).forEach(([k, v]) => {
+                    if (v != null && v !== 'anyone' && !isNaN(Number(v)) && Number(v) > 0) {
+                        clean[k] = Number(v);
+                    }
+                });
+            }
+            return clean;
+        };
+
         const bookingPayload = {
             appointmentTime: `${selectedDate}T${selectedTime}`,
             stationPreference: bookingState.stepOrder.includes('STATION')
                 ? (bookingState.selectedStation || 'Any Available Station')
                 : null,
-            nailTech: (bookingState.selectedStaff && bookingState.selectedStaff.id)
+            nailTech: (!isAnyonePrimary && bookingState.selectedStaff && bookingState.selectedStaff.id)
                 ? { id: bookingState.selectedStaff.id }
                 : null,
             customerName: primaryGuest.customerName || '',
@@ -3741,7 +3862,7 @@
                 customerEmail: g.customerEmail,
                 notes: g.notes,
                 serviceIds: g.services.map(s => s.id),
-                serviceStaffAssignments: g.serviceStaffAssignments || {},
+                serviceStaffAssignments: cleanServiceStaffAssignments(g.serviceStaffAssignments),
                 serviceTimeSlots: g.serviceTimeSlots || bookingState.serviceTimeSlots || {}
             }))
         };
@@ -3820,7 +3941,7 @@
                             Subtotal: $${totals.subtotal.toFixed(2)} (${totals.duration} mins)
                         </span>
                     </div>
-                    <div class="small text-muted mb-2">${g.customerPhone} &bull; ${g.customerEmail}</div>
+                    <div class="small text-muted mb-2">${g.customerPhone}${g.customerEmail ? ' &bull; ' + g.customerEmail : ''}</div>
                     <ul class="list-unstyled mb-0">${servicesLines}</ul>
                     ${g.notes ? `<div class="small text-muted border-top pt-2 mt-2"><em>Notes: ${g.notes}</em></div>` : ''}
                 </div>

@@ -179,6 +179,10 @@ public class NailTechController {
             tech.setPassword(passwordEncoder.encode("defaultPassword123"));
         }
 
+        if (tech.getCommissionRate() == null || tech.getCommissionRate().compareTo(java.math.BigDecimal.ZERO) < 0) {
+            tech.setCommissionRate(new java.math.BigDecimal("60.00"));
+        }
+
         tech.setRole("ROLE_NAIL_TECH");
 
         UserEntity savedTech = userRepository.save(tech);
@@ -219,6 +223,9 @@ public class NailTechController {
                     tech.setName(updatedTech.getName());
                     tech.setEmail(newEmail);
                     tech.setSpecialty(updatedTech.getSpecialty());
+                    if (updatedTech.getCommissionRate() != null && updatedTech.getCommissionRate().compareTo(java.math.BigDecimal.ZERO) >= 0) {
+                        tech.setCommissionRate(updatedTech.getCommissionRate());
+                    }
                     if (newUsername != null) {
                         tech.setUsername(newUsername);
                     }

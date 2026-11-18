@@ -189,6 +189,36 @@ class AppointmentBookingFlowTest {
     }
 
     @Test
+    void testBookingSucceedsWhenEmailIsOmitted() throws Exception {
+        ServiceEntity svc = new ServiceEntity("default", "Classic Manicure", "Nails", new BigDecimal("35.00"), 45);
+        svc.setId(10L);
+
+        when(serviceRepository.findByTenantIdAndId("default", 10L)).thenReturn(Optional.of(svc));
+        when(appointmentRepository.save(any(Appointment.class))).thenAnswer(inv -> {
+            Appointment a = inv.getArgument(0);
+            a.setId(777L);
+            return a;
+        });
+
+        // Booking with customerEmail omitted
+        String payload = """
+                {
+                  "appointmentTime": "2026-11-20T11:00:00",
+                  "customerName": "Jane Doe",
+                  "customerPhone": "(555) 123-4567",
+                  "serviceIds": [10]
+                }
+                """;
+
+        mockMvc.perform(post("/api/bookings")
+                        .header("X-Tenant-ID", "default")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(777));
+    }
+
+    @Test
     void testAdminWalkInBookingManualOverride() throws Exception {
         ServiceEntity svc = new ServiceEntity("default", "Quick Polish", "Express", new BigDecimal("20.00"), 20);
         svc.setId(5L);
@@ -914,5 +944,162 @@ class AppointmentBookingFlowTest {
         org.junit.jupiter.api.Assertions.assertTrue(queriedLuxe.isPresent());
         org.junit.jupiter.api.Assertions.assertEquals("Diabetic (gentle cuticle care)", queriedLuxe.get().getMedicalFlags());
         org.junit.jupiter.api.Assertions.assertEquals("Royal Gold Shimmer #7", queriedLuxe.get().getColorFormula());
+    }
+
+    @Test
+    void testThreeOrMoreServicesSequentialBookingSuccessForSameTech() throws Exception {
+        UserEntity tony = new UserEntity();
+        tony.setId(10L);
+        tony.setName("Tony");
+        tony.setTenantId("default");
+
+        ServiceEntity svc1 = new ServiceEntity("default", "Manicure", "Mani", new BigDecimal("35.00"), 45);
+        svc1.setId(201L);
+        ServiceEntity svc2 = new ServiceEntity("default", "Pedicure", "Pedi", new BigDecimal("45.00"), 45);
+        svc2.setId(202L);
+        ServiceEntity svc3 = new ServiceEntity("default", "Nail Art", "Art", new BigDecimal("25.00"), 30);
+        svc3.setId(203L);
+
+        when(userRepository.findAllByTenantIdAndRole("default", "ROLE_NAIL_TECH")).thenReturn(List.of(tony));
+        when(userRepository.findByTenantIdAndId("default", 10L)).thenReturn(Optional.of(tony));
+        when(serviceRepository.findByTenantIdAndId("default", 201L)).thenReturn(Optional.of(svc1));
+        when(serviceRepository.findByTenantIdAndId("default", 202L)).thenReturn(Optional.of(svc2));
+        when(serviceRepository.findByTenantIdAndId("default", 203L)).thenReturn(Optional.of(svc3));
+        when(appointmentRepository.findByTenantIdAndAppointmentTimeBetween(
+                eq("default"), any(LocalDateTime.class), any(LocalDateTime.class)
+        )).thenReturn(Collections.emptyList());
+
+        List<Appointment> savedList = new ArrayList<>();
+        when(appointmentRepository.save(any(Appointment.class))).thenAnswer(inv -> {
+            Appointment a = inv.getArgument(0);
+            a.setId((long) (900 + savedList.size()));
+            savedList.add(a);
+            return a;
+        });
+
+        // Booking 3 services sequentially (10:00, 10:45, 11:30) with same technician Tony
+        String payload = """
+                {
+                  "appointmentTime": "2026-11-20T10:00:00",
+                  "nailTech": { "id": 10 },
+                  "customerName": "Emma Watson",
+                  "customerPhone": "(555) 123-9999",
+                  "customerEmail": "emma@example.com",
+                  "serviceIds": [201, 202, 203],
+                  "serviceTimeSlots": {
+                    "201": "10:00:00",
+                    "202": "10:45:00",
+                    "203": "11:30:00"
+                  },
+                  "guests": [
+                    {
+                      "guestNumber": 1,
+                      "customerName": "Emma Watson",
+                      "customerPhone": "(555) 123-9999",
+                      "customerEmail": "emma@example.com",
+                      "serviceIds": [201, 202, 203],
+                      "serviceStaffAssignments": {
+                        "201": 10,
+                        "202": 10,
+                        "203": 10
+                      },
+                      "serviceTimeSlots": {
+                        "201": "10:00:00",
+                        "202": "10:45:00",
+                        "203": "11:30:00"
+                      }
+                    }
+                  ]
+                }
+                """;
+
+        mockMvc.perform(post("/api/bookings")
+                        .header("X-Tenant-ID", "default")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.appointments.length()").value(3));
+
+        org.junit.jupiter.api.Assertions.assertEquals(3, savedList.size());
+        org.junit.jupiter.api.Assertions.assertEquals(10L, savedList.get(0).getNailTech().getId());
+        org.junit.jupiter.api.Assertions.assertEquals(10L, savedList.get(1).getNailTech().getId());
+        org.junit.jupiter.api.Assertions.assertEquals(10L, savedList.get(2).getNailTech().getId());
+        org.junit.jupiter.api.Assertions.assertEquals(LocalDateTime.of(2026, 11, 20, 10, 0), savedList.get(0).getAppointmentTime());
+        org.junit.jupiter.api.Assertions.assertEquals(LocalDateTime.of(2026, 11, 20, 10, 45), savedList.get(1).getAppointmentTime());
+        org.junit.jupiter.api.Assertions.assertEquals(LocalDateTime.of(2026, 11, 20, 11, 30), savedList.get(2).getAppointmentTime());
+    }
+
+    @Test
+    void testAnyoneAvailableWorksWhenTonyIsBookedAtTimeSlot() throws Exception {
+        UserEntity tony = new UserEntity();
+        tony.setId(10L);
+        tony.setName("Tony");
+        tony.setTenantId("default");
+
+        UserEntity chloe = new UserEntity();
+        chloe.setId(20L);
+        chloe.setName("Chloe");
+        chloe.setTenantId("default");
+
+        ServiceEntity svc = new ServiceEntity("default", "Manicure", "Mani", new BigDecimal("35.00"), 45);
+        svc.setId(204L);
+
+        // Tony is already booked at 14:00
+        Appointment tonyExisting = new Appointment();
+        tonyExisting.setId(850L);
+        tonyExisting.setTenantId("default");
+        tonyExisting.setNailTech(tony);
+        tonyExisting.setService(svc);
+        tonyExisting.setAppointmentTime(LocalDateTime.of(2026, 11, 20, 14, 0));
+        tonyExisting.setStatus(Appointment.AppointmentStatus.CONFIRMED);
+
+        when(userRepository.findAllByTenantIdAndRole("default", "ROLE_NAIL_TECH")).thenReturn(List.of(tony, chloe));
+        when(serviceRepository.findByTenantIdAndId("default", 204L)).thenReturn(Optional.of(svc));
+        when(appointmentRepository.findByTenantIdAndAppointmentTimeBetween(
+                eq("default"), any(LocalDateTime.class), any(LocalDateTime.class)
+        )).thenReturn(List.of(tonyExisting));
+
+        List<Appointment> savedList = new ArrayList<>();
+        when(appointmentRepository.save(any(Appointment.class))).thenAnswer(inv -> {
+            Appointment a = inv.getArgument(0);
+            a.setId((long) (950 + savedList.size()));
+            savedList.add(a);
+            return a;
+        });
+
+        // Customer chooses Anyone Available at 14:00 (serviceStaffAssignments has "anyone" or null)
+        String payload = """
+                {
+                  "appointmentTime": "2026-11-20T14:00:00",
+                  "nailTech": null,
+                  "customerName": "Diana Prince",
+                  "customerPhone": "(555) 888-9999",
+                  "customerEmail": "diana@example.com",
+                  "serviceIds": [204],
+                  "guests": [
+                    {
+                      "guestNumber": 1,
+                      "customerName": "Diana Prince",
+                      "customerPhone": "(555) 888-9999",
+                      "customerEmail": "diana@example.com",
+                      "serviceIds": [204],
+                      "serviceStaffAssignments": {
+                        "204": "anyone"
+                      }
+                    }
+                  ]
+                }
+                """;
+
+        mockMvc.perform(post("/api/bookings")
+                        .header("X-Tenant-ID", "default")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isOk());
+
+        org.junit.jupiter.api.Assertions.assertEquals(1, savedList.size());
+        // Verify Chloe was auto-assigned since Tony was booked
+        org.junit.jupiter.api.Assertions.assertEquals(20L, savedList.get(0).getNailTech().getId());
+        org.junit.jupiter.api.Assertions.assertEquals("Chloe", savedList.get(0).getNailTech().getName());
     }
 }

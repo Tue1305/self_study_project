@@ -190,6 +190,61 @@ class MultiTenantStaffIsolationTest {
     }
 
     @Test
+    void canCreateAndUpdateNailTechWithCommissionRate() throws Exception {
+        when(userRepository.existsByTenantIdAndUsername("default", "sarah@salon.com")).thenReturn(false);
+        when(userRepository.existsByTenantIdAndEmail("default", "sarah@salon.com")).thenReturn(false);
+        when(userRepository.save(any(UserEntity.class))).thenAnswer(inv -> {
+            UserEntity u = inv.getArgument(0);
+            u.setId(99L);
+            return u;
+        });
+
+        String createPayload = """
+                {
+                  "name": "Sarah Jenkins",
+                  "email": "sarah@salon.com",
+                  "specialty": "MANICURE, NAIL_ART",
+                  "commissionRate": 65.00
+                }
+                """;
+
+        nailTechMockMvc.perform(post("/api/nail-techs")
+                        .header("X-Tenant-ID", "default")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createPayload))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(99))
+                .andExpect(jsonPath("$.commissionRate").value(65.00));
+
+        // Now test update commission rate to 70%
+        UserEntity existingSarah = new UserEntity();
+        existingSarah.setId(99L);
+        existingSarah.setTenantId("default");
+        existingSarah.setUsername("sarah@salon.com");
+        existingSarah.setEmail("sarah@salon.com");
+        existingSarah.setCommissionRate(new java.math.BigDecimal("65.00"));
+
+        when(userRepository.findByTenantIdAndId("default", 99L)).thenReturn(Optional.of(existingSarah));
+
+        String updatePayload = """
+                {
+                  "name": "Sarah Jenkins",
+                  "email": "sarah@salon.com",
+                  "specialty": "MANICURE, NAIL_ART, PEDICURE",
+                  "commissionRate": 70.00
+                }
+                """;
+
+        nailTechMockMvc.perform(put("/api/nail-techs/99")
+                        .header("X-Tenant-ID", "default")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(updatePayload))
+                .andExpect(status().isOk());
+
+        assertEquals(new java.math.BigDecimal("70.00"), existingSarah.getCommissionRate());
+    }
+
+    @Test
     void customUserDetailsServiceResolvesUserScopedToActiveTenant() {
         UserEntity defaultTony = new UserEntity();
         defaultTony.setId(10L);

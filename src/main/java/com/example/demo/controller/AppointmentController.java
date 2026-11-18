@@ -47,6 +47,7 @@ public class AppointmentController {
     private final TenantContextResolver tenantContextResolver;
     private final AppointmentAuditService auditService;
     private final NotificationService notificationService;
+    private final com.example.demo.repository.AppointmentTransactionRepository transactionRepository;
     private com.example.demo.service.AppointmentReminderService reminderService;
 
     @Autowired(required = false)
@@ -69,7 +70,8 @@ public class AppointmentController {
             UserRepository userRepository,
             TenantContextResolver tenantContextResolver,
             @Autowired(required = false) AppointmentAuditService auditService,
-            @Autowired(required = false) NotificationService notificationService
+            @Autowired(required = false) NotificationService notificationService,
+            @Autowired(required = false) com.example.demo.repository.AppointmentTransactionRepository transactionRepository
     ) {
         this.appointmentRepository = appointmentRepository;
         this.customerRepository = customerRepository;
@@ -78,6 +80,19 @@ public class AppointmentController {
         this.tenantContextResolver = tenantContextResolver;
         this.auditService = auditService;
         this.notificationService = notificationService;
+        this.transactionRepository = transactionRepository;
+    }
+
+    public AppointmentController(
+            AppointmentRepository appointmentRepository,
+            CustomerRepository customerRepository,
+            ServiceRepository serviceRepository,
+            UserRepository userRepository,
+            TenantContextResolver tenantContextResolver,
+            @Autowired(required = false) AppointmentAuditService auditService,
+            @Autowired(required = false) NotificationService notificationService
+    ) {
+        this(appointmentRepository, customerRepository, serviceRepository, userRepository, tenantContextResolver, auditService, notificationService, null);
     }
 
     public AppointmentController(
@@ -87,7 +102,7 @@ public class AppointmentController {
             UserRepository userRepository,
             TenantContextResolver tenantContextResolver
     ) {
-        this(appointmentRepository, customerRepository, serviceRepository, userRepository, tenantContextResolver, null, null);
+        this(appointmentRepository, customerRepository, serviceRepository, userRepository, tenantContextResolver, null, null, null);
     }
 
     @GetMapping
@@ -269,13 +284,53 @@ public class AppointmentController {
             targetTechs.addAll(tenantTechs);
         }
 
+        // Flatten any comma-separated values passed in query params
+        List<Long> flatServiceIds = new ArrayList<>();
+        if (serviceIds != null) {
+            for (Object sid : serviceIds) {
+                if (sid != null) {
+                    for (String part : String.valueOf(sid).split(",")) {
+                        try {
+                            long p = Long.parseLong(part.trim());
+                            if (p > 0) flatServiceIds.add(p);
+                        } catch (Exception ignored) {}
+                    }
+                }
+            }
+        }
+
+        List<Integer> flatServiceDurations = new ArrayList<>();
+        if (serviceDurations != null) {
+            for (Object sd : serviceDurations) {
+                if (sd != null) {
+                    for (String part : String.valueOf(sd).split(",")) {
+                        try {
+                            int dur = Integer.parseInt(part.trim());
+                            if (dur > 0) flatServiceDurations.add(dur);
+                        } catch (Exception ignored) {}
+                    }
+                }
+            }
+        }
+
+        List<String> flatServiceTechIds = new ArrayList<>();
+        if (serviceTechIds != null) {
+            for (String st : serviceTechIds) {
+                if (st != null) {
+                    for (String part : st.split(",")) {
+                        flatServiceTechIds.add(part.trim());
+                    }
+                }
+            }
+        }
+
         // Build sequential service segments configuration
         List<ServiceSegmentConfig> segments = new ArrayList<>();
         int segmentCount = 0;
-        if (serviceDurations != null && !serviceDurations.isEmpty()) {
-            segmentCount = serviceDurations.size();
-        } else if (serviceIds != null && !serviceIds.isEmpty()) {
-            segmentCount = serviceIds.size();
+        if (!flatServiceDurations.isEmpty()) {
+            segmentCount = flatServiceDurations.size();
+        } else if (!flatServiceIds.isEmpty()) {
+            segmentCount = flatServiceIds.size();
         } else if (techIds != null && !techIds.isEmpty()) {
             segmentCount = techIds.size();
         } else {
@@ -286,13 +341,13 @@ public class AppointmentController {
             ServiceSegmentConfig seg = new ServiceSegmentConfig();
 
             // Service ID
-            if (serviceIds != null && i < serviceIds.size()) {
-                seg.serviceId = serviceIds.get(i);
+            if (i < flatServiceIds.size()) {
+                seg.serviceId = flatServiceIds.get(i);
             }
 
             // Duration
-            if (serviceDurations != null && i < serviceDurations.size() && serviceDurations.get(i) != null && serviceDurations.get(i) > 0) {
-                seg.durationMinutes = serviceDurations.get(i);
+            if (i < flatServiceDurations.size() && flatServiceDurations.get(i) != null && flatServiceDurations.get(i) > 0) {
+                seg.durationMinutes = flatServiceDurations.get(i);
             } else if (seg.serviceId != null) {
                 Optional<ServiceEntity> srvOpt = serviceRepository.findByTenantIdAndId(tenantId, seg.serviceId);
                 seg.durationMinutes = (srvOpt.isPresent() && srvOpt.get().getDurationMinutes() != null && srvOpt.get().getDurationMinutes() > 0)
@@ -311,8 +366,8 @@ public class AppointmentController {
 
             // Tech ID
             Long resolvedTid = null;
-            if (serviceTechIds != null && i < serviceTechIds.size()) {
-                String raw = serviceTechIds.get(i);
+            if (i < flatServiceTechIds.size()) {
+                String raw = flatServiceTechIds.get(i);
                 if (raw != null && !raw.isBlank() && !"anyone".equalsIgnoreCase(raw.trim()) && !"null".equalsIgnoreCase(raw.trim())) {
                     try {
                         long parsed = Long.parseLong(raw.trim());
@@ -321,7 +376,7 @@ public class AppointmentController {
                 }
             } else if (techIds != null && i < techIds.size() && techIds.get(i) != null && techIds.get(i) > 0) {
                 resolvedTid = techIds.get(i);
-            } else if (techId != null && techId > 0 && (segmentCount == 1 || serviceTechIds == null)) {
+            } else if (techId != null && techId > 0 && (segmentCount == 1 || flatServiceTechIds.isEmpty())) {
                 resolvedTid = techId;
             }
             seg.techId = resolvedTid;
@@ -746,10 +801,11 @@ public class AppointmentController {
             if (conflict) return true;
         }
         if (batchAppts != null) {
+            // Buffer is 0 for batch appointments (sequential services within the same customer visit)
             return batchAppts.stream()
                     .filter(a -> a.getStatus() != Appointment.AppointmentStatus.CANCELLED)
                     .filter(a -> a.getNailTech() != null && techId.equals(a.getNailTech().getId()))
-                    .anyMatch(a -> hasOverlapWithBuffer(a, start, end, bufferMinutes));
+                    .anyMatch(a -> hasOverlapWithBuffer(a, start, end, 0));
         }
         return false;
     }
@@ -790,6 +846,9 @@ public class AppointmentController {
             tenantTechs = Collections.emptyList();
         }
 
+        boolean isMultiGuestRequest = bookingRequest.getGuests() != null && !bookingRequest.getGuests().isEmpty();
+        boolean isTopLevelMultiService = bookingRequest.getServiceIds() != null && bookingRequest.getServiceIds().size() > 1;
+
         // Validate technician belongs to active tenant and has no conflict at the requested time slot
         UserEntity resolvedTech = null;
         if (bookingRequest.getNailTech() != null && bookingRequest.getNailTech().getId() != null) {
@@ -801,7 +860,9 @@ public class AppointmentController {
             resolvedTech = tenantTech.get();
 
             boolean hasConflict = false;
-            if (!Boolean.TRUE.equals(bookingRequest.getManualOverride())) {
+            // Only perform top-level conflict check for single-guest single-service bookings.
+            // Multi-service and multi-guest requests perform per-service specialist scheduling below.
+            if (!isMultiGuestRequest && !isTopLevelMultiService && !Boolean.TRUE.equals(bookingRequest.getManualOverride())) {
                 boolean exactConflict = appointmentRepository.existsByTenantIdAndNailTechIdAndAppointmentTimeAndStatusNot(
                         tenantId, techId, bookingRequest.getAppointmentTime(), Appointment.AppointmentStatus.CANCELLED);
                 if (exactConflict) {
@@ -838,9 +899,6 @@ public class AppointmentController {
                         .body(Map.of("message", "This technician is already booked at the selected time slot. Please choose another time or technician."));
             }
         }
-
-        boolean isMultiGuestRequest = bookingRequest.getGuests() != null && !bookingRequest.getGuests().isEmpty();
-        boolean isTopLevelMultiService = bookingRequest.getServiceIds() != null && bookingRequest.getServiceIds().size() > 1;
 
         // Branch 1: Multi-guest or multi-service booking flow
         if (isMultiGuestRequest || isTopLevelMultiService) {
@@ -880,7 +938,7 @@ public class AppointmentController {
                 if (guest.getCustomerName() == null || guest.getCustomerName().isBlank()) {
                     return ResponseEntity.badRequest().body(Map.of("message", label + " name is required."));
                 }
-                if (guest.getCustomerEmail() == null || guest.getCustomerEmail().isBlank() || !isValidEmail(guest.getCustomerEmail())) {
+                if (guest.getCustomerEmail() != null && !guest.getCustomerEmail().isBlank() && !isValidEmail(guest.getCustomerEmail())) {
                     return ResponseEntity.badRequest().body(Map.of("message", "Please enter a valid email address for " + label + " (e.g. name@example.com)."));
                 }
                 if (guest.getCustomerPhone() == null || guest.getCustomerPhone().isBlank()) {
@@ -924,7 +982,7 @@ public class AppointmentController {
                     Appointment appt = new Appointment();
                     appt.setTenantId(tenantId);
                     appt.setCustomerName(guest.getCustomerName().trim());
-                    appt.setCustomerEmail(guest.getCustomerEmail().trim());
+                    appt.setCustomerEmail(guest.getCustomerEmail() != null ? guest.getCustomerEmail().trim() : "");
                     appt.setCustomerPhone(guest.getCustomerPhone().trim());
                     // Resolve per-service time slot if provided (e.g. { "101": "15:00:00", "102": "15:30:00" })
                     LocalDateTime serviceApptTime = currentServiceStart;
@@ -960,18 +1018,15 @@ public class AppointmentController {
                     // Check if per-service staff selection was assigned for this service
                     UserEntity serviceSpecificTech = resolvedTech;
                     if (guest.getServiceStaffAssignments() != null && srv.getId() != null) {
-                        Long assignedTechId = guest.getServiceStaffAssignments().get(String.valueOf(srv.getId()));
-                        if (assignedTechId == null) {
-                            // Try Long key if any
-                            for (Map.Entry<String, Long> entry : guest.getServiceStaffAssignments().entrySet()) {
-                                if (String.valueOf(srv.getId()).equals(entry.getKey())) {
-                                    assignedTechId = entry.getValue();
-                                    break;
-                                }
+                        String srvKey = String.valueOf(srv.getId());
+                        if (guest.getServiceStaffAssignments().containsKey(srvKey)) {
+                            Long assignedTechId = guest.getServiceStaffAssignments().get(srvKey);
+                            if (assignedTechId != null && assignedTechId > 0) {
+                                serviceSpecificTech = userRepository.findByTenantIdAndId(tenantId, assignedTechId).orElse(null);
+                            } else {
+                                // Explicitly unassigned or "Anyone Available" for this service
+                                serviceSpecificTech = null;
                             }
-                        }
-                        if (assignedTechId != null) {
-                            serviceSpecificTech = userRepository.findByTenantIdAndId(tenantId, assignedTechId).orElse(resolvedTech);
                         }
                     }
 
@@ -1048,7 +1103,7 @@ public class AppointmentController {
                 guestSummary.put("guestNumber", guestNum);
                 guestSummary.put("customerName", guest.getCustomerName().trim());
                 guestSummary.put("customerPhone", guest.getCustomerPhone().trim());
-                guestSummary.put("customerEmail", guest.getCustomerEmail().trim());
+                guestSummary.put("customerEmail", guest.getCustomerEmail() != null ? guest.getCustomerEmail().trim() : "");
                 guestSummary.put("notes", guest.getNotes() != null ? guest.getNotes().trim() : "");
                 guestSummary.put("services", guestServices);
                 guestSummary.put("subtotal", guestSubtotal);
@@ -1090,7 +1145,7 @@ public class AppointmentController {
         if (bookingRequest.getCustomerName() == null || bookingRequest.getCustomerName().isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("message", "Customer name is required."));
         }
-        if (bookingRequest.getCustomerEmail() == null || bookingRequest.getCustomerEmail().isBlank() || !isValidEmail(bookingRequest.getCustomerEmail())) {
+        if (bookingRequest.getCustomerEmail() != null && !bookingRequest.getCustomerEmail().isBlank() && !isValidEmail(bookingRequest.getCustomerEmail())) {
             return ResponseEntity.badRequest().body(Map.of("message", "Please enter a valid email address (e.g. name@example.com)."));
         }
         if (bookingRequest.getCustomerPhone() == null || bookingRequest.getCustomerPhone().isBlank()) {
@@ -1167,7 +1222,7 @@ public class AppointmentController {
         Appointment appointment = new Appointment();
         appointment.setTenantId(tenantId);
         appointment.setCustomerName(bookingRequest.getCustomerName().trim());
-        appointment.setCustomerEmail(bookingRequest.getCustomerEmail().trim());
+        appointment.setCustomerEmail(bookingRequest.getCustomerEmail() != null ? bookingRequest.getCustomerEmail().trim() : "");
         appointment.setCustomerPhone(bookingRequest.getCustomerPhone().trim());
         appointment.setAppointmentTime(singleApptTime);
         appointment.setNotes(bookingRequest.getNotes());
@@ -1381,6 +1436,41 @@ public class AppointmentController {
             appointment.setNotes(existingNotes.isEmpty() ? noteTag : existingNotes + " | " + noteTag);
 
             Appointment updated = appointmentRepository.save(appointment);
+
+            if (newStatus == Appointment.AppointmentStatus.COMPLETED && transactionRepository != null && body != null) {
+                try {
+                    java.math.BigDecimal subtotal = body.containsKey("subtotal") ? new java.math.BigDecimal(String.valueOf(body.get("subtotal"))) :
+                            (appointment.getService() != null && appointment.getService().getPrice() != null ? appointment.getService().getPrice() : java.math.BigDecimal.ZERO);
+                    java.math.BigDecimal taxRate = body.containsKey("taxRate") ? new java.math.BigDecimal(String.valueOf(body.get("taxRate"))) : new java.math.BigDecimal("0.0825");
+                    java.math.BigDecimal taxAmount = body.containsKey("taxAmount") ? new java.math.BigDecimal(String.valueOf(body.get("taxAmount"))) : subtotal.multiply(taxRate).setScale(2, java.math.RoundingMode.HALF_UP);
+                    java.math.BigDecimal tipAmount = body.containsKey("tipAmount") ? new java.math.BigDecimal(String.valueOf(body.get("tipAmount"))) : java.math.BigDecimal.ZERO;
+                    java.math.BigDecimal discount = body.containsKey("discountAmount") ? new java.math.BigDecimal(String.valueOf(body.get("discountAmount"))) : java.math.BigDecimal.ZERO;
+                    java.math.BigDecimal totalAmount = body.containsKey("totalAmount") ? new java.math.BigDecimal(String.valueOf(body.get("totalAmount"))) : subtotal.add(taxAmount).add(tipAmount).subtract(discount);
+                    String payMethod = body.containsKey("paymentMethod") ? String.valueOf(body.get("paymentMethod")).toUpperCase() : "CARD";
+                    String splitDetails = body.containsKey("splitDetails") ? String.valueOf(body.get("splitDetails")) : null;
+
+                    com.example.demo.entity.AppointmentTransaction tx = new com.example.demo.entity.AppointmentTransaction();
+                    tx.setTenantId(tenantId);
+                    tx.setAppointmentId(updated.getId());
+                    tx.setCustomerId(customer != null ? customer.getId() : null);
+                    tx.setNailTechId(appointment.getNailTech() != null ? appointment.getNailTech().getId() : null);
+                    tx.setNailTechName(staffName);
+                    tx.setCustomerName(updated.getCustomerName());
+                    tx.setSubtotal(subtotal);
+                    tx.setTaxRate(taxRate);
+                    tx.setTaxAmount(taxAmount);
+                    tx.setTipAmount(tipAmount);
+                    tx.setDiscountAmount(discount);
+                    tx.setTotalAmount(totalAmount);
+                    tx.setPaymentMethod(payMethod);
+                    tx.setSplitDetails(splitDetails);
+                    tx.setNotes(finalReason);
+                    tx.setStatus("COMPLETED");
+                    tx.setCreatedAt(java.time.LocalDateTime.now());
+                    transactionRepository.save(tx);
+                } catch (Exception ignored) {
+                }
+            }
 
             if (auditService != null) {
                 String performedBy = auditService.resolvePerformedBy("ADMIN");

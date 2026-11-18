@@ -108,6 +108,7 @@
                     <th>Name</th>
                     <th>Email / Username</th>
                     <th>Specialty</th>
+                    <th>Commission Split</th>
                     <th class="text-end">Actions</th>
                 </tr>
                 </thead>
@@ -141,6 +142,21 @@
                     <label for="techSpecialty" class="form-label fw-semibold text-secondary small">Specialty / Capabilities</label>
                     <input type="text" class="form-control rounded-3" id="techSpecialty" placeholder="e.g. ALL, NAIL_ART or MANICURE">
                     <div class="form-text">Comma-separated tags (e.g. ALL, NAIL_ART, MANICURE, BODY_MASSAGE, WAXING, FACIAL)</div>
+                </div>
+                <div class="mb-3">
+                    <label for="techCommissionRate" class="form-label fw-semibold text-secondary small">Service Commission Rate (%)</label>
+                    <div class="input-group">
+                        <input type="number" step="0.5" min="0" max="100" class="form-control rounded-start-3" id="techCommissionRate" placeholder="60.00" value="60">
+                        <span class="input-group-text rounded-end-3 bg-light fw-bold text-secondary">%</span>
+                    </div>
+                    <div class="form-text">Technician's percentage of service revenue. Tips are always 100% technician.</div>
+                    <div class="d-flex flex-wrap gap-1 mt-2">
+                        <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2 rounded-pill" onclick="setCommissionChip(50)">50% Split</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2 rounded-pill" onclick="setCommissionChip(60)">60% Standard</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2 rounded-pill" onclick="setCommissionChip(65)">65% Senior</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2 rounded-pill" onclick="setCommissionChip(70)">70% Master</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2 rounded-pill" onclick="setCommissionChip(100)">100% Booth Rent</button>
+                    </div>
                 </div>
             </div>
             <div class="modal-footer border-0 pt-0">
@@ -306,14 +322,25 @@
             }
 
             techs.forEach((tech, index) => {
+                const comm = tech.commissionRate != null ? Number(tech.commissionRate) : 60;
+                const salonCut = Math.max(0, 100 - comm);
+                const safeName = (tech.name || tech.username || '').replace(/'/g, "\\'");
+                const safeEmail = (tech.email || tech.username || '').replace(/'/g, "\\'");
+                const safeSpec = (tech.specialty || '').replace(/'/g, "\\'");
+
                 tbody.innerHTML += `
                     <tr>
                         <td>#${index + 1}</td>
                         <td class="fw-semibold">${tech.name || tech.username}</td>
                         <td>${tech.email || tech.username}</td>
                         <td><span class="badge bg-light text-dark border">${tech.specialty || 'General'}</span></td>
+                        <td>
+                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle fw-bold">
+                                ${comm}% Tech / ${salonCut}% House
+                            </span>
+                        </td>
                         <td class="text-end">
-                            <button class="btn btn-outline-secondary btn-sm me-1" onclick="openEditModal(${tech.id}, '${tech.name || tech.username}', '${tech.email || tech.username}', '${tech.specialty || ''}')">
+                            <button class="btn btn-outline-secondary btn-sm me-1" onclick="openEditModal(${tech.id}, '${safeName}', '${safeEmail}', '${safeSpec}', ${comm})">
                                 <i class="bi bi-pencil"></i>
                             </button>
                             <button class="btn btn-outline-danger btn-sm" onclick="deleteNailTech(${tech.id})">
@@ -325,8 +352,12 @@
             });
         } catch (error) {
             console.error('Error loading nail techs:', error);
-            document.getElementById('techTableBody').innerHTML = `<tr><td colspan="5" class="text-center text-danger py-4">Error loading data from server.</td></tr>`;
+            document.getElementById('techTableBody').innerHTML = `<tr><td colspan="6" class="text-center text-danger py-4">Error loading data from server.</td></tr>`;
         }
+    }
+
+    function setCommissionChip(rate) {
+        document.getElementById('techCommissionRate').value = rate;
     }
 
     function openAddModal() {
@@ -334,15 +365,17 @@
         document.getElementById('techName').value = '';
         document.getElementById('techEmail').value = '';
         document.getElementById('techSpecialty').value = '';
+        document.getElementById('techCommissionRate').value = '60';
         document.getElementById('modalTitle').innerText = 'Add New Nail Technician';
         techModalInstance.show();
     }
 
-    function openEditModal(id, name, email, specialty) {
+    function openEditModal(id, name, email, specialty, commissionRate) {
         document.getElementById('techId').value = id;
         document.getElementById('techName').value = name;
         document.getElementById('techEmail').value = email;
         document.getElementById('techSpecialty').value = specialty === 'undefined' ? '' : specialty;
+        document.getElementById('techCommissionRate').value = (commissionRate != null) ? commissionRate : '60';
         document.getElementById('modalTitle').innerText = 'Edit Nail Technician';
         techModalInstance.show();
     }
@@ -352,6 +385,7 @@
         const name = document.getElementById('techName').value;
         const email = document.getElementById('techEmail').value;
         const specialty = document.getElementById('techSpecialty').value;
+        const commissionRate = parseFloat(document.getElementById('techCommissionRate').value) || 60.0;
 
         if (!name || !email) {
             alert('Please fill in all required fields.');
@@ -365,7 +399,8 @@
             name: name,
             email: email,
             username: email,
-            specialty: specialty
+            specialty: specialty,
+            commissionRate: commissionRate
         };
 
         try {

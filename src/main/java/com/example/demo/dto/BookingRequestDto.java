@@ -108,8 +108,23 @@ public class BookingRequestDto {
             return serviceStaffAssignments;
         }
 
-        public void setServiceStaffAssignments(java.util.Map<String, Long> serviceStaffAssignments) {
-            this.serviceStaffAssignments = serviceStaffAssignments != null ? serviceStaffAssignments : new java.util.HashMap<>();
+        public void setServiceStaffAssignments(java.util.Map<?, ?> rawAssignments) {
+            this.serviceStaffAssignments = new java.util.HashMap<>();
+            if (rawAssignments != null) {
+                for (java.util.Map.Entry<?, ?> entry : rawAssignments.entrySet()) {
+                    if (entry.getKey() != null && entry.getValue() != null) {
+                        try {
+                            String valStr = String.valueOf(entry.getValue()).trim();
+                            if (!valStr.isBlank() && !"anyone".equalsIgnoreCase(valStr) && !"null".equalsIgnoreCase(valStr)) {
+                                long parsed = Long.parseLong(valStr);
+                                if (parsed > 0) {
+                                    this.serviceStaffAssignments.put(String.valueOf(entry.getKey()), parsed);
+                                }
+                            }
+                        } catch (Exception ignored) {}
+                    }
+                }
+            }
         }
 
         public java.util.Map<String, String> getServiceTimeSlots() {
@@ -208,8 +223,23 @@ public class BookingRequestDto {
         return serviceStaffAssignments;
     }
 
-    public void setServiceStaffAssignments(java.util.Map<String, Long> serviceStaffAssignments) {
-        this.serviceStaffAssignments = serviceStaffAssignments != null ? serviceStaffAssignments : new java.util.HashMap<>();
+    public void setServiceStaffAssignments(java.util.Map<?, ?> rawAssignments) {
+        this.serviceStaffAssignments = new java.util.HashMap<>();
+        if (rawAssignments != null) {
+            for (java.util.Map.Entry<?, ?> entry : rawAssignments.entrySet()) {
+                if (entry.getKey() != null && entry.getValue() != null) {
+                    try {
+                        String valStr = String.valueOf(entry.getValue()).trim();
+                        if (!valStr.isBlank() && !"anyone".equalsIgnoreCase(valStr) && !"null".equalsIgnoreCase(valStr)) {
+                            long parsed = Long.parseLong(valStr);
+                            if (parsed > 0) {
+                                this.serviceStaffAssignments.put(String.valueOf(entry.getKey()), parsed);
+                            }
+                        }
+                    } catch (Exception ignored) {}
+                }
+            }
+        }
     }
 
     public java.util.Map<String, String> getServiceTimeSlots() {

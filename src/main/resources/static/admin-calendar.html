@@ -872,8 +872,36 @@
         const [completeModal, setCompleteModal] = useState({
             isOpen: false,
             apt: null,
+            lineItems: [],
+            taxRate: 0.0825,
+            taxExempt: false,
+            tipPercent: 18,
+            tipCustom: '',
+            paymentMethod: 'CARD',
+            splitPayments: [],
             notes: '',
+            colorFormula: '',
+            medicalFlags: '',
+            customAddonName: '',
+            customAddonPrice: '',
             saving: false,
+            error: null
+        });
+
+        const [posSummaryModal, setPosSummaryModal] = useState({
+            isOpen: false,
+            loading: false,
+            data: null,
+            error: null,
+            date: toDateKey(new Date())
+        });
+
+        const [payrollModal, setPayrollModal] = useState({
+            isOpen: false,
+            loading: false,
+            startDate: '',
+            endDate: '',
+            data: null,
             error: null
         });
 
@@ -1323,14 +1351,266 @@
 
         const handleOpenCompleteModal = (apt) => {
             if (!apt) return;
+            const basePrice = Number((apt.service && apt.service.price) || 0);
+            const baseSrvName = (apt.service && apt.service.name) || 'Nail Service';
+            const initialItems = [
+                { id: 'base-service', name: baseSrvName, price: basePrice, type: 'SERVICE' }
+            ];
+            const subtotal = basePrice;
+            const taxRate = 0.0825;
+            const taxAmount = Number((subtotal * taxRate).toFixed(2));
+            const tipPercent = 18;
+            const tipAmount = Number((subtotal * 0.18).toFixed(2));
+            const total = Number((subtotal + taxAmount + tipAmount).toFixed(2));
+
             setCompleteModal({
                 isOpen: true,
                 apt: apt,
+                lineItems: initialItems,
+                taxRate: taxRate,
+                taxExempt: false,
+                tipPercent: tipPercent,
+                tipCustom: '',
+                paymentMethod: 'CARD',
+                splitPayments: [
+                    { method: 'CARD', amount: Number((total / 2).toFixed(2)) },
+                    { method: 'CASH', amount: Number((total - Number((total / 2).toFixed(2))).toFixed(2)) }
+                ],
                 notes: '',
                 colorFormula: apt.colorFormula || '',
                 medicalFlags: apt.medicalFlags || '',
+                customAddonName: '',
+                customAddonPrice: '',
                 saving: false,
                 error: null
+            });
+        };
+
+        const handleAddAddon = (name, price) => {
+            setCompleteModal(prev => {
+                const newItems = [...prev.lineItems, {
+                    id: 'addon-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
+                    name: name,
+                    price: Number(price) || 0,
+                    type: 'ADDON'
+                }];
+                return { ...prev, lineItems: newItems };
+            });
+        };
+
+        const handleRemoveLineItem = (idx) => {
+            setCompleteModal(prev => {
+                const newItems = prev.lineItems.filter((_, i) => i !== idx);
+                return { ...prev, lineItems: newItems };
+            });
+        };
+
+        const handleAddCustomAddon = () => {
+            setCompleteModal(prev => {
+                const name = prev.customAddonName ? prev.customAddonName.trim() : '';
+                const price = Number(prev.customAddonPrice);
+                if (!name || isNaN(price)) return prev;
+                const newItems = [...prev.lineItems, {
+                    id: 'custom-' + Date.now(),
+                    name: name,
+                    price: price,
+                    type: price < 0 ? 'DISCOUNT' : 'ADDON'
+                }];
+                return {
+                    ...prev,
+                    lineItems: newItems,
+                    customAddonName: '',
+                    customAddonPrice: ''
+                };
+            });
+        };
+
+        const handleSetTipPercent = (pct) => {
+            setCompleteModal(prev => ({
+                ...prev,
+                tipPercent: pct,
+                tipCustom: ''
+            }));
+        };
+
+        const handleSetCustomTip = (val) => {
+            setCompleteModal(prev => ({
+                ...prev,
+                tipPercent: null,
+                tipCustom: val
+            }));
+        };
+
+        const handleToggleTaxExempt = () => {
+            setCompleteModal(prev => ({
+                ...prev,
+                taxExempt: !prev.taxExempt
+            }));
+        };
+
+        const handlePaymentMethodChange = (method) => {
+            setCompleteModal(prev => {
+                const sub = prev.lineItems.reduce((acc, it) => acc + (Number(it.price) || 0), 0);
+                const tax = prev.taxExempt ? 0 : Number((sub * prev.taxRate).toFixed(2));
+                const tip = prev.tipPercent !== null ? Number((sub * (prev.tipPercent / 100)).toFixed(2)) : (Number(prev.tipCustom) || 0);
+                const total = Math.max(0, Number((sub + tax + tip).toFixed(2)));
+
+                let splits = prev.splitPayments;
+                if (method === 'SPLIT' && (!splits || splits.length < 2)) {
+                    const half1 = Number((total / 2).toFixed(2));
+                    const half2 = Number((total - half1).toFixed(2));
+                    splits = [
+                        { method: 'CARD', amount: half1 },
+                        { method: 'CASH', amount: half2 }
+                    ];
+                }
+                return {
+                    ...prev,
+                    paymentMethod: method,
+                    splitPayments: splits
+                };
+            });
+        };
+
+        const handleSplitRowChange = (idx, field, value) => {
+            setCompleteModal(prev => {
+                const newSplits = prev.splitPayments.map((sp, i) => {
+                    if (i !== idx) return sp;
+                    return { ...sp, [field]: field === 'amount' ? (value === '' ? '' : Number(value)) : value };
+                });
+                return { ...prev, splitPayments: newSplits };
+            });
+        };
+
+        const handleAddSplitRow = () => {
+            setCompleteModal(prev => ({
+                ...prev,
+                splitPayments: [...prev.splitPayments, { method: 'CARD', amount: 0 }]
+            }));
+        };
+
+        const handleRemoveSplitRow = (idx) => {
+            setCompleteModal(prev => ({
+                ...prev,
+                splitPayments: prev.splitPayments.filter((_, i) => i !== idx)
+            }));
+        };
+
+        const handleAutoFillRemainingSplit = (totalDue) => {
+            setCompleteModal(prev => {
+                if (!prev.splitPayments || prev.splitPayments.length === 0) return prev;
+                const allocatedExceptLast = prev.splitPayments.slice(0, -1).reduce((acc, sp) => acc + (Number(sp.amount) || 0), 0);
+                const remaining = Math.max(0, Number((totalDue - allocatedExceptLast).toFixed(2)));
+                const lastIdx = prev.splitPayments.length - 1;
+                const updatedSplits = prev.splitPayments.map((sp, i) => i === lastIdx ? { ...sp, amount: remaining } : sp);
+                return { ...prev, splitPayments: updatedSplits };
+            });
+        };
+
+        const handleOpenPosSummary = async (dateStr) => {
+            const queryDate = dateStr || selectedDateKey;
+            setPosSummaryModal({
+                isOpen: true,
+                loading: true,
+                data: null,
+                error: null,
+                date: queryDate
+            });
+            try {
+                const res = await fetch(`/api/pos/daily-summary?date=${queryDate}`, {
+                    headers: {
+                        'X-Tenant-ID': activeTenant,
+                        ...(token ? { 'Authorization': 'Bearer ' + token } : {})
+                    }
+                });
+                if (!res.ok) {
+                    const text = await res.text();
+                    throw new Error(text || 'Failed to fetch daily POS summary.');
+                }
+                const data = await res.json();
+                setPosSummaryModal(prev => ({ ...prev, loading: false, data: data }));
+            } catch (err) {
+                console.error('POS summary error:', err);
+                setPosSummaryModal(prev => ({ ...prev, loading: false, error: err.message || 'Error loading financials' }));
+            }
+        };
+
+        const getMondayOfCurrentWeek = () => {
+            const d = new Date();
+            const day = d.getDay();
+            const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+            const monday = new Date(d.setDate(diff));
+            return monday.toISOString().split('T')[0];
+        };
+
+        const getSundayOfCurrentWeek = () => {
+            const d = new Date();
+            const day = d.getDay();
+            const diff = d.getDate() - day + (day === 0 ? 0 : 7);
+            const sunday = new Date(d.setDate(diff));
+            return sunday.toISOString().split('T')[0];
+        };
+
+        const handleOpenPayrollReport = async (customStart, customEnd) => {
+            const startStr = customStart || payrollModal.startDate || getMondayOfCurrentWeek();
+            const endStr = customEnd || payrollModal.endDate || getSundayOfCurrentWeek();
+
+            setPayrollModal(prev => ({
+                ...prev,
+                isOpen: true,
+                loading: true,
+                startDate: startStr,
+                endDate: endStr,
+                data: null,
+                error: null
+            }));
+
+            try {
+                const res = await fetch(`/api/pos/payroll-report?startDate=${startStr}&endDate=${endStr}`, {
+                    headers: {
+                        'X-Tenant-ID': activeTenant,
+                        ...(token ? { 'Authorization': 'Bearer ' + token } : {})
+                    }
+                });
+                if (!res.ok) {
+                    const text = await res.text();
+                    throw new Error(text || 'Failed to fetch payroll report.');
+                }
+                const data = await res.json();
+                setPayrollModal(prev => ({ ...prev, loading: false, data: data, startDate: startStr, endDate: endStr }));
+            } catch (err) {
+                console.error('Payroll report error:', err);
+                setPayrollModal(prev => ({ ...prev, loading: false, error: err.message || 'Error loading payroll report' }));
+            }
+        };
+
+        const handleDownloadPayrollCsv = () => {
+            const startStr = payrollModal.startDate || getMondayOfCurrentWeek();
+            const endStr = payrollModal.endDate || getSundayOfCurrentWeek();
+            const url = `/api/pos/payroll-report/export-csv?startDate=${startStr}&endDate=${endStr}`;
+
+            fetch(url, {
+                headers: {
+                    'X-Tenant-ID': activeTenant,
+                    ...(token ? { 'Authorization': 'Bearer ' + token } : {})
+                }
+            })
+            .then(resp => {
+                if (!resp.ok) throw new Error('Failed to generate CSV export');
+                return resp.blob();
+            })
+            .then(blob => {
+                const downloadUrl = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = downloadUrl;
+                a.download = `payroll-report-${activeTenant}-${startStr}-to-${endStr}.csv`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(downloadUrl);
+            })
+            .catch(err => {
+                alert('Error downloading CSV: ' + err.message);
             });
         };
 
@@ -1347,40 +1627,69 @@
             if (!completeModal.apt) return;
             const apt = completeModal.apt;
             setCompleteModal(prev => ({ ...prev, saving: true, error: null }));
+
+            const subtotal = completeModal.lineItems.reduce((acc, it) => acc + (Number(it.price) || 0), 0);
+            const taxAmount = completeModal.taxExempt ? 0 : Number((subtotal * completeModal.taxRate).toFixed(2));
+            const tipAmount = completeModal.tipPercent !== null
+                ? Number((subtotal * (completeModal.tipPercent / 100)).toFixed(2))
+                : (Number(completeModal.tipCustom) || 0);
+            const totalAmount = Math.max(0, Number((subtotal + taxAmount + tipAmount).toFixed(2)));
+
+            // Validate split payment
+            if (completeModal.paymentMethod === 'SPLIT') {
+                const splitTotal = completeModal.splitPayments.reduce((acc, sp) => acc + (Number(sp.amount) || 0), 0);
+                if (Math.abs(splitTotal - totalAmount) > 0.05) {
+                    setCompleteModal(prev => ({
+                        ...prev,
+                        saving: false,
+                        error: `Split payment total ($${splitTotal.toFixed(2)}) must match the invoice total ($${totalAmount.toFixed(2)}). Please adjust amounts or click Auto-Fill.`
+                    }));
+                    return;
+                }
+            }
+
             try {
-                const effectiveNotes = completeModal.notes ? completeModal.notes.trim() : 'Service completed';
-                const effectiveColor = completeModal.colorFormula ? completeModal.colorFormula.trim() : '';
-                const effectiveFlags = completeModal.medicalFlags ? completeModal.medicalFlags.trim() : '';
-                const res = await fetch(`/api/appointments/${apt.id}/status?status=COMPLETED&reason=${encodeURIComponent(effectiveNotes)}&notifyCustomer=${notifyCustomer}&colorFormula=${encodeURIComponent(effectiveColor)}&medicalFlags=${encodeURIComponent(effectiveFlags)}`, {
-                    method: 'PATCH',
+                const payload = {
+                    appointmentId: apt.id,
+                    lineItems: completeModal.lineItems,
+                    subtotal: subtotal,
+                    taxRate: completeModal.taxRate,
+                    taxAmount: taxAmount,
+                    tipPercent: completeModal.tipPercent,
+                    tipAmount: tipAmount,
+                    totalAmount: totalAmount,
+                    paymentMethod: completeModal.paymentMethod,
+                    splitPayments: completeModal.paymentMethod === 'SPLIT' ? completeModal.splitPayments : [],
+                    colorFormula: completeModal.colorFormula ? completeModal.colorFormula.trim() : null,
+                    medicalFlags: completeModal.medicalFlags ? completeModal.medicalFlags.trim() : null,
+                    notes: completeModal.notes ? completeModal.notes.trim() : 'Service completed & checked out',
+                    notifyCustomer: notifyCustomer
+                };
+
+                const res = await fetch('/api/pos/checkout', {
+                    method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'X-Tenant-ID': activeTenant,
                         ...(token ? { 'Authorization': 'Bearer ' + token } : {})
                     },
-                    body: JSON.stringify({
-                        status: 'COMPLETED',
-                        reason: effectiveNotes,
-                        notes: effectiveNotes,
-                        colorFormula: effectiveColor,
-                        medicalFlags: effectiveFlags,
-                        notifyCustomer: notifyCustomer
-                    })
+                    body: JSON.stringify(payload)
                 });
+
                 const data = await res.json().catch(() => ({}));
                 if (res.ok) {
                     if (data.appointment) {
                         setAppointments(prev => prev.map(a => a.id === apt.id ? data.appointment : a));
                     }
-                    setCompleteModal({ isOpen: false, apt: null, notes: '', saving: false, error: null });
+                    setCompleteModal(prev => ({ ...prev, isOpen: false, apt: null, saving: false, error: null }));
                     setSelectedAppointment(null);
                     setDragToast({
                         type: 'success',
-                        message: `✅ Appointment #${apt.id} (${apt.customerName || 'Guest'}) marked COMPLETED!`
+                        message: `✅ Checkout Complete! $${totalAmount.toFixed(2)} recorded ($${tipAmount.toFixed(2)} tip) for Appointment #${apt.id}!`
                     });
                     await fetchScheduleData(true);
                 } else {
-                    setCompleteModal(prev => ({ ...prev, saving: false, error: data.message || 'Failed to complete appointment.' }));
+                    setCompleteModal(prev => ({ ...prev, saving: false, error: data.message || 'Checkout failed.' }));
                 }
             } catch (err) {
                 console.error('Error completing appointment:', err);
@@ -1636,7 +1945,25 @@
                         disabled: dispatchingReminders
                     },
                         dispatchingReminders ? '🔔 Dispatching...' : '🔔 Dispatch 24h Reminders'
-                    )
+                    ),
+                    h('button', {
+                        type: 'button',
+                        className: 'btn btn-outline-success btn-sm px-3 fw-bold d-flex align-items-center gap-1 shadow-sm',
+                        title: 'View Daily POS Gross Sales, Tips Breakdown & Staff Payouts',
+                        onClick: () => handleOpenPosSummary(selectedDateKey)
+                    }, [
+                        h('i', { className: 'bi bi-cash-stack text-success me-1' }),
+                        'POS Financials & Payouts'
+                    ]),
+                    h('button', {
+                        type: 'button',
+                        className: 'btn btn-outline-primary btn-sm px-3 fw-bold d-flex align-items-center gap-1 shadow-sm',
+                        title: 'Weekly & Custom Date Range Payroll Report with CSV Export',
+                        onClick: () => handleOpenPayrollReport()
+                    }, [
+                        h('i', { className: 'bi bi-file-earmark-spreadsheet text-primary me-1' }),
+                        'Weekly Payroll & CSV'
+                    ])
                 )
             ),
 
@@ -2118,7 +2445,13 @@
                                         className: 'btn btn-sm btn-primary fw-bold rounded-pill px-3 py-1 d-inline-flex align-items-center gap-1',
                                         style: { fontSize: '0.78rem' },
                                         onClick: () => handleOpenCompleteModal(selectedAppointment)
-                                    }, [h('i', { className: 'bi bi-check2-all' }), ' Complete Service'])
+                                    }, [h('i', { className: 'bi bi-cash-coin' }), ' Checkout & Complete']),
+                                    selectedAppointment.status === 'COMPLETED' && h('button', {
+                                        type: 'button',
+                                        className: 'btn btn-sm btn-outline-success fw-bold rounded-pill px-3 py-1 d-inline-flex align-items-center gap-1',
+                                        style: { fontSize: '0.78rem' },
+                                        onClick: () => handleOpenCompleteModal(selectedAppointment)
+                                    }, [h('i', { className: 'bi bi-receipt' }), ' View / Adjust Receipt'])
                                 )
                             ),
 
@@ -2292,7 +2625,7 @@
                                     type: 'button',
                                     className: 'btn btn-sm btn-primary fw-bold px-3 d-inline-flex align-items-center gap-1',
                                     onClick: () => handleOpenCompleteModal(selectedAppointment)
-                                }, [h('i', { className: 'bi bi-check2-all' }), ' Complete Service']),
+                                }, [h('i', { className: 'bi bi-cash-coin' }), ' Checkout & Complete']),
                                 h('button', {
                                     type: 'button',
                                     className: 'btn btn-sm btn-success fw-bold px-3 d-inline-flex align-items-center gap-1',
@@ -2323,175 +2656,869 @@
                 )
             ),
 
-            /* Complete Appointment & Checkout Modal */
-            completeModal.isOpen && completeModal.apt && h('div', {
+            /* Complete Appointment & POS Financials Modal */
+            completeModal.isOpen && completeModal.apt && (() => {
+                const subtotal = completeModal.lineItems.reduce((acc, it) => acc + (Number(it.price) || 0), 0);
+                const taxAmount = completeModal.taxExempt ? 0 : Number((subtotal * completeModal.taxRate).toFixed(2));
+                const tipAmount = completeModal.tipPercent !== null
+                    ? Number((subtotal * (completeModal.tipPercent / 100)).toFixed(2))
+                    : (Number(completeModal.tipCustom) || 0);
+                const totalAmount = Math.max(0, Number((subtotal + taxAmount + tipAmount).toFixed(2)));
+
+                const splitSum = (completeModal.splitPayments || []).reduce((acc, sp) => acc + (Number(sp.amount) || 0), 0);
+                const splitDiff = Number((totalAmount - splitSum).toFixed(2));
+                const isSplitBalanced = Math.abs(splitDiff) <= 0.05;
+
+                const techName = completeModal.apt.nailTech
+                    ? (completeModal.apt.nailTech.name || completeModal.apt.nailTech.username)
+                    : 'Technician';
+
+                return h('div', {
+                    className: 'modal show d-block',
+                    style: { backgroundColor: 'rgba(15, 23, 42, 0.65)', zIndex: 1080 },
+                    tabIndex: -1,
+                    onClick: () => !completeModal.saving && setCompleteModal(prev => ({ ...prev, isOpen: false, apt: null, error: null }))
+                },
+                    h('div', {
+                        className: 'modal-dialog modal-dialog-centered modal-lg',
+                        style: { maxWidth: '780px' },
+                        onClick: (e) => e.stopPropagation()
+                    },
+                        h('div', { className: 'modal-content border-0 shadow-lg rounded-4 overflow-hidden' },
+                            /* Header */
+                            h('div', { className: 'modal-header bg-light border-bottom py-3 px-4 d-flex justify-content-between align-items-center' },
+                                h('div', null,
+                                    h('h5', { className: 'modal-title fw-bold text-dark d-flex align-items-center gap-2 mb-0' },
+                                        h('i', { className: 'bi bi-cash-coin text-success fs-4' }),
+                                        'Checkout & POS Financials'
+                                    ),
+                                    h('div', { className: 'small text-muted mt-1' },
+                                        `Appointment #${completeModal.apt.id} • ${completeModal.apt.customerName || 'Walk-In Guest'} • Staff: ${techName}`
+                                    )
+                                ),
+                                h('button', {
+                                    type: 'button',
+                                    className: 'btn-close',
+                                    disabled: completeModal.saving,
+                                    onClick: () => setCompleteModal(prev => ({ ...prev, isOpen: false, apt: null, error: null }))
+                                })
+                            ),
+
+                            /* Body */
+                            h('div', { className: 'modal-body p-4', style: { maxHeight: '78vh', overflowY: 'auto' } },
+                                completeModal.error && h('div', { className: 'alert alert-danger py-2 px-3 small mb-3' }, completeModal.error),
+
+                                /* Safety & Allergy Warning in Complete Modal */
+                                completeModal.apt.medicalFlags && h('div', {
+                                    className: 'alert alert-danger d-flex align-items-start gap-2 py-2 px-3 mb-3 rounded-3 small border-2 border-danger'
+                                },
+                                    h('i', { className: 'bi bi-exclamation-triangle-fill fs-5 text-danger flex-shrink-0' }),
+                                    h('div', null,
+                                        h('strong', { className: 'text-danger' }, '⚠️ Client Medical / Allergy Flag: '),
+                                        completeModal.apt.medicalFlags
+                                    )
+                                ),
+
+                                /* 1. Services & On-the-Fly Add-ons Section */
+                                h('div', { className: 'card border-0 bg-light rounded-3 p-3 mb-3' },
+                                    h('div', { className: 'd-flex justify-content-between align-items-center mb-2 border-bottom pb-2' },
+                                        h('span', { className: 'small fw-bold text-uppercase text-secondary d-flex align-items-center gap-1', style: { letterSpacing: '0.5px' } }, [
+                                            h('i', { className: 'bi bi-receipt-cutoff text-pink' }),
+                                            'Billed Services & Add-ons'
+                                        ]),
+                                        h('span', { className: 'badge bg-white text-dark border' }, `${completeModal.lineItems.length} item${completeModal.lineItems.length === 1 ? '' : 's'}`)
+                                    ),
+
+                                    /* Line Items List */
+                                    h('div', { className: 'd-flex flex-column gap-2 mb-3' },
+                                        completeModal.lineItems.map((item, idx) =>
+                                            h('div', { key: item.id || idx, className: 'd-flex justify-content-between align-items-center bg-white p-2 rounded-3 border small shadow-sm' },
+                                                h('div', { className: 'd-flex align-items-center gap-2' },
+                                                    h('span', { className: `badge ${item.type === 'SERVICE' ? 'bg-primary-subtle text-primary border border-primary-subtle' : item.type === 'DISCOUNT' ? 'bg-warning-subtle text-warning border border-warning-subtle' : 'bg-info-subtle text-info-emphasis border border-info-subtle'}` }, item.type || 'ADDON'),
+                                                    h('span', { className: 'fw-bold text-dark' }, item.name)
+                                                ),
+                                                h('div', { className: 'd-flex align-items-center gap-3' },
+                                                    h('span', { className: 'fw-bold fs-6 text-dark' }, `$${Number(item.price || 0).toFixed(2)}`),
+                                                    idx > 0 && h('button', {
+                                                        type: 'button',
+                                                        className: 'btn btn-outline-danger btn-sm py-0 px-2 rounded-circle',
+                                                        style: { fontSize: '0.7rem' },
+                                                        title: 'Remove item',
+                                                        onClick: () => handleRemoveLineItem(idx)
+                                                    }, '✕')
+                                                )
+                                            )
+                                        )
+                                    ),
+
+                                    /* Quick Preset Add-ons Chips */
+                                    h('div', { className: 'mb-2' },
+                                        h('div', { className: 'small fw-semibold text-secondary mb-1' }, '⚡ Quick On-The-Fly Add-ons:'),
+                                        h('div', { className: 'd-flex flex-wrap gap-1' },
+                                            [
+                                                { name: 'French Tips', price: 10 },
+                                                { name: '2-Finger Nail Art', price: 15 },
+                                                { name: 'Acrylic Soak-Off', price: 10 },
+                                                { name: 'Chrome Powder Finish', price: 8 },
+                                                { name: 'Paraffin Wax Treatment', price: 12 },
+                                                { name: 'Matte Topcoat', price: 5 },
+                                                { name: 'Intensive Cuticle Care', price: 15 },
+                                                { name: 'Long Extension Surcharge', price: 15 }
+                                            ].map(addon =>
+                                                h('button', {
+                                                    key: addon.name,
+                                                    type: 'button',
+                                                    className: 'btn btn-outline-secondary btn-sm py-1 px-2 rounded-pill bg-white shadow-sm',
+                                                    style: { fontSize: '0.74rem' },
+                                                    onClick: () => handleAddAddon(addon.name, addon.price)
+                                                }, `+ ${addon.name} ($${addon.price})`)
+                                            )
+                                        )
+                                    ),
+
+                                    /* Custom Add-on / Discount Row */
+                                    h('div', { className: 'd-flex align-items-center gap-2 mt-2 pt-2 border-top' },
+                                        h('input', {
+                                            type: 'text',
+                                            className: 'form-control form-control-sm',
+                                            placeholder: 'Custom item name (e.g. Swarovski crystals, discount)',
+                                            value: completeModal.customAddonName || '',
+                                            onChange: (e) => setCompleteModal(prev => ({ ...prev, customAddonName: e.target.value }))
+                                        }),
+                                        h('div', { className: 'input-group input-group-sm', style: { maxWidth: '140px' } },
+                                            h('span', { className: 'input-group-text' }, '$'),
+                                            h('input', {
+                                                type: 'number',
+                                                step: '0.50',
+                                                className: 'form-control form-control-sm',
+                                                placeholder: 'Price',
+                                                value: completeModal.customAddonPrice || '',
+                                                onChange: (e) => setCompleteModal(prev => ({ ...prev, customAddonPrice: e.target.value }))
+                                            })
+                                        ),
+                                        h('button', {
+                                            type: 'button',
+                                            className: 'btn btn-outline-primary btn-sm px-3 fw-semibold text-nowrap',
+                                            onClick: handleAddCustomAddon
+                                        }, '+ Add Item')
+                                    )
+                                ),
+
+                                /* 2. Financial Summary, Taxes & Tips */
+                                h('div', { className: 'card border-0 bg-light rounded-3 p-3 mb-3' },
+                                    h('div', { className: 'd-flex justify-content-between align-items-center mb-2' },
+                                        h('span', { className: 'small fw-bold text-uppercase text-secondary d-flex align-items-center gap-1', style: { letterSpacing: '0.5px' } }, [
+                                            h('i', { className: 'bi bi-calculator text-pink' }),
+                                            'Totals, Taxes & Gratuity'
+                                        ]),
+                                        h('div', { className: 'form-check form-switch m-0' },
+                                            h('input', {
+                                                className: 'form-check-input',
+                                                type: 'checkbox',
+                                                id: 'taxExemptSwitch',
+                                                checked: completeModal.taxExempt,
+                                                onChange: handleToggleTaxExempt
+                                            }),
+                                            h('label', { className: 'form-check-label extra-small fw-semibold text-secondary', htmlFor: 'taxExemptSwitch' }, 'Tax Exempt')
+                                        )
+                                    ),
+
+                                    /* Subtotal & Tax Row */
+                                    h('div', { className: 'd-flex justify-content-between align-items-center py-1 border-bottom small' },
+                                        h('span', { className: 'text-secondary' }, 'Subtotal (Services & Add-ons):'),
+                                        h('span', { className: 'fw-bold text-dark' }, `$${subtotal.toFixed(2)}`)
+                                    ),
+                                    h('div', { className: 'd-flex justify-content-between align-items-center py-1 border-bottom small' },
+                                        h('span', { className: 'text-secondary' }, `Sales Tax (${(completeModal.taxRate * 100).toFixed(2)}%):`),
+                                        h('span', { className: completeModal.taxExempt ? 'text-muted fst-italic' : 'fw-bold text-dark' },
+                                            completeModal.taxExempt ? 'Exempt ($0.00)' : `$${taxAmount.toFixed(2)}`
+                                        )
+                                    ),
+
+                                    /* Tip & Gratuity Section */
+                                    h('div', { className: 'py-2 border-bottom' },
+                                        h('div', { className: 'd-flex justify-content-between align-items-center mb-2' },
+                                            h('label', { className: 'small fw-bold text-dark d-flex align-items-center gap-1 mb-0' }, [
+                                                h('i', { className: 'bi bi-heart-fill text-danger' }),
+                                                `Technician Tip (100% Payout to ${techName}):`
+                                            ]),
+                                            h('span', { className: 'fw-bold text-success fs-6' }, `+$${tipAmount.toFixed(2)}`)
+                                        ),
+                                        /* Tip Buttons */
+                                        h('div', { className: 'd-flex flex-wrap gap-1 align-items-center mb-2' },
+                                            [
+                                                { label: 'No Tip (0%)', pct: 0 },
+                                                { label: '15%', pct: 15 },
+                                                { label: '18%', pct: 18 },
+                                                { label: '20%', pct: 20 },
+                                                { label: '25%', pct: 25 }
+                                            ].map(t =>
+                                                h('button', {
+                                                    key: t.pct,
+                                                    type: 'button',
+                                                    className: `btn btn-sm py-1 px-3 rounded-pill fw-semibold ${completeModal.tipPercent === t.pct ? 'btn-success text-white' : 'btn-outline-secondary bg-white'}`,
+                                                    style: { fontSize: '0.75rem' },
+                                                    onClick: () => handleSetTipPercent(t.pct)
+                                                }, t.label)
+                                            ),
+                                            h('button', {
+                                                type: 'button',
+                                                className: `btn btn-sm py-1 px-3 rounded-pill fw-semibold ${completeModal.tipPercent === null ? 'btn-success text-white' : 'btn-outline-secondary bg-white'}`,
+                                                style: { fontSize: '0.75rem' },
+                                                onClick: () => handleSetCustomTip(completeModal.tipCustom || '5.00')
+                                            }, 'Custom $')
+                                        ),
+                                        completeModal.tipPercent === null && h('div', { className: 'input-group input-group-sm mt-1', style: { maxWidth: '180px' } },
+                                            h('span', { className: 'input-group-text bg-white' }, 'Custom Tip $'),
+                                            h('input', {
+                                                type: 'number',
+                                                step: '1.00',
+                                                className: 'form-control',
+                                                placeholder: '0.00',
+                                                value: completeModal.tipCustom,
+                                                onChange: (e) => handleSetCustomTip(e.target.value)
+                                            })
+                                        )
+                                    ),
+
+                                    /* Total Due Banner */
+                                    h('div', { className: 'd-flex justify-content-between align-items-center pt-2 mt-1' },
+                                        h('div', null,
+                                            h('span', { className: 'fs-6 fw-bold text-dark text-uppercase' }, 'Total Amount Due:'),
+                                            h('div', { className: 'extra-small text-muted' }, `Includes $${subtotal.toFixed(2)} service + $${taxAmount.toFixed(2)} tax + $${tipAmount.toFixed(2)} tip`)
+                                        ),
+                                        h('div', { className: 'fs-4 fw-bold text-pink' }, `$${totalAmount.toFixed(2)}`)
+                                    )
+                                ),
+
+                                /* 3. Payment Method & Split Payment */
+                                h('div', { className: 'card border-0 bg-light rounded-3 p-3 mb-3' },
+                                    h('div', { className: 'd-flex justify-content-between align-items-center mb-2 border-bottom pb-2' },
+                                        h('span', { className: 'small fw-bold text-uppercase text-secondary d-flex align-items-center gap-1', style: { letterSpacing: '0.5px' } }, [
+                                            h('i', { className: 'bi bi-credit-card text-pink' }),
+                                            'Payment Method'
+                                        ]),
+                                        h('span', { className: 'badge bg-white text-secondary border' }, completeModal.paymentMethod)
+                                    ),
+
+                                    /* Method Selection Buttons */
+                                    h('div', { className: 'd-flex flex-wrap gap-2 mb-3' },
+                                        [
+                                            { id: 'CARD', label: '💳 Credit / Debit Card' },
+                                            { id: 'CASH', label: '💵 Cash' },
+                                            { id: 'APPLE_PAY', label: '📱 Apple Pay / Contactless' },
+                                            { id: 'GIFT_CARD', label: '🎁 Gift Card' },
+                                            { id: 'SPLIT', label: '🔀 Split Payment' }
+                                        ].map(m =>
+                                            h('button', {
+                                                key: m.id,
+                                                type: 'button',
+                                                className: `btn btn-sm py-2 px-3 rounded-3 fw-bold flex-grow-1 ${completeModal.paymentMethod === m.id ? 'btn-primary shadow' : 'btn-outline-secondary bg-white'}`,
+                                                style: { fontSize: '0.78rem' },
+                                                onClick: () => handlePaymentMethodChange(m.id)
+                                            }, m.label)
+                                        )
+                                    ),
+
+                                    /* Split Payment Sub-Panel */
+                                    completeModal.paymentMethod === 'SPLIT' && h('div', { className: 'p-3 bg-white rounded-3 border mt-2' },
+                                        h('div', { className: 'd-flex justify-content-between align-items-center mb-2' },
+                                            h('span', { className: 'small fw-bold text-dark' }, 'Split Tender Distribution:'),
+                                            h('button', {
+                                                type: 'button',
+                                                className: 'btn btn-outline-primary btn-sm py-0 px-2 rounded-pill',
+                                                style: { fontSize: '0.72rem' },
+                                                onClick: handleAddSplitRow
+                                            }, '+ Add Tender')
+                                        ),
+
+                                        /* Split Rows */
+                                        h('div', { className: 'd-flex flex-column gap-2 mb-2' },
+                                            (completeModal.splitPayments || []).map((sp, sIdx) =>
+                                                h('div', { key: sIdx, className: 'd-flex align-items-center gap-2' },
+                                                    h('span', { className: 'badge bg-light text-secondary border' }, `#${sIdx + 1}`),
+                                                    h('select', {
+                                                        className: 'form-select form-select-sm',
+                                                        style: { maxWidth: '170px' },
+                                                        value: sp.method,
+                                                        onChange: (e) => handleSplitRowChange(sIdx, 'method', e.target.value)
+                                                    },
+                                                        h('option', { value: 'CARD' }, 'Credit / Debit Card'),
+                                                        h('option', { value: 'CASH' }, 'Cash'),
+                                                        h('option', { value: 'APPLE_PAY' }, 'Apple Pay'),
+                                                        h('option', { value: 'GIFT_CARD' }, 'Gift Card')
+                                                    ),
+                                                    h('div', { className: 'input-group input-group-sm' },
+                                                        h('span', { className: 'input-group-text' }, '$'),
+                                                        h('input', {
+                                                            type: 'number',
+                                                            step: '0.50',
+                                                            className: 'form-control',
+                                                            placeholder: '0.00',
+                                                            value: sp.amount !== undefined ? sp.amount : '',
+                                                            onChange: (e) => handleSplitRowChange(sIdx, 'amount', e.target.value)
+                                                        })
+                                                    ),
+                                                    (completeModal.splitPayments || []).length > 1 && h('button', {
+                                                        type: 'button',
+                                                        className: 'btn btn-outline-danger btn-sm py-0 px-2 rounded-circle',
+                                                        onClick: () => handleRemoveSplitRow(sIdx)
+                                                    }, '✕')
+                                                )
+                                            )
+                                        ),
+
+                                        /* Balance Status */
+                                        h('div', { className: 'd-flex justify-content-between align-items-center pt-2 border-top small mt-2' },
+                                            h('div', null,
+                                                h('span', { className: 'text-muted' }, `Allocated: $${splitSum.toFixed(2)} / Due: $${totalAmount.toFixed(2)} • `),
+                                                isSplitBalanced
+                                                    ? h('span', { className: 'badge bg-success-subtle text-success border border-success-subtle' }, '✅ Perfectly Balanced')
+                                                    : h('span', { className: 'badge bg-warning-subtle text-warning border border-warning-subtle' }, `⚠️ Remaining: $${splitDiff.toFixed(2)}`)
+                                            ),
+                                            !isSplitBalanced && h('button', {
+                                                type: 'button',
+                                                className: 'btn btn-outline-success btn-sm py-0 px-2 fw-bold',
+                                                style: { fontSize: '0.72rem' },
+                                                onClick: () => handleAutoFillRemainingSplit(totalAmount)
+                                            }, 'Auto-Fill Remaining')
+                                        )
+                                    )
+                                ),
+
+                                /* 4. Color & Formula Used Today */
+                                h('div', { className: 'mb-3 bg-light p-3 rounded-3 border' },
+                                    h('div', { className: 'd-flex justify-content-between align-items-center mb-1' },
+                                        h('label', { className: 'form-label small fw-bold text-dark d-flex align-items-center gap-1 mb-0' }, [
+                                            h('i', { className: 'bi bi-palette text-pink' }),
+                                            'Color / Product Formula Used Today:'
+                                        ]),
+                                        h('span', { className: 'badge bg-white text-secondary border' }, 'Saved to Profile')
+                                    ),
+                                    h('div', { className: 'small text-muted mb-2', style: { fontSize: '0.76rem' } },
+                                        'Save color shade or brand formula (e.g. OPI "Bubble Bath" Gel #23 or DND #455) for repeat visits:'
+                                    ),
+                                    h('div', { className: 'd-flex flex-wrap gap-1 mb-2' },
+                                        [
+                                            'OPI Bubble Bath #23',
+                                            'DND #455',
+                                            'Funny Bunny',
+                                            'Chisel Dipping #12',
+                                            'Gel X Natural',
+                                            'Chrome Finish'
+                                        ].map(shade =>
+                                            h('button', {
+                                                key: shade,
+                                                type: 'button',
+                                                className: 'btn btn-outline-secondary btn-sm py-0 px-2 rounded-pill bg-white shadow-sm',
+                                                style: { fontSize: '0.72rem' },
+                                                onClick: () => setCompleteModal(prev => ({
+                                                    ...prev,
+                                                    colorFormula: prev.colorFormula ? `${prev.colorFormula}, ${shade}` : shade
+                                                }))
+                                            }, `+ ${shade}`)
+                                        )
+                                    ),
+                                    h('input', {
+                                        type: 'text',
+                                        className: 'form-control form-control-sm',
+                                        placeholder: 'e.g. OPI "Bubble Bath" Gel #23 or DND #455',
+                                        value: completeModal.colorFormula || '',
+                                        onChange: (e) => setCompleteModal(prev => ({ ...prev, colorFormula: e.target.value }))
+                                    })
+                                ),
+
+                                /* 5. Staff Notes & Service Remarks */
+                                h('div', { className: 'mb-3' },
+                                    h('label', { className: 'form-label small fw-bold text-dark d-flex align-items-center gap-1 mb-1' }, [
+                                        h('i', { className: 'bi bi-pencil-fill text-pink' }),
+                                        'Staff Notes & Service Remarks:'
+                                    ]),
+                                    /* Quick chips */
+                                    h('div', { className: 'd-flex flex-wrap gap-1 mb-2' },
+                                        [
+                                            'Paid via Card',
+                                            'Paid Cash',
+                                            'Paid Apple Pay',
+                                            'Rebooked next visit',
+                                            'Cuticle oil recommended',
+                                            'Loved the design / color'
+                                        ].map(chip =>
+                                            h('button', {
+                                                key: chip,
+                                                type: 'button',
+                                                className: 'btn btn-outline-secondary btn-sm py-0 px-2 rounded-pill bg-white shadow-sm',
+                                                style: { fontSize: '0.73rem' },
+                                                onClick: () => handleAppendCompleteChip(chip)
+                                            }, `+ ${chip}`)
+                                        )
+                                    ),
+                                    h('textarea', {
+                                        className: 'form-control',
+                                        rows: 2,
+                                        placeholder: 'e.g. OPI Bubble Bath 2 coats. Rebooked next appointment for Dec 10.',
+                                        value: completeModal.notes,
+                                        onChange: (e) => setCompleteModal(prev => ({ ...prev, notes: e.target.value }))
+                                    })
+                                ),
+
+                                /* 6. Notify customer toggle */
+                                h('div', { className: 'form-check' },
+                                    h('input', {
+                                        className: 'form-check-input',
+                                        type: 'checkbox',
+                                        id: 'completeNotifyCustomer',
+                                        checked: notifyCustomer,
+                                        onChange: (e) => setNotifyCustomer(e.target.checked)
+                                    }),
+                                    h('label', { className: 'form-check-label small fw-semibold text-secondary', htmlFor: 'completeNotifyCustomer' },
+                                        'Send POS thank-you receipt / notification via Email & SMS'
+                                    )
+                                )
+                            ),
+
+                            /* Footer */
+                            h('div', { className: 'modal-footer bg-light border-top d-flex justify-content-between p-3' },
+                                h('button', {
+                                    type: 'button',
+                                    className: 'btn btn-outline-secondary btn-sm px-3 fw-semibold',
+                                    disabled: completeModal.saving,
+                                    onClick: () => setCompleteModal(prev => ({ ...prev, isOpen: false, apt: null, error: null }))
+                                }, 'Cancel'),
+                                h('button', {
+                                    type: 'button',
+                                    className: 'btn btn-success px-4 py-2 fw-bold d-inline-flex align-items-center gap-2 rounded-3 shadow-sm',
+                                    disabled: completeModal.saving || (completeModal.paymentMethod === 'SPLIT' && !isSplitBalanced),
+                                    onClick: handleConfirmComplete
+                                }, completeModal.saving ? 'Processing Checkout...' : [
+                                    h('i', { className: 'bi bi-check2-circle fs-5' }),
+                                    `Finalize Checkout & Complete ($${totalAmount.toFixed(2)})`
+                                ])
+                            )
+                        )
+                    )
+                );
+            })(),
+
+            /* Daily POS Financials & Staff Payouts Modal */
+            posSummaryModal.isOpen && h('div', {
                 className: 'modal show d-block',
-                style: { backgroundColor: 'rgba(15, 23, 42, 0.65)', zIndex: 1080 },
+                style: { backgroundColor: 'rgba(15, 23, 42, 0.65)', zIndex: 1075 },
                 tabIndex: -1,
-                onClick: () => !completeModal.saving && setCompleteModal({ isOpen: false, apt: null, notes: '', saving: false, error: null })
+                onClick: () => setPosSummaryModal(prev => ({ ...prev, isOpen: false }))
             },
                 h('div', {
-                    className: 'modal-dialog modal-dialog-centered',
-                    style: { maxWidth: '560px' },
+                    className: 'modal-dialog modal-dialog-centered modal-xl',
+                    style: { maxWidth: '960px' },
                     onClick: (e) => e.stopPropagation()
                 },
                     h('div', { className: 'modal-content border-0 shadow-lg rounded-4 overflow-hidden' },
                         /* Header */
-                        h('div', { className: 'modal-header bg-light border-bottom py-3 px-4' },
-                            h('div', null,
-                                h('h5', { className: 'modal-title fw-bold text-dark d-flex align-items-center gap-2 mb-0' },
-                                    h('i', { className: 'bi bi-check-circle-fill text-success fs-5' }),
-                                    'Complete Service & Checkout'
+                        h('div', { className: 'modal-header bg-light border-bottom py-3 px-4 d-flex justify-content-between align-items-center' },
+                            h('div', { className: 'd-flex align-items-center gap-3' },
+                                h('div', { className: 'p-2 bg-success-subtle text-success rounded-3 fs-4' },
+                                    h('i', { className: 'bi bi-cash-stack' })
                                 ),
-                                h('div', { className: 'small text-muted mt-1' },
-                                    `Appointment #${completeModal.apt.id} • ${completeModal.apt.customerName || 'Walk-In Guest'}`
+                                h('div', null,
+                                    h('h5', { className: 'modal-title fw-bold text-dark mb-0' }, 'Daily POS Financials & Staff Payouts'),
+                                    h('div', { className: 'small text-muted' }, `Salon Financial Settlement for ${posSummaryModal.date}`)
                                 )
                             ),
                             h('button', {
                                 type: 'button',
                                 className: 'btn-close',
-                                disabled: completeModal.saving,
-                                onClick: () => setCompleteModal({ isOpen: false, apt: null, notes: '', saving: false, error: null })
+                                onClick: () => setPosSummaryModal(prev => ({ ...prev, isOpen: false }))
                             })
                         ),
 
                         /* Body */
                         h('div', { className: 'modal-body p-4' },
-                            completeModal.error && h('div', { className: 'alert alert-danger py-2 px-3 small mb-3' }, completeModal.error),
-
-                            /* Safety & Allergy Warning in Complete Modal */
-                            completeModal.apt.medicalFlags && h('div', {
-                                className: 'alert alert-danger d-flex align-items-start gap-2 py-2 px-3 mb-3 rounded-3 small border-2 border-danger'
-                            },
-                                h('i', { className: 'bi bi-exclamation-triangle-fill fs-5 text-danger flex-shrink-0' }),
-                                h('div', null,
-                                    h('strong', { className: 'text-danger' }, '⚠️ Client Medical / Allergy Flag: '),
-                                    completeModal.apt.medicalFlags
+                            /* Date Selector Bar */
+                            h('div', { className: 'd-flex justify-content-between align-items-center mb-4 flex-wrap gap-2 bg-light p-3 rounded-3 border' },
+                                h('div', { className: 'd-flex align-items-center gap-2' },
+                                    h('label', { className: 'small fw-bold text-dark mb-0' }, 'Select Settlement Date:'),
+                                    h('input', {
+                                        type: 'date',
+                                        className: 'form-control form-control-sm',
+                                        value: posSummaryModal.date,
+                                        onChange: (e) => handleOpenPosSummary(e.target.value)
+                                    })
+                                ),
+                                h('div', { className: 'd-flex gap-2' },
+                                    h('button', {
+                                        type: 'button',
+                                        className: 'btn btn-outline-secondary btn-sm fw-semibold',
+                                        onClick: () => handleOpenPosSummary(toDateKey(new Date()))
+                                    }, 'Today'),
+                                    h('button', {
+                                        type: 'button',
+                                        className: 'btn btn-outline-primary btn-sm fw-semibold d-flex align-items-center gap-1',
+                                        onClick: () => window.print()
+                                    }, [h('i', { className: 'bi bi-printer' }), ' Print Settlement'])
                                 )
                             ),
 
-                            /* 1. Services being done based on the appointment */
-                            h('div', { className: 'card border-0 bg-light rounded-3 p-3 mb-3' },
-                                h('div', { className: 'd-flex justify-content-between align-items-center mb-2 border-bottom pb-2' },
-                                    h('span', { className: 'small fw-bold text-uppercase text-secondary', style: { letterSpacing: '0.5px' } }, 'Services Performed'),
-                                    h('span', { className: 'badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2 py-1' },
-                                        'Ready to Complete'
-                                    )
-                                ),
-                                h('div', { className: 'd-flex justify-content-between align-items-center' },
-                                    h('div', null,
-                                        h('div', { className: 'fw-bold text-dark fs-6' },
-                                            (completeModal.apt.service && completeModal.apt.service.name) || 'Nail Service'
-                                        ),
-                                        h('div', { className: 'small text-muted mt-1' },
-                                            `Duration: ${(completeModal.apt.service && completeModal.apt.service.durationMinutes) || 45} mins • Staff: ${completeModal.apt.nailTech ? (completeModal.apt.nailTech.name || completeModal.apt.nailTech.username) : 'Anyone Available'}`
+                            posSummaryModal.loading && h('div', { className: 'text-center py-5' },
+                                h('div', { className: 'spinner-border text-pink', role: 'status' }),
+                                h('p', { className: 'text-muted small mt-2 mb-0' }, 'Calculating daily revenue, taxes & technician gratuities...')
+                            ),
+
+                            posSummaryModal.error && h('div', { className: 'alert alert-danger py-2' }, posSummaryModal.error),
+
+                            posSummaryModal.data && h('div', null,
+                                /* KPI Cards Row */
+                                h('div', { className: 'row g-3 mb-4' },
+                                    h('div', { className: 'col-md-3 col-6' },
+                                        h('div', { className: 'p-3 bg-white rounded-3 border shadow-sm text-center' },
+                                            h('div', { className: 'text-muted extra-small text-uppercase fw-bold', style: { letterSpacing: '0.05em' } }, 'Gross Sales Total'),
+                                            h('div', { className: 'fs-4 fw-bold text-dark mt-1' }, `$${Number(posSummaryModal.data.totalGrossRevenue || 0).toFixed(2)}`),
+                                            h('div', { className: 'extra-small text-muted' }, `${posSummaryModal.data.transactionCount || 0} transactions`)
                                         )
                                     ),
-                                    h('div', { className: 'text-end' },
-                                        h('div', { className: 'fs-5 fw-bold text-pink' },
-                                            `$${Number((completeModal.apt.service && completeModal.apt.service.price) || 0).toFixed(2)}`
-                                        ),
-                                        h('div', { className: 'small text-muted', style: { fontSize: '0.72rem' } }, 'Payment due in salon')
+                                    h('div', { className: 'col-md-3 col-6' },
+                                        h('div', { className: 'p-3 bg-white rounded-3 border shadow-sm text-center' },
+                                            h('div', { className: 'text-muted extra-small text-uppercase fw-bold', style: { letterSpacing: '0.05em' } }, 'Staff Commissions Paid'),
+                                            h('div', { className: 'fs-4 fw-bold text-primary mt-1' }, `$${Number(posSummaryModal.data.totalCommissionPaid || 0).toFixed(2)}`),
+                                            h('div', { className: 'extra-small text-muted' }, 'Service Commission Splits')
+                                        )
+                                    ),
+                                    h('div', { className: 'col-md-3 col-6' },
+                                        h('div', { className: 'p-3 bg-white rounded-3 border shadow-sm text-center' },
+                                            h('div', { className: 'text-muted extra-small text-uppercase fw-bold', style: { letterSpacing: '0.05em' } }, 'Tips & Gratuities'),
+                                            h('div', { className: 'fs-4 fw-bold text-success mt-1' }, `$${Number(posSummaryModal.data.totalTipsCollected || 0).toFixed(2)}`),
+                                            h('div', { className: 'extra-small text-muted' }, '100% Payout to Staff')
+                                        )
+                                    ),
+                                    h('div', { className: 'col-md-3 col-6' },
+                                        h('div', { className: 'p-3 bg-white rounded-3 border shadow-sm text-center' },
+                                            h('div', { className: 'text-muted extra-small text-uppercase fw-bold', style: { letterSpacing: '0.05em' } }, 'Salon House Retained'),
+                                            h('div', { className: 'fs-4 fw-bold text-dark mt-1' }, `$${Number(posSummaryModal.data.totalSalonRetained || 0).toFixed(2)}`),
+                                            h('div', { className: 'extra-small text-muted' }, 'House Cut + Sales Tax')
+                                        )
                                     )
                                 ),
-                                completeModal.apt.stationPreference && h('div', { className: 'small text-muted mt-2 pt-2 border-top' },
-                                    h('strong', null, 'Station / Room: '), completeModal.apt.stationPreference
+
+                                /* Staff Payouts & Gratuity Table (Crucial for Salon Manager) */
+                                h('div', { className: 'card border-0 shadow-sm rounded-3 mb-4' },
+                                    h('div', { className: 'card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center' },
+                                        h('h6', { className: 'fw-bold text-dark mb-0 d-flex align-items-center gap-2' }, [
+                                            h('i', { className: 'bi bi-people-fill text-pink' }),
+                                            'Staff Commission & Payout Settlement'
+                                        ]),
+                                        h('div', { className: 'd-flex align-items-center gap-2' },
+                                            h('button', {
+                                                type: 'button',
+                                                className: 'btn btn-outline-primary btn-sm py-1 px-2 fw-semibold',
+                                                onClick: () => {
+                                                    setPosSummaryModal(prev => ({ ...prev, isOpen: false }));
+                                                    handleOpenPayrollReport();
+                                                }
+                                            }, [
+                                                h('i', { className: 'bi bi-file-earmark-spreadsheet me-1' }),
+                                                'View Weekly Payroll'
+                                            ]),
+                                            h('span', { className: 'badge bg-success-subtle text-success border border-success-subtle' }, 'Daily Settlement')
+                                        )
+                                    ),
+                                    h('div', { className: 'table-responsive' },
+                                        h('table', { className: 'table table-hover align-middle mb-0' },
+                                            h('thead', { className: 'table-light small text-uppercase text-secondary' },
+                                                h('tr', null,
+                                                    h('th', null, 'Technician Name'),
+                                                    h('th', { className: 'text-center' }, 'Completed'),
+                                                    h('th', { className: 'text-end' }, 'Services ($)'),
+                                                    h('th', { className: 'text-center' }, 'Split (%)'),
+                                                    h('th', { className: 'text-end' }, 'Commission ($)'),
+                                                    h('th', { className: 'text-end' }, 'Total Tips ($)'),
+                                                    h('th', { className: 'text-end fw-bold text-success' }, 'Net Tech Payout ($)'),
+                                                    h('th', { className: 'text-end fw-bold text-primary' }, 'Salon Share ($)')
+                                                )
+                                            ),
+                                            h('tbody', null,
+                                                (posSummaryModal.data.staffPayouts || []).length === 0
+                                                    ? h('tr', null, h('td', { colSpan: 8, className: 'text-center text-muted py-4' }, 'No checkouts or transactions recorded for this date.'))
+                                                    : (posSummaryModal.data.staffPayouts || []).map((staff, sIdx) =>
+                                                        h('tr', { key: staff.nailTechId || sIdx },
+                                                            h('td', { className: 'fw-bold text-dark' }, [
+                                                                h('i', { className: 'bi bi-person-circle text-pink me-2' }),
+                                                                staff.nailTechName || 'Staff'
+                                                            ]),
+                                                            h('td', { className: 'text-center' },
+                                                                h('span', { className: 'badge bg-light text-dark border' }, staff.appointmentsCount)
+                                                            ),
+                                                            h('td', { className: 'text-end fw-semibold text-secondary' }, `$${Number(staff.serviceSales || 0).toFixed(2)}`),
+                                                            h('td', { className: 'text-center' },
+                                                                h('span', { className: 'badge bg-primary-subtle text-primary border border-primary-subtle fw-semibold' },
+                                                                    `${Number(staff.commissionRate || 60).toFixed(0)}%`
+                                                                )
+                                                            ),
+                                                            h('td', { className: 'text-end fw-bold text-primary' }, `$${Number(staff.commissionEarned || 0).toFixed(2)}`),
+                                                            h('td', { className: 'text-end fw-semibold text-success' }, `$${Number(staff.totalTips || 0).toFixed(2)}`),
+                                                            h('td', { className: 'text-end fw-bold fs-6 text-success' }, `$${Number(staff.totalStaffPayout || staff.totalStaffEarnings || 0).toFixed(2)}`),
+                                                            h('td', { className: 'text-end fw-bold text-dark' }, `$${Number(staff.salonHouseShare || 0).toFixed(2)}`)
+                                                        )
+                                                    )
+                                            )
+                                        )
+                                    )
                                 ),
-                                completeModal.apt.notes && h('div', { className: 'small text-muted mt-2 pt-2 border-top' },
-                                    h('strong', null, 'Initial Booking Request: '), completeModal.apt.notes
+
+                                /* Payment Tender Breakdown */
+                                h('div', { className: 'p-3 bg-light rounded-3 border' },
+                                    h('div', { className: 'small fw-bold text-secondary text-uppercase mb-2' }, 'Payment Tender Breakdown:'),
+                                    h('div', { className: 'd-flex flex-wrap gap-2' },
+                                        Object.entries(posSummaryModal.data.paymentBreakdown || {}).map(([method, val]) =>
+                                            h('div', { key: method, className: 'bg-white px-3 py-2 rounded-3 border shadow-sm small' },
+                                                h('span', { className: 'text-muted' }, `${method}: `),
+                                                h('strong', { className: 'text-dark' }, `$${Number(val.total || 0).toFixed(2)}`),
+                                                h('span', { className: 'badge bg-light text-secondary border ms-1' }, `${val.count || 0}`)
+                                            )
+                                        )
+                                    )
+                                )
+                            )
+                        ),
+
+                        /* Footer */
+                        h('div', { className: 'modal-footer bg-light border-top d-flex justify-content-end p-3' },
+                            h('button', {
+                                type: 'button',
+                                className: 'btn btn-secondary btn-sm px-4 fw-semibold',
+                                onClick: () => setPosSummaryModal(prev => ({ ...prev, isOpen: false }))
+                            }, 'Close')
+                        )
+                    )
+                )
+            ),
+
+            /* Weekly & Custom Date Range Payroll Modal */
+            payrollModal.isOpen && h('div', {
+                className: 'modal show d-block',
+                style: { backgroundColor: 'rgba(15, 23, 42, 0.65)', zIndex: 1076 },
+                tabIndex: -1,
+                onClick: () => setPayrollModal(prev => ({ ...prev, isOpen: false }))
+            },
+                h('div', {
+                    className: 'modal-dialog modal-dialog-centered modal-xl',
+                    style: { maxWidth: '1050px' },
+                    onClick: (e) => e.stopPropagation()
+                },
+                    h('div', { className: 'modal-content border-0 shadow-lg rounded-4 overflow-hidden' },
+                        /* Header */
+                        h('div', { className: 'modal-header bg-light border-bottom py-3 px-4 d-flex justify-content-between align-items-center' },
+                            h('div', { className: 'd-flex align-items-center gap-3' },
+                                h('div', { className: 'p-2 bg-primary-subtle text-primary rounded-3 fs-4' },
+                                    h('i', { className: 'bi bi-file-earmark-spreadsheet' })
+                                ),
+                                h('div', null,
+                                    h('h5', { className: 'modal-title fw-bold text-dark mb-0' }, 'Weekly & Custom Date Range Staff Payroll'),
+                                    h('div', { className: 'small text-muted' }, `Settlement Period: ${payrollModal.startDate} to ${payrollModal.endDate}`)
+                                )
+                            ),
+                            h('button', {
+                                type: 'button',
+                                className: 'btn-close',
+                                onClick: () => setPayrollModal(prev => ({ ...prev, isOpen: false }))
+                            })
+                        ),
+
+                        /* Body */
+                        h('div', { className: 'modal-body p-4' },
+                            /* Date Range Selector & Actions Bar */
+                            h('div', { className: 'd-flex justify-content-between align-items-center mb-4 flex-wrap gap-2 bg-light p-3 rounded-3 border' },
+                                h('div', { className: 'd-flex flex-wrap align-items-center gap-2' },
+                                    h('span', { className: 'small fw-bold text-dark' }, 'Presets:'),
+                                    h('button', {
+                                        type: 'button',
+                                        className: 'btn btn-outline-secondary btn-sm fw-semibold',
+                                        onClick: () => handleOpenPayrollReport(getMondayOfCurrentWeek(), getSundayOfCurrentWeek())
+                                    }, 'This Week'),
+                                    h('button', {
+                                        type: 'button',
+                                        className: 'btn btn-outline-secondary btn-sm fw-semibold',
+                                        onClick: () => {
+                                            const d = new Date();
+                                            const day = d.getDay();
+                                            const diffMon = d.getDate() - day + (day === 0 ? -6 : 1) - 7;
+                                            const lastMon = new Date(new Date().setDate(diffMon));
+                                            const lastSun = new Date(new Date().setDate(diffMon + 6));
+                                            handleOpenPayrollReport(lastMon.toISOString().split('T')[0], lastSun.toISOString().split('T')[0]);
+                                        }
+                                    }, 'Last Week'),
+                                    h('button', {
+                                        type: 'button',
+                                        className: 'btn btn-outline-secondary btn-sm fw-semibold',
+                                        onClick: () => {
+                                            const now = new Date();
+                                            const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+                                            const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+                                            handleOpenPayrollReport(firstDay, lastDay);
+                                        }
+                                    }, 'This Month'),
+                                    h('button', {
+                                        type: 'button',
+                                        className: 'btn btn-outline-secondary btn-sm fw-semibold',
+                                        onClick: () => handleOpenPayrollReport(selectedDateKey, selectedDateKey)
+                                    }, 'Today')
+                                ),
+                                h('div', { className: 'd-flex flex-wrap align-items-center gap-2' },
+                                    h('div', { className: 'd-flex align-items-center gap-1' },
+                                        h('input', {
+                                            type: 'date',
+                                            className: 'form-control form-control-sm',
+                                            value: payrollModal.startDate,
+                                            onChange: (e) => setPayrollModal(prev => ({ ...prev, startDate: e.target.value }))
+                                        }),
+                                        h('span', { className: 'text-muted small' }, 'to'),
+                                        h('input', {
+                                            type: 'date',
+                                            className: 'form-control form-control-sm',
+                                            value: payrollModal.endDate,
+                                            onChange: (e) => setPayrollModal(prev => ({ ...prev, endDate: e.target.value }))
+                                        })
+                                    ),
+                                    h('button', {
+                                        type: 'button',
+                                        className: 'btn btn-primary btn-sm fw-semibold',
+                                        onClick: () => handleOpenPayrollReport(payrollModal.startDate, payrollModal.endDate)
+                                    }, 'Run Report'),
+                                    h('button', {
+                                        type: 'button',
+                                        className: 'btn btn-success btn-sm fw-bold d-flex align-items-center gap-1 shadow-sm',
+                                        onClick: handleDownloadPayrollCsv
+                                    }, [
+                                        h('i', { className: 'bi bi-file-earmark-arrow-down' }),
+                                        'Export CSV'
+                                    ])
                                 )
                             ),
 
-                            /* 2. Color / Formula Used Today */
-                            h('div', { className: 'mb-3 bg-light p-3 rounded-3 border' },
-                                h('div', { className: 'd-flex justify-content-between align-items-center mb-1' },
-                                    h('label', { className: 'form-label small fw-bold text-dark d-flex align-items-center gap-1 mb-0' }, [
-                                        h('i', { className: 'bi bi-palette text-pink' }),
-                                        'Color / Product Formula Used Today:'
-                                    ]),
-                                    h('span', { className: 'badge bg-white text-secondary border' }, 'Saved to Profile')
-                                ),
-                                h('div', { className: 'small text-muted mb-2', style: { fontSize: '0.76rem' } },
-                                    'Save color shade or brand formula (e.g. OPI "Bubble Bath" Gel #23 or DND #455) for repeat visits:'
-                                ),
-                                h('div', { className: 'd-flex flex-wrap gap-1 mb-2' },
-                                    [
-                                        'OPI Bubble Bath #23',
-                                        'DND #455',
-                                        'Funny Bunny',
-                                        'Chisel Dipping #12',
-                                        'Gel X Natural',
-                                        'Chrome Finish'
-                                    ].map(shade =>
-                                        h('button', {
-                                            key: shade,
-                                            type: 'button',
-                                            className: 'btn btn-outline-secondary btn-sm py-0 px-2 rounded-pill',
-                                            style: { fontSize: '0.72rem' },
-                                            onClick: () => setCompleteModal(prev => ({
-                                                ...prev,
-                                                colorFormula: prev.colorFormula ? `${prev.colorFormula}, ${shade}` : shade
-                                            }))
-                                        }, `+ ${shade}`)
-                                    )
-                                ),
-                                h('input', {
-                                    type: 'text',
-                                    className: 'form-control form-control-sm',
-                                    placeholder: 'e.g. OPI "Bubble Bath" Gel #23 or DND #455',
-                                    value: completeModal.colorFormula || '',
-                                    onChange: (e) => setCompleteModal(prev => ({ ...prev, colorFormula: e.target.value }))
-                                })
+                            payrollModal.loading && h('div', { className: 'text-center py-5' },
+                                h('div', { className: 'spinner-border text-primary', role: 'status' }),
+                                h('p', { className: 'text-muted small mt-2 mb-0' }, 'Aggregating weekly transactions, calculating commission splits & gratuities...')
                             ),
 
-                            /* 3. Staff typed notes section */
-                            h('div', { className: 'mb-3' },
-                                h('label', { className: 'form-label small fw-bold text-dark d-flex align-items-center gap-1 mb-1' }, [
-                                    h('i', { className: 'bi bi-pencil-fill text-pink' }),
-                                    'Staff Notes & Service Remarks:'
-                                ]),
-                                h('div', { className: 'small text-muted mb-2' },
-                                    'Type any remarks on nail colors used, retail recommended, payment details, or client feedback:'
-                                ),
-                                /* Quick chips */
-                                h('div', { className: 'd-flex flex-wrap gap-1 mb-2' },
-                                    [
-                                        'Paid via Card',
-                                        'Paid Cash',
-                                        'Paid Apple Pay',
-                                        'Rebooked next visit',
-                                        'Cuticle oil recommended',
-                                        'Loved the design / color'
-                                    ].map(chip =>
-                                        h('button', {
-                                            key: chip,
-                                            type: 'button',
-                                            className: 'btn btn-outline-secondary btn-sm py-0 px-2 rounded-pill',
-                                            style: { fontSize: '0.73rem' },
-                                            onClick: () => handleAppendCompleteChip(chip)
-                                        }, `+ ${chip}`)
+                            payrollModal.error && h('div', { className: 'alert alert-danger py-2' }, payrollModal.error),
+
+                            payrollModal.data && h('div', null,
+                                /* KPI Summary Cards */
+                                h('div', { className: 'row g-3 mb-4' },
+                                    h('div', { className: 'col-md' },
+                                        h('div', { className: 'p-3 bg-white rounded-3 border shadow-sm text-center' },
+                                            h('div', { className: 'text-muted extra-small text-uppercase fw-bold', style: { letterSpacing: '0.05em' } }, 'Gross Sales Total'),
+                                            h('div', { className: 'fs-4 fw-bold text-dark mt-1' }, `$${Number(payrollModal.data.totalGrossRevenue || 0).toFixed(2)}`),
+                                            h('div', { className: 'extra-small text-muted' }, `${payrollModal.data.transactionCount || 0} checkouts`)
+                                        )
+                                    ),
+                                    h('div', { className: 'col-md' },
+                                        h('div', { className: 'p-3 bg-white rounded-3 border shadow-sm text-center' },
+                                            h('div', { className: 'text-muted extra-small text-uppercase fw-bold', style: { letterSpacing: '0.05em' } }, 'Net Service Sales'),
+                                            h('div', { className: 'fs-4 fw-bold text-secondary mt-1' }, `$${Number(payrollModal.data.totalServiceSales || 0).toFixed(2)}`),
+                                            h('div', { className: 'extra-small text-muted' }, 'Base Services & Add-ons')
+                                        )
+                                    ),
+                                    h('div', { className: 'col-md' },
+                                        h('div', { className: 'p-3 bg-white rounded-3 border shadow-sm text-center' },
+                                            h('div', { className: 'text-muted extra-small text-uppercase fw-bold', style: { letterSpacing: '0.05em' } }, 'Staff Commissions'),
+                                            h('div', { className: 'fs-4 fw-bold text-primary mt-1' }, `$${Number(payrollModal.data.totalCommissionPaid || 0).toFixed(2)}`),
+                                            h('div', { className: 'extra-small text-muted' }, 'Service Revenue Split')
+                                        )
+                                    ),
+                                    h('div', { className: 'col-md' },
+                                        h('div', { className: 'p-3 bg-white rounded-3 border shadow-sm text-center' },
+                                            h('div', { className: 'text-muted extra-small text-uppercase fw-bold', style: { letterSpacing: '0.05em' } }, 'Tips Distributed'),
+                                            h('div', { className: 'fs-4 fw-bold text-success mt-1' }, `$${Number(payrollModal.data.totalTipsCollected || 0).toFixed(2)}`),
+                                            h('div', { className: 'extra-small text-muted' }, '100% Pass-through to Staff')
+                                        )
+                                    ),
+                                    h('div', { className: 'col-md' },
+                                        h('div', { className: 'p-3 bg-white rounded-3 border shadow-sm text-center' },
+                                            h('div', { className: 'text-muted extra-small text-uppercase fw-bold', style: { letterSpacing: '0.05em' } }, 'Salon House Retained'),
+                                            h('div', { className: 'fs-4 fw-bold text-dark mt-1' }, `$${Number(payrollModal.data.totalSalonRetained || 0).toFixed(2)}`),
+                                            h('div', { className: 'extra-small text-muted' }, 'House Share + Tax')
+                                        )
                                     )
                                 ),
-                                h('textarea', {
-                                    className: 'form-control',
-                                    rows: 3,
-                                    placeholder: 'e.g. OPI Bubble Bath 2 coats, chrome accent. Paid in cash with tip. Rebooked for Dec 10.',
-                                    value: completeModal.notes,
-                                    onChange: (e) => setCompleteModal(prev => ({ ...prev, notes: e.target.value }))
-                                })
-                            ),
 
-                            /* 3. Notify customer toggle */
-                            h('div', { className: 'form-check' },
-                                h('input', {
-                                    className: 'form-check-input',
-                                    type: 'checkbox',
-                                    id: 'completeNotifyCustomer',
-                                    checked: notifyCustomer,
-                                    onChange: (e) => setNotifyCustomer(e.target.checked)
-                                }),
-                                h('label', { className: 'form-check-label small fw-semibold text-secondary', htmlFor: 'completeNotifyCustomer' },
-                                    'Send thank-you receipt / notification via Email & SMS'
+                                /* Detailed Staff Payroll Breakdown Table */
+                                h('div', { className: 'card border-0 shadow-sm rounded-3 mb-3' },
+                                    h('div', { className: 'card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center' },
+                                        h('h6', { className: 'fw-bold text-dark mb-0 d-flex align-items-center gap-2' }, [
+                                            h('i', { className: 'bi bi-people-fill text-primary' }),
+                                            'Technician Earnings & House Settlement'
+                                        ]),
+                                        h('span', { className: 'badge bg-primary-subtle text-primary border border-primary-subtle' },
+                                            `${(payrollModal.data.staffPayroll || []).length} Technicians Active`
+                                        )
+                                    ),
+                                    h('div', { className: 'table-responsive' },
+                                        h('table', { className: 'table table-hover align-middle mb-0' },
+                                            h('thead', { className: 'table-light small text-uppercase text-secondary' },
+                                                h('tr', null,
+                                                    h('th', null, 'Technician Name'),
+                                                    h('th', { className: 'text-center' }, 'Appts'),
+                                                    h('th', { className: 'text-end' }, 'Service Sales ($)'),
+                                                    h('th', { className: 'text-center' }, 'Split (%)'),
+                                                    h('th', { className: 'text-end' }, 'Commission ($)'),
+                                                    h('th', { className: 'text-end' }, 'Card Tips ($)'),
+                                                    h('th', { className: 'text-end' }, 'Cash Tips ($)'),
+                                                    h('th', { className: 'text-end' }, 'Total Tips ($)'),
+                                                    h('th', { className: 'text-end fw-bold text-success' }, 'Net Tech Payout ($)'),
+                                                    h('th', { className: 'text-end fw-bold text-primary' }, 'Salon Share ($)')
+                                                )
+                                            ),
+                                            h('tbody', null,
+                                                (payrollModal.data.staffPayroll || []).length === 0
+                                                    ? h('tr', null, h('td', { colSpan: 10, className: 'text-center text-muted py-4' }, 'No transactions recorded for the selected period.'))
+                                                    : (payrollModal.data.staffPayroll || []).map((staff, sIdx) =>
+                                                        h('tr', { key: staff.nailTechId || sIdx },
+                                                            h('td', { className: 'fw-bold text-dark' }, [
+                                                                h('i', { className: 'bi bi-person-circle text-primary me-2' }),
+                                                                staff.nailTechName || 'Staff'
+                                                            ]),
+                                                            h('td', { className: 'text-center' },
+                                                                h('span', { className: 'badge bg-light text-dark border' }, staff.appointmentsCount)
+                                                            ),
+                                                            h('td', { className: 'text-end text-secondary fw-semibold' }, `$${Number(staff.serviceSales || 0).toFixed(2)}`),
+                                                            h('td', { className: 'text-center' },
+                                                                h('span', { className: 'badge bg-primary-subtle text-primary border border-primary-subtle fw-semibold' },
+                                                                    `${Number(staff.commissionRate || 60).toFixed(0)}%`
+                                                                )
+                                                            ),
+                                                            h('td', { className: 'text-end fw-bold text-primary' }, `$${Number(staff.commissionEarned || 0).toFixed(2)}`),
+                                                            h('td', { className: 'text-end small' }, `$${Number(staff.cardTips || 0).toFixed(2)}`),
+                                                            h('td', { className: 'text-end small' }, `$${Number(staff.cashTips || 0).toFixed(2)}`),
+                                                            h('td', { className: 'text-end fw-semibold text-success' }, `$${Number(staff.totalTips || 0).toFixed(2)}`),
+                                                            h('td', { className: 'text-end fw-bold fs-6 text-success' }, `$${Number(staff.totalStaffPayout || 0).toFixed(2)}`),
+                                                            h('td', { className: 'text-end fw-bold text-dark' }, `$${Number(staff.salonHouseShare || 0).toFixed(2)}`)
+                                                        )
+                                                    )
+                                            ),
+                                            /* Summary Footer Row */
+                                            (payrollModal.data.staffPayroll || []).length > 0 && h('tfoot', { className: 'table-light fw-bold border-top' },
+                                                h('tr', null,
+                                                    h('td', null, 'TOTAL'),
+                                                    h('td', { className: 'text-center' },
+                                                        (payrollModal.data.staffPayroll || []).reduce((acc, s) => acc + (s.appointmentsCount || 0), 0)
+                                                    ),
+                                                    h('td', { className: 'text-end' }, `$${Number(payrollModal.data.totalServiceSales || 0).toFixed(2)}`),
+                                                    h('td', { className: 'text-center' }, '--'),
+                                                    h('td', { className: 'text-end text-primary' }, `$${Number(payrollModal.data.totalCommissionPaid || 0).toFixed(2)}`),
+                                                    h('td', { className: 'text-end' },
+                                                        `$${Number((payrollModal.data.staffPayroll || []).reduce((acc, s) => acc + Number(s.cardTips || 0), 0)).toFixed(2)}`
+                                                    ),
+                                                    h('td', { className: 'text-end' },
+                                                        `$${Number((payrollModal.data.staffPayroll || []).reduce((acc, s) => acc + Number(s.cashTips || 0), 0)).toFixed(2)}`
+                                                    ),
+                                                    h('td', { className: 'text-end text-success' }, `$${Number(payrollModal.data.totalTipsCollected || 0).toFixed(2)}`),
+                                                    h('td', { className: 'text-end text-success fs-6' },
+                                                        `$${Number((payrollModal.data.staffPayroll || []).reduce((acc, s) => acc + Number(s.totalStaffPayout || 0), 0)).toFixed(2)}`
+                                                    ),
+                                                    h('td', { className: 'text-end text-dark' }, `$${Number(payrollModal.data.totalSalonHouseShare || 0).toFixed(2)}`)
+                                                )
+                                            )
+                                        )
+                                    )
                                 )
                             )
                         ),
@@ -2500,16 +3527,17 @@
                         h('div', { className: 'modal-footer bg-light border-top d-flex justify-content-between p-3' },
                             h('button', {
                                 type: 'button',
-                                className: 'btn btn-outline-secondary btn-sm px-3 fw-semibold',
-                                disabled: completeModal.saving,
-                                onClick: () => setCompleteModal({ isOpen: false, apt: null, notes: '', saving: false, error: null })
-                            }, 'Cancel'),
+                                className: 'btn btn-success btn-sm px-4 fw-bold d-flex align-items-center gap-1 shadow-sm',
+                                onClick: handleDownloadPayrollCsv
+                            }, [
+                                h('i', { className: 'bi bi-file-earmark-arrow-down' }),
+                                'Download CSV Report'
+                            ]),
                             h('button', {
                                 type: 'button',
-                                className: 'btn btn-success px-4 py-2 fw-bold d-inline-flex align-items-center gap-2 rounded-3 shadow-sm',
-                                disabled: completeModal.saving,
-                                onClick: handleConfirmComplete
-                            }, completeModal.saving ? 'Completing...' : [h('i', { className: 'bi bi-check2-circle fs-6' }), ' Confirm & Complete'])
+                                className: 'btn btn-secondary btn-sm px-4 fw-semibold',
+                                onClick: () => setPayrollModal(prev => ({ ...prev, isOpen: false }))
+                            }, 'Close')
                         )
                     )
                 )

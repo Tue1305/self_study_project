@@ -2,6 +2,7 @@ package com.example.demo.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
+import java.math.BigDecimal;
 
 @Entity
 @Table(
@@ -42,6 +43,9 @@ public class UserEntity {
     private String email;
     private String phoneNumber;
     private String specialty;
+
+    @Column(name = "commission_rate", nullable = false, precision = 5, scale = 2)
+    private BigDecimal commissionRate = new BigDecimal("60.00");
 
     public UserEntity() {}
 
@@ -86,6 +90,9 @@ public class UserEntity {
 
     public String getSpecialty() { return specialty; }
     public void setSpecialty(String specialty) { this.specialty = specialty; }
+
+    public BigDecimal getCommissionRate() { return commissionRate != null ? commissionRate : new BigDecimal("60.00"); }
+    public void setCommissionRate(BigDecimal commissionRate) { this.commissionRate = commissionRate != null ? commissionRate : new BigDecimal("60.00"); }
 
     public String getTenantId() { return tenantId; }
     public void setTenantId(String tenantId) { this.tenantId = (tenantId == null || tenantId.isBlank()) ? "default" : tenantId.trim().toLowerCase(); }

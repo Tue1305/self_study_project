@@ -20,8 +20,8 @@ public class Appointment {
     @Column(nullable = false)
     private String customerPhone;
 
-    @Column(nullable = false)
-    private String customerEmail;
+    @Column(name = "customer_email", nullable = true)
+    private String customerEmail = "";
 
     @Column(nullable = false)
     private LocalDateTime appointmentTime;
@@ -72,8 +72,8 @@ public class Appointment {
     public String getCustomerPhone() { return customerPhone; }
     public void setCustomerPhone(String customerPhone) { this.customerPhone = customerPhone; }
 
-    public String getCustomerEmail() { return customerEmail; }
-    public void setCustomerEmail(String customerEmail) { this.customerEmail = customerEmail; }
+    public String getCustomerEmail() { return customerEmail != null ? customerEmail : ""; }
+    public void setCustomerEmail(String customerEmail) { this.customerEmail = customerEmail != null ? customerEmail.trim() : ""; }
 
     public LocalDateTime getAppointmentTime() { return appointmentTime; }
     public void setAppointmentTime(LocalDateTime appointmentTime) { this.appointmentTime = appointmentTime; }

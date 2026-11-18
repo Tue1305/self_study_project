@@ -14,6 +14,10 @@ public class CheckoutRequestDto {
     private BigDecimal tipAmount;
     private BigDecimal tipPercent;
     private BigDecimal discountAmount;
+    private Integer redeemPoints;
+    private BigDecimal pointsDiscountAmount;
+    private String giftCardCode;
+    private BigDecimal giftCardAmount;
     private BigDecimal totalAmount;
     private String paymentMethod; // CARD, CASH, APPLE_PAY, GIFT_CARD, SPLIT
     private List<SplitPaymentDto> splitPayments = new ArrayList<>();
@@ -90,6 +94,18 @@ public class CheckoutRequestDto {
 
     public BigDecimal getDiscountAmount() { return discountAmount; }
     public void setDiscountAmount(BigDecimal discountAmount) { this.discountAmount = discountAmount; }
+
+    public Integer getRedeemPoints() { return redeemPoints; }
+    public void setRedeemPoints(Integer redeemPoints) { this.redeemPoints = redeemPoints; }
+
+    public BigDecimal getPointsDiscountAmount() { return pointsDiscountAmount; }
+    public void setPointsDiscountAmount(BigDecimal pointsDiscountAmount) { this.pointsDiscountAmount = pointsDiscountAmount; }
+
+    public String getGiftCardCode() { return giftCardCode; }
+    public void setGiftCardCode(String giftCardCode) { this.giftCardCode = giftCardCode; }
+
+    public BigDecimal getGiftCardAmount() { return giftCardAmount; }
+    public void setGiftCardAmount(BigDecimal giftCardAmount) { this.giftCardAmount = giftCardAmount; }
 
     public BigDecimal getTotalAmount() { return totalAmount; }
     public void setTotalAmount(BigDecimal totalAmount) { this.totalAmount = totalAmount; }

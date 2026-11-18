@@ -13,6 +13,7 @@ public interface CustomerRepository extends JpaRepository<Customer, Long> {
     Optional<Customer> findByName(String name);
 
     List<Customer> findByTenantId(String tenantId);
+    List<Customer> findAllByTenantId(String tenantId);
     List<Customer> findByTenantIdOrderByNameAsc(String tenantId);
     Optional<Customer> findByTenantIdAndEmail(String tenantId, String email);
     Optional<Customer> findByTenantIdAndName(String tenantId, String name);

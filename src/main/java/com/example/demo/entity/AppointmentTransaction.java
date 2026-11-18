@@ -65,6 +65,21 @@ public class AppointmentTransaction {
     @Column(name = "line_items_json", columnDefinition = "TEXT")
     private String lineItemsJson;
 
+    @Column(name = "points_earned")
+    private Integer pointsEarned = 0;
+
+    @Column(name = "points_redeemed")
+    private Integer pointsRedeemed = 0;
+
+    @Column(name = "points_discount_amount", precision = 10, scale = 2)
+    private BigDecimal pointsDiscountAmount = BigDecimal.ZERO;
+
+    @Column(name = "gift_card_code", length = 64)
+    private String giftCardCode;
+
+    @Column(name = "gift_card_amount", precision = 10, scale = 2)
+    private BigDecimal giftCardAmount = BigDecimal.ZERO;
+
     @Column(length = 1000)
     private String notes;
 
@@ -127,6 +142,21 @@ public class AppointmentTransaction {
 
     public String getLineItemsJson() { return lineItemsJson; }
     public void setLineItemsJson(String lineItemsJson) { this.lineItemsJson = lineItemsJson; }
+
+    public Integer getPointsEarned() { return pointsEarned != null ? pointsEarned : 0; }
+    public void setPointsEarned(Integer pointsEarned) { this.pointsEarned = pointsEarned != null ? pointsEarned : 0; }
+
+    public Integer getPointsRedeemed() { return pointsRedeemed != null ? pointsRedeemed : 0; }
+    public void setPointsRedeemed(Integer pointsRedeemed) { this.pointsRedeemed = pointsRedeemed != null ? pointsRedeemed : 0; }
+
+    public BigDecimal getPointsDiscountAmount() { return pointsDiscountAmount != null ? pointsDiscountAmount : BigDecimal.ZERO; }
+    public void setPointsDiscountAmount(BigDecimal pointsDiscountAmount) { this.pointsDiscountAmount = pointsDiscountAmount != null ? pointsDiscountAmount : BigDecimal.ZERO; }
+
+    public String getGiftCardCode() { return giftCardCode; }
+    public void setGiftCardCode(String giftCardCode) { this.giftCardCode = giftCardCode; }
+
+    public BigDecimal getGiftCardAmount() { return giftCardAmount != null ? giftCardAmount : BigDecimal.ZERO; }
+    public void setGiftCardAmount(BigDecimal giftCardAmount) { this.giftCardAmount = giftCardAmount != null ? giftCardAmount : BigDecimal.ZERO; }
 
     public String getNotes() { return notes; }
     public void setNotes(String notes) { this.notes = notes; }

@@ -884,8 +884,33 @@
             medicalFlags: '',
             customAddonName: '',
             customAddonPrice: '',
+            customerLoyalty: { loading: false, balance: 0, customerId: null },
+            redeemPoints: 0,
+            pointsDiscountAmount: 0.00,
+            giftCardCode: '',
+            giftCardAppliedAmount: 0.00,
+            giftCardVerifying: false,
+            giftCardError: null,
+            giftCardInfo: null,
             saving: false,
             error: null
+        });
+
+        const [giftCardsModal, setGiftCardsModal] = useState({
+            isOpen: false,
+            loading: false,
+            cards: [],
+            error: null,
+            filter: 'ALL',
+            issueAmount: '50.00',
+            issuePurchaserName: '',
+            issuePurchaserEmail: '',
+            issueRecipientName: '',
+            issueRecipientEmail: '',
+            issueNotes: '',
+            customCode: '',
+            issuing: false,
+            newlyIssuedCard: null
         });
 
         const [posSummaryModal, setPosSummaryModal] = useState({
@@ -1381,9 +1406,210 @@
                 medicalFlags: apt.medicalFlags || '',
                 customAddonName: '',
                 customAddonPrice: '',
+                customerLoyalty: { loading: true, balance: 0, customerId: null },
+                redeemPoints: 0,
+                pointsDiscountAmount: 0.00,
+                giftCardCode: '',
+                giftCardAppliedAmount: 0.00,
+                giftCardVerifying: false,
+                giftCardError: null,
+                giftCardInfo: null,
                 saving: false,
                 error: null
             });
+
+            // Async customer loyalty lookup
+            if (apt.customerEmail || apt.customerPhone) {
+                const queryParam = apt.customerEmail
+                    ? `email=${encodeURIComponent(apt.customerEmail.trim())}`
+                    : `phone=${encodeURIComponent(apt.customerPhone.trim())}`;
+                fetch(`/api/customers/lookup?${queryParam}`, {
+                    headers: {
+                        'X-Tenant-ID': activeTenant,
+                        ...(token ? { 'Authorization': 'Bearer ' + token } : {})
+                    }
+                })
+                .then(res => res.ok ? res.json() : null)
+                .then(cust => {
+                    if (cust) {
+                        setCompleteModal(prev => ({
+                            ...prev,
+                            customerLoyalty: { loading: false, balance: cust.loyaltyPoints || 0, customerId: cust.id }
+                        }));
+                    } else {
+                        setCompleteModal(prev => ({
+                            ...prev,
+                            customerLoyalty: { loading: false, balance: 0, customerId: null }
+                        }));
+                    }
+                })
+                .catch(() => {
+                    setCompleteModal(prev => ({
+                        ...prev,
+                        customerLoyalty: { loading: false, balance: 0, customerId: null }
+                    }));
+                });
+            } else {
+                setCompleteModal(prev => ({
+                    ...prev,
+                    customerLoyalty: { loading: false, balance: 0, customerId: null }
+                }));
+            }
+        };
+
+        const handleSetRedeemPoints = (pts) => {
+            setCompleteModal(prev => {
+                const maxPossible = (prev.customerLoyalty && prev.customerLoyalty.balance) || 0;
+                const safePts = Math.min(Math.max(0, pts), maxPossible);
+                const discount = Number((safePts * 0.10).toFixed(2));
+                return {
+                    ...prev,
+                    redeemPoints: safePts,
+                    pointsDiscountAmount: discount
+                };
+            });
+        };
+
+        const handleVerifyGiftCardForCheckout = async () => {
+            const code = completeModal.giftCardCode ? completeModal.giftCardCode.trim().toUpperCase() : '';
+            if (!code) {
+                setCompleteModal(prev => ({ ...prev, giftCardError: 'Please enter a gift card code.' }));
+                return;
+            }
+            setCompleteModal(prev => ({ ...prev, giftCardVerifying: true, giftCardError: null }));
+            try {
+                const res = await fetch(`/api/gift-cards/verify?code=${encodeURIComponent(code)}`, {
+                    headers: {
+                        'X-Tenant-ID': activeTenant,
+                        ...(token ? { 'Authorization': 'Bearer ' + token } : {})
+                    }
+                });
+                const data = await res.json();
+                if (!res.ok || !data.valid) {
+                    setCompleteModal(prev => ({
+                        ...prev,
+                        giftCardVerifying: false,
+                        giftCardError: data.message || `Gift card is ${data.status || 'invalid'} with balance $${Number(data.currentBalance || 0).toFixed(2)}.`
+                    }));
+                    return;
+                }
+                setCompleteModal(prev => {
+                    const subtotal = prev.lineItems.reduce((acc, it) => acc + (Number(it.price) || 0), 0);
+                    const ptsDisc = prev.pointsDiscountAmount || 0;
+                    const tax = prev.taxExempt ? 0 : Number((subtotal * prev.taxRate).toFixed(2));
+                    const tip = prev.tipPercent !== null ? Number((subtotal * (prev.tipPercent / 100)).toFixed(2)) : (Number(prev.tipCustom) || 0);
+                    const totalDueBeforeGC = Math.max(0, Number((subtotal - ptsDisc + tax + tip).toFixed(2)));
+                    const applied = Math.min(Number(data.currentBalance), totalDueBeforeGC);
+
+                    return {
+                        ...prev,
+                        giftCardVerifying: false,
+                        giftCardInfo: data,
+                        giftCardAppliedAmount: applied,
+                        giftCardError: null
+                    };
+                });
+            } catch (err) {
+                setCompleteModal(prev => ({ ...prev, giftCardVerifying: false, giftCardError: 'Failed to verify gift card code.' }));
+            }
+        };
+
+        const handleRemoveGiftCardFromCheckout = () => {
+            setCompleteModal(prev => ({
+                ...prev,
+                giftCardCode: '',
+                giftCardInfo: null,
+                giftCardAppliedAmount: 0.00,
+                giftCardError: null
+            }));
+        };
+
+        const handleOpenGiftCardsModal = async () => {
+            setGiftCardsModal(prev => ({ ...prev, isOpen: true, loading: true, error: null, newlyIssuedCard: null }));
+            try {
+                const res = await fetch('/api/gift-cards', {
+                    headers: {
+                        'X-Tenant-ID': activeTenant,
+                        ...(token ? { 'Authorization': 'Bearer ' + token } : {})
+                    }
+                });
+                if (!res.ok) throw new Error('Failed to load gift cards');
+                const list = await res.json();
+                setGiftCardsModal(prev => ({ ...prev, loading: false, cards: list || [] }));
+            } catch (err) {
+                setGiftCardsModal(prev => ({ ...prev, loading: false, error: err.message || 'Error loading cards' }));
+            }
+        };
+
+        const handleIssueGiftCard = async () => {
+            const amt = parseFloat(giftCardsModal.issueAmount);
+            if (!amt || amt <= 0) {
+                alert('Please enter a valid gift card amount greater than $0.');
+                return;
+            }
+            setGiftCardsModal(prev => ({ ...prev, issuing: true, error: null }));
+            try {
+                const payload = {
+                    initialBalance: amt,
+                    purchaserName: giftCardsModal.issuePurchaserName,
+                    purchaserEmail: giftCardsModal.issuePurchaserEmail,
+                    recipientName: giftCardsModal.issueRecipientName,
+                    recipientEmail: giftCardsModal.issueRecipientEmail,
+                    notes: giftCardsModal.issueNotes,
+                    code: giftCardsModal.customCode ? giftCardsModal.customCode.trim() : undefined
+                };
+                const res = await fetch('/api/gift-cards', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Tenant-ID': activeTenant,
+                        ...(token ? { 'Authorization': 'Bearer ' + token } : {})
+                    },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                    throw new Error(data.message || 'Failed to issue gift card.');
+                }
+                const newCard = data.giftCard;
+                setGiftCardsModal(prev => ({
+                    ...prev,
+                    issuing: false,
+                    newlyIssuedCard: newCard,
+                    cards: [newCard, ...prev.cards],
+                    issuePurchaserName: '',
+                    issuePurchaserEmail: '',
+                    issueRecipientName: '',
+                    issueRecipientEmail: '',
+                    issueNotes: '',
+                    customCode: ''
+                }));
+            } catch (err) {
+                setGiftCardsModal(prev => ({ ...prev, issuing: false, error: err.message || 'Error issuing gift card' }));
+            }
+        };
+
+        const handleUpdateGiftCardStatus = async (id, newStatus) => {
+            try {
+                const res = await fetch(`/api/gift-cards/${id}/status`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Tenant-ID': activeTenant,
+                        ...(token ? { 'Authorization': 'Bearer ' + token } : {})
+                    },
+                    body: JSON.stringify({ status: newStatus })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    setGiftCardsModal(prev => ({
+                        ...prev,
+                        cards: prev.cards.map(c => c.id === id ? data.giftCard : c)
+                    }));
+                }
+            } catch (err) {
+                console.error('Failed to update gift card status:', err);
+            }
         };
 
         const handleAddAddon = (name, price) => {
@@ -1629,11 +1855,13 @@
             setCompleteModal(prev => ({ ...prev, saving: true, error: null }));
 
             const subtotal = completeModal.lineItems.reduce((acc, it) => acc + (Number(it.price) || 0), 0);
+            const pointsDiscountAmount = Number(completeModal.pointsDiscountAmount || 0);
             const taxAmount = completeModal.taxExempt ? 0 : Number((subtotal * completeModal.taxRate).toFixed(2));
             const tipAmount = completeModal.tipPercent !== null
                 ? Number((subtotal * (completeModal.tipPercent / 100)).toFixed(2))
                 : (Number(completeModal.tipCustom) || 0);
-            const totalAmount = Math.max(0, Number((subtotal + taxAmount + tipAmount).toFixed(2)));
+            const giftCardAmount = Number(completeModal.giftCardAppliedAmount || 0);
+            const totalAmount = Math.max(0, Number((subtotal - pointsDiscountAmount + taxAmount + tipAmount - giftCardAmount).toFixed(2)));
 
             // Validate split payment
             if (completeModal.paymentMethod === 'SPLIT') {
@@ -1658,6 +1886,10 @@
                     tipPercent: completeModal.tipPercent,
                     tipAmount: tipAmount,
                     totalAmount: totalAmount,
+                    redeemPoints: completeModal.redeemPoints || 0,
+                    pointsDiscountAmount: pointsDiscountAmount,
+                    giftCardCode: (completeModal.giftCardInfo && giftCardAmount > 0) ? completeModal.giftCardInfo.code : (completeModal.paymentMethod === 'GIFT_CARD' ? completeModal.giftCardCode : null),
+                    giftCardAmount: giftCardAmount,
                     paymentMethod: completeModal.paymentMethod,
                     splitPayments: completeModal.paymentMethod === 'SPLIT' ? completeModal.splitPayments : [],
                     colorFormula: completeModal.colorFormula ? completeModal.colorFormula.trim() : null,
@@ -1963,6 +2195,15 @@
                     }, [
                         h('i', { className: 'bi bi-file-earmark-spreadsheet text-primary me-1' }),
                         'Weekly Payroll & CSV'
+                    ]),
+                    h('button', {
+                        type: 'button',
+                        className: 'btn btn-outline-warning btn-sm px-3 fw-bold d-flex align-items-center gap-1 shadow-sm text-dark',
+                        title: 'Issue & Manage Salon Gift Cards & Balances',
+                        onClick: handleOpenGiftCardsModal
+                    }, [
+                        h('i', { className: 'bi bi-gift-fill text-warning me-1' }),
+                        'Gift Cards'
                     ])
                 )
             ),
@@ -2659,15 +2900,21 @@
             /* Complete Appointment & POS Financials Modal */
             completeModal.isOpen && completeModal.apt && (() => {
                 const subtotal = completeModal.lineItems.reduce((acc, it) => acc + (Number(it.price) || 0), 0);
+                const pointsDiscount = Number(completeModal.pointsDiscountAmount || 0);
                 const taxAmount = completeModal.taxExempt ? 0 : Number((subtotal * completeModal.taxRate).toFixed(2));
                 const tipAmount = completeModal.tipPercent !== null
                     ? Number((subtotal * (completeModal.tipPercent / 100)).toFixed(2))
                     : (Number(completeModal.tipCustom) || 0);
-                const totalAmount = Math.max(0, Number((subtotal + taxAmount + tipAmount).toFixed(2)));
+                const giftCardDeduction = Number(completeModal.giftCardAppliedAmount || 0);
+                const totalAmount = Math.max(0, Number((subtotal - pointsDiscount + taxAmount + tipAmount - giftCardDeduction).toFixed(2)));
 
                 const splitSum = (completeModal.splitPayments || []).reduce((acc, sp) => acc + (Number(sp.amount) || 0), 0);
                 const splitDiff = Number((totalAmount - splitSum).toFixed(2));
                 const isSplitBalanced = Math.abs(splitDiff) <= 0.05;
+
+                const custPts = (completeModal.customerLoyalty && completeModal.customerLoyalty.balance) || 0;
+                const custPtsLoading = completeModal.customerLoyalty && completeModal.customerLoyalty.loading;
+                const pointsEarnedToday = Math.max(0, Math.floor(subtotal));
 
                 const techName = completeModal.apt.nailTech
                     ? (completeModal.apt.nailTech.name || completeModal.apt.nailTech.username)
@@ -2804,7 +3051,52 @@
                                     )
                                 ),
 
-                                /* 2. Financial Summary, Taxes & Tips */
+                                /* 2. VIP Loyalty Points Redemption Section */
+                                h('div', { className: 'card border-0 bg-warning-subtle text-dark rounded-3 p-3 mb-3 border border-warning-subtle shadow-sm' },
+                                    h('div', { className: 'd-flex justify-content-between align-items-center mb-1' },
+                                        h('span', { className: 'small fw-bold text-dark d-flex align-items-center gap-1' }, [
+                                            h('i', { className: 'bi bi-star-fill text-warning' }),
+                                            'VIP Salon Loyalty Points'
+                                        ]),
+                                        custPtsLoading
+                                            ? h('span', { className: 'spinner-border spinner-border-sm text-warning' })
+                                            : h('span', { className: 'badge bg-warning text-dark fw-bold' }, `${custPts} pts available ($${(custPts * 0.10).toFixed(2)})`)
+                                    ),
+                                    h('div', { className: 'extra-small text-muted mb-2' },
+                                        'Clients earn 1 pt / $1 spent. Redeem points for an instant bill discount (100 pts = $10.00).'
+                                    ),
+                                    h('div', { className: 'd-flex flex-wrap gap-1 align-items-center mb-1' },
+                                        [
+                                            { label: 'None (0 pts)', pts: 0 },
+                                            { label: '50 pts (-$5.00)', pts: 50 },
+                                            { label: '100 pts (-$10.00)', pts: 100 },
+                                            { label: '200 pts (-$20.00)', pts: 200 }
+                                        ].map(btn =>
+                                            h('button', {
+                                                key: btn.pts,
+                                                type: 'button',
+                                                className: `btn btn-sm py-1 px-3 rounded-pill fw-semibold ${completeModal.redeemPoints === btn.pts ? 'btn-dark text-white' : 'btn-outline-dark bg-white'}`,
+                                                style: { fontSize: '0.74rem' },
+                                                disabled: btn.pts > custPts,
+                                                onClick: () => handleSetRedeemPoints(btn.pts)
+                                            }, btn.label)
+                                        ),
+                                        custPts > 0 && h('button', {
+                                            type: 'button',
+                                            className: `btn btn-sm py-1 px-3 rounded-pill fw-semibold ${completeModal.redeemPoints === custPts ? 'btn-dark text-white' : 'btn-outline-dark bg-white'}`,
+                                            style: { fontSize: '0.74rem' },
+                                            onClick: () => handleSetRedeemPoints(custPts)
+                                        }, `Max (${custPts} pts)`)
+                                    ),
+                                    pointsDiscount > 0 && h('div', { className: 'small fw-bold text-success mt-1' },
+                                        `✅ Applied discount: ${completeModal.redeemPoints} points = -$${pointsDiscount.toFixed(2)}`
+                                    ),
+                                    h('div', { className: 'extra-small text-secondary mt-1' },
+                                        `✨ Client will earn +${pointsEarnedToday} points for this visit.`
+                                    )
+                                ),
+
+                                /* 3. Financial Summary, Taxes & Tips */
                                 h('div', { className: 'card border-0 bg-light rounded-3 p-3 mb-3' },
                                     h('div', { className: 'd-flex justify-content-between align-items-center mb-2' },
                                         h('span', { className: 'small fw-bold text-uppercase text-secondary d-flex align-items-center gap-1', style: { letterSpacing: '0.5px' } }, [
@@ -2827,6 +3119,10 @@
                                     h('div', { className: 'd-flex justify-content-between align-items-center py-1 border-bottom small' },
                                         h('span', { className: 'text-secondary' }, 'Subtotal (Services & Add-ons):'),
                                         h('span', { className: 'fw-bold text-dark' }, `$${subtotal.toFixed(2)}`)
+                                    ),
+                                    pointsDiscount > 0 && h('div', { className: 'd-flex justify-content-between align-items-center py-1 border-bottom small text-success' },
+                                        h('span', null, `⭐ Loyalty Points Discount (${completeModal.redeemPoints} pts):`),
+                                        h('span', { className: 'fw-bold' }, `-$${pointsDiscount.toFixed(2)}`)
                                     ),
                                     h('div', { className: 'd-flex justify-content-between align-items-center py-1 border-bottom small' },
                                         h('span', { className: 'text-secondary' }, `Sales Tax (${(completeModal.taxRate * 100).toFixed(2)}%):`),
@@ -2881,22 +3177,33 @@
                                         )
                                     ),
 
+                                    /* Gift Card Deduction Row if Applied */
+                                    giftCardDeduction > 0 && h('div', { className: 'd-flex justify-content-between align-items-center py-1 border-bottom small text-primary' },
+                                        h('span', null, `🎁 Gift Card (${completeModal.giftCardInfo ? completeModal.giftCardInfo.code : 'Applied'}):`),
+                                        h('span', { className: 'fw-bold' }, `-$${giftCardDeduction.toFixed(2)}`)
+                                    ),
+
                                     /* Total Due Banner */
                                     h('div', { className: 'd-flex justify-content-between align-items-center pt-2 mt-1' },
                                         h('div', null,
                                             h('span', { className: 'fs-6 fw-bold text-dark text-uppercase' }, 'Total Amount Due:'),
-                                            h('div', { className: 'extra-small text-muted' }, `Includes $${subtotal.toFixed(2)} service + $${taxAmount.toFixed(2)} tax + $${tipAmount.toFixed(2)} tip`)
+                                            h('div', { className: 'extra-small text-muted' },
+                                                `Services $${subtotal.toFixed(2)}` +
+                                                (pointsDiscount > 0 ? ` - Points $${pointsDiscount.toFixed(2)}` : '') +
+                                                ` + Tax $${taxAmount.toFixed(2)} + Tip $${tipAmount.toFixed(2)}` +
+                                                (giftCardDeduction > 0 ? ` - Gift Card $${giftCardDeduction.toFixed(2)}` : '')
+                                            )
                                         ),
                                         h('div', { className: 'fs-4 fw-bold text-pink' }, `$${totalAmount.toFixed(2)}`)
                                     )
                                 ),
 
-                                /* 3. Payment Method & Split Payment */
+                                /* 4. Payment Method, Gift Card Tender & Split Payment */
                                 h('div', { className: 'card border-0 bg-light rounded-3 p-3 mb-3' },
                                     h('div', { className: 'd-flex justify-content-between align-items-center mb-2 border-bottom pb-2' },
                                         h('span', { className: 'small fw-bold text-uppercase text-secondary d-flex align-items-center gap-1', style: { letterSpacing: '0.5px' } }, [
                                             h('i', { className: 'bi bi-credit-card text-pink' }),
-                                            'Payment Method'
+                                            'Payment Method & Tender'
                                         ]),
                                         h('span', { className: 'badge bg-white text-secondary border' }, completeModal.paymentMethod)
                                     ),
@@ -2917,6 +3224,52 @@
                                                 style: { fontSize: '0.78rem' },
                                                 onClick: () => handlePaymentMethodChange(m.id)
                                             }, m.label)
+                                        )
+                                    ),
+
+                                    /* Gift Card Code Input / Verified Card Info */
+                                    (completeModal.paymentMethod === 'GIFT_CARD' || completeModal.giftCardInfo) && h('div', { className: 'p-3 bg-white rounded-3 border mb-3' },
+                                        h('div', { className: 'd-flex justify-content-between align-items-center mb-2' },
+                                            h('span', { className: 'small fw-bold text-dark d-flex align-items-center gap-1' }, [
+                                                h('i', { className: 'bi bi-gift-fill text-warning' }),
+                                                'Gift Card Tender'
+                                            ]),
+                                            completeModal.giftCardInfo && h('span', { className: 'badge bg-success-subtle text-success border border-success-subtle fw-semibold' }, 'Active & Verified')
+                                        ),
+                                        !completeModal.giftCardInfo ? h('div', null,
+                                            h('div', { className: 'extra-small text-muted mb-2' }, 'Enter Salon Gift Card code (e.g. GC-A7B8-9K2M) to apply balance:'),
+                                            h('div', { className: 'd-flex gap-2' },
+                                                h('input', {
+                                                    type: 'text',
+                                                    className: 'form-control form-control-sm text-uppercase fw-bold',
+                                                    placeholder: 'GC-XXXX-XXXX',
+                                                    value: completeModal.giftCardCode || '',
+                                                    onChange: (e) => setCompleteModal(prev => ({ ...prev, giftCardCode: e.target.value.toUpperCase() }))
+                                                }),
+                                                h('button', {
+                                                    type: 'button',
+                                                    className: 'btn btn-outline-primary btn-sm px-3 fw-bold text-nowrap',
+                                                    disabled: completeModal.giftCardVerifying,
+                                                    onClick: handleVerifyGiftCardForCheckout
+                                                }, completeModal.giftCardVerifying ? 'Verifying...' : 'Verify & Apply')
+                                            ),
+                                            completeModal.giftCardError && h('div', { className: 'alert alert-danger py-1 px-2 extra-small mt-2 mb-0' }, completeModal.giftCardError)
+                                        ) : h('div', { className: 'bg-light p-2 rounded-3 border' },
+                                            h('div', { className: 'd-flex justify-content-between align-items-center' },
+                                                h('div', null,
+                                                    h('div', { className: 'fw-bold text-dark font-monospace' }, completeModal.giftCardInfo.code),
+                                                    h('div', { className: 'extra-small text-muted' }, `Available Balance: $${Number(completeModal.giftCardInfo.currentBalance || 0).toFixed(2)}`)
+                                                ),
+                                                h('div', { className: 'd-flex align-items-center gap-2' },
+                                                    h('span', { className: 'badge bg-success fs-6' }, `-$${giftCardDeduction.toFixed(2)} Applied`),
+                                                    h('button', {
+                                                        type: 'button',
+                                                        className: 'btn btn-outline-danger btn-sm py-0 px-2 rounded-circle',
+                                                        title: 'Remove gift card',
+                                                        onClick: handleRemoveGiftCardFromCheckout
+                                                    }, '✕')
+                                                )
+                                            )
                                         )
                                     ),
 
@@ -2986,7 +3339,7 @@
                                     )
                                 ),
 
-                                /* 4. Color & Formula Used Today */
+                                /* 5. Color & Formula Used Today */
                                 h('div', { className: 'mb-3 bg-light p-3 rounded-3 border' },
                                     h('div', { className: 'd-flex justify-content-between align-items-center mb-1' },
                                         h('label', { className: 'form-label small fw-bold text-dark d-flex align-items-center gap-1 mb-0' }, [
@@ -3635,6 +3988,267 @@
                                 type: 'button',
                                 className: 'btn btn-sm btn-secondary',
                                 onClick: () => setCustomerHistoryModal({ isOpen: false, loading: false, data: null, error: null, title: '' })
+                            }, 'Close')
+                        )
+                    )
+                )
+            ),
+
+            /* Gift Cards Management Modal */
+            giftCardsModal.isOpen && h('div', {
+                className: 'modal show d-block',
+                style: { backgroundColor: 'rgba(15, 23, 42, 0.65)', zIndex: 1070 },
+                tabIndex: -1,
+                onClick: () => !giftCardsModal.issuing && setGiftCardsModal(prev => ({ ...prev, isOpen: false, error: null }))
+            },
+                h('div', {
+                    className: 'modal-dialog modal-dialog-centered modal-lg',
+                    style: { maxWidth: '840px' },
+                    onClick: (e) => e.stopPropagation()
+                },
+                    h('div', { className: 'modal-content border-0 shadow-lg rounded-4 overflow-hidden' },
+                        /* Header */
+                        h('div', { className: 'modal-header bg-light border-bottom py-3 px-4 d-flex justify-content-between align-items-center' },
+                            h('div', { className: 'd-flex align-items-center gap-3' },
+                                h('div', { className: 'p-2 bg-warning-subtle text-warning rounded-3 fs-4' },
+                                    h('i', { className: 'bi bi-gift-fill' })
+                                ),
+                                h('div', null,
+                                    h('h5', { className: 'modal-title fw-bold text-dark mb-0' }, 'Salon Gift Cards & Balances'),
+                                    h('div', { className: 'small text-muted' }, 'Issue, verify and track customer gift cards and outstanding balances')
+                                )
+                            ),
+                            h('button', {
+                                type: 'button',
+                                className: 'btn-close',
+                                disabled: giftCardsModal.issuing,
+                                onClick: () => setGiftCardsModal(prev => ({ ...prev, isOpen: false, error: null }))
+                            })
+                        ),
+
+                        /* Body */
+                        h('div', { className: 'modal-body p-4', style: { maxHeight: '78vh', overflowY: 'auto' } },
+                            giftCardsModal.error && h('div', { className: 'alert alert-danger py-2 px-3 small mb-3' }, giftCardsModal.error),
+
+                            /* Newly Issued Card Highlight */
+                            giftCardsModal.newlyIssuedCard && h('div', {
+                                className: 'alert alert-warning border-2 border-warning rounded-4 p-3 mb-4 shadow-sm'
+                            },
+                                h('div', { className: 'd-flex justify-content-between align-items-center mb-2' },
+                                    h('span', { className: 'fw-bold text-dark d-flex align-items-center gap-1' }, [
+                                        h('i', { className: 'bi bi-check-circle-fill text-success' }),
+                                        'New Gift Card Successfully Issued!'
+                                    ]),
+                                    h('button', {
+                                        type: 'button',
+                                        className: 'btn-close btn-close-sm',
+                                        onClick: () => setGiftCardsModal(prev => ({ ...prev, newlyIssuedCard: null }))
+                                    })
+                                ),
+                                h('div', { className: 'd-flex justify-content-between align-items-center bg-white p-3 rounded-3 border' },
+                                    h('div', null,
+                                        h('div', { className: 'extra-small text-muted text-uppercase fw-bold' }, 'Gift Card Code'),
+                                        h('div', { className: 'fs-3 fw-bold text-dark font-monospace' }, giftCardsModal.newlyIssuedCard.code),
+                                        h('div', { className: 'small text-muted' },
+                                            `Balance: $${Number(giftCardsModal.newlyIssuedCard.initialBalance).toFixed(2)}` +
+                                            (giftCardsModal.newlyIssuedCard.recipientName ? ` • Recipient: ${giftCardsModal.newlyIssuedCard.recipientName}` : '')
+                                        )
+                                    ),
+                                    h('button', {
+                                        type: 'button',
+                                        className: 'btn btn-warning btn-sm px-3 fw-bold d-flex align-items-center gap-1 text-dark shadow-sm',
+                                        onClick: () => {
+                                            if (navigator.clipboard) {
+                                                navigator.clipboard.writeText(giftCardsModal.newlyIssuedCard.code);
+                                                alert(`Copied gift card code ${giftCardsModal.newlyIssuedCard.code} to clipboard!`);
+                                            }
+                                        }
+                                    }, [
+                                        h('i', { className: 'bi bi-clipboard me-1' }),
+                                        'Copy Code'
+                                    ])
+                                )
+                            ),
+
+                            /* Issue New Card Panel */
+                            h('div', { className: 'card border-0 bg-light rounded-4 p-3 mb-4' },
+                                h('div', { className: 'small fw-bold text-uppercase text-secondary mb-2 d-flex align-items-center gap-1', style: { letterSpacing: '0.5px' } }, [
+                                    h('i', { className: 'bi bi-plus-circle-fill text-warning' }),
+                                    'Issue New Salon Gift Card'
+                                ]),
+                                /* Amount Presets */
+                                h('div', { className: 'mb-3' },
+                                    h('label', { className: 'extra-small fw-semibold text-secondary mb-1' }, 'Card Value / Initial Balance:'),
+                                    h('div', { className: 'd-flex flex-wrap gap-2 align-items-center' },
+                                        ['25.00', '50.00', '75.00', '100.00', '150.00'].map(val =>
+                                            h('button', {
+                                                key: val,
+                                                type: 'button',
+                                                className: `btn btn-sm py-1 px-3 rounded-pill fw-bold ${giftCardsModal.issueAmount === val ? 'btn-warning text-dark shadow-sm' : 'btn-outline-secondary bg-white'}`,
+                                                style: { fontSize: '0.8rem' },
+                                                onClick: () => setGiftCardsModal(prev => ({ ...prev, issueAmount: val }))
+                                            }, `$${parseFloat(val).toFixed(0)}`)
+                                        ),
+                                        h('div', { className: 'input-group input-group-sm', style: { maxWidth: '140px' } },
+                                            h('span', { className: 'input-group-text bg-white' }, '$'),
+                                            h('input', {
+                                                type: 'number',
+                                                step: '5.00',
+                                                className: 'form-control',
+                                                placeholder: 'Custom',
+                                                value: giftCardsModal.issueAmount,
+                                                onChange: (e) => setGiftCardsModal(prev => ({ ...prev, issueAmount: e.target.value }))
+                                            })
+                                        )
+                                    )
+                                ),
+                                /* Purchaser & Recipient Inputs */
+                                h('div', { className: 'row g-2 mb-2' },
+                                    h('div', { className: 'col-md-6' },
+                                        h('input', {
+                                            type: 'text',
+                                            className: 'form-control form-control-sm',
+                                            placeholder: 'Purchaser Name (optional)',
+                                            value: giftCardsModal.issuePurchaserName,
+                                            onChange: (e) => setGiftCardsModal(prev => ({ ...prev, issuePurchaserName: e.target.value }))
+                                        })
+                                    ),
+                                    h('div', { className: 'col-md-6' },
+                                        h('input', {
+                                            type: 'text',
+                                            className: 'form-control form-control-sm',
+                                            placeholder: 'Recipient Name (optional)',
+                                            value: giftCardsModal.issueRecipientName,
+                                            onChange: (e) => setGiftCardsModal(prev => ({ ...prev, issueRecipientName: e.target.value }))
+                                        })
+                                    )
+                                ),
+                                h('div', { className: 'row g-2 mb-3' },
+                                    h('div', { className: 'col-md-6' },
+                                        h('input', {
+                                            type: 'text',
+                                            className: 'form-control form-control-sm text-uppercase',
+                                            placeholder: 'Custom Code (optional, or auto-generate)',
+                                            value: giftCardsModal.customCode,
+                                            onChange: (e) => setGiftCardsModal(prev => ({ ...prev, customCode: e.target.value.toUpperCase() }))
+                                        })
+                                    ),
+                                    h('div', { className: 'col-md-6' },
+                                        h('input', {
+                                            type: 'text',
+                                            className: 'form-control form-control-sm',
+                                            placeholder: 'Notes / Memo (e.g. Birthday gift, promo)',
+                                            value: giftCardsModal.issueNotes,
+                                            onChange: (e) => setGiftCardsModal(prev => ({ ...prev, issueNotes: e.target.value }))
+                                        })
+                                    )
+                                ),
+                                h('div', { className: 'text-end' },
+                                    h('button', {
+                                        type: 'button',
+                                        className: 'btn btn-warning px-4 py-1 btn-sm fw-bold text-dark shadow-sm',
+                                        disabled: giftCardsModal.issuing,
+                                        onClick: handleIssueGiftCard
+                                    }, giftCardsModal.issuing ? 'Issuing Gift Card...' : [
+                                        h('i', { className: 'bi bi-plus-lg me-1' }),
+                                        `Issue $${parseFloat(giftCardsModal.issueAmount || 0).toFixed(2)} Gift Card`
+                                    ])
+                                )
+                            ),
+
+                            /* Cards Table */
+                            h('div', { className: 'card border-0 shadow-sm rounded-4' },
+                                h('div', { className: 'card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center' },
+                                    h('h6', { className: 'fw-bold text-dark mb-0 d-flex align-items-center gap-2' }, [
+                                        h('i', { className: 'bi bi-list-stars text-warning' }),
+                                        `Issued Gift Cards Registry (${(giftCardsModal.cards || []).length})`
+                                    ]),
+                                    h('div', { className: 'd-flex gap-1' },
+                                        ['ALL', 'ACTIVE', 'DEPLETED'].map(flt =>
+                                            h('button', {
+                                                key: flt,
+                                                type: 'button',
+                                                className: `btn btn-sm py-0 px-2 rounded-pill fw-semibold ${giftCardsModal.filter === flt ? 'btn-secondary text-white' : 'btn-outline-secondary'}`,
+                                                style: { fontSize: '0.72rem' },
+                                                onClick: () => setGiftCardsModal(prev => ({ ...prev, filter: flt }))
+                                            }, flt)
+                                        )
+                                    )
+                                ),
+                                h('div', { className: 'table-responsive' },
+                                    h('table', { className: 'table table-hover align-middle mb-0' },
+                                        h('thead', { className: 'table-light small text-uppercase text-secondary' },
+                                            h('tr', null,
+                                                h('th', null, 'Card Code'),
+                                                h('th', null, 'Recipient / Purchaser'),
+                                                h('th', { className: 'text-end' }, 'Current Balance'),
+                                                h('th', { className: 'text-end' }, 'Initial'),
+                                                h('th', { className: 'text-center' }, 'Status'),
+                                                h('th', { className: 'text-end' }, 'Actions')
+                                            )
+                                        ),
+                                        h('tbody', null,
+                                            giftCardsModal.loading
+                                                ? h('tr', null, h('td', { colSpan: 6, className: 'text-center text-muted py-4' }, 'Loading gift cards...'))
+                                                : (giftCardsModal.cards || [])
+                                                    .filter(c => giftCardsModal.filter === 'ALL' || (c.status || '').toUpperCase() === giftCardsModal.filter)
+                                                    .length === 0
+                                                    ? h('tr', null, h('td', { colSpan: 6, className: 'text-center text-muted py-4' }, 'No gift cards found.'))
+                                                    : (giftCardsModal.cards || [])
+                                                        .filter(c => giftCardsModal.filter === 'ALL' || (c.status || '').toUpperCase() === giftCardsModal.filter)
+                                                        .map(c =>
+                                                            h('tr', { key: c.id },
+                                                                h('td', { className: 'fw-bold text-dark font-monospace' }, [
+                                                                    h('span', { className: 'badge bg-light text-dark border me-1' }, c.code),
+                                                                    h('button', {
+                                                                        type: 'button',
+                                                                        className: 'btn btn-outline-secondary btn-sm py-0 px-1 border-0',
+                                                                        title: 'Copy Code',
+                                                                        onClick: () => {
+                                                                            if (navigator.clipboard) navigator.clipboard.writeText(c.code);
+                                                                        }
+                                                                    }, h('i', { className: 'bi bi-clipboard extra-small' }))
+                                                                ]),
+                                                                h('td', { className: 'small' },
+                                                                    h('div', { className: 'fw-semibold text-dark' }, c.recipientName || c.purchaserName || 'General Customer'),
+                                                                    c.notes && h('div', { className: 'extra-small text-muted fst-italic' }, c.notes)
+                                                                ),
+                                                                h('td', { className: 'text-end fw-bold fs-6 text-success' }, `$${Number(c.currentBalance || 0).toFixed(2)}`),
+                                                                h('td', { className: 'text-end text-muted small' }, `$${Number(c.initialBalance || 0).toFixed(2)}`),
+                                                                h('td', { className: 'text-center' },
+                                                                    h('span', {
+                                                                        className: `badge ${c.status === 'ACTIVE' ? 'bg-success-subtle text-success border border-success-subtle' : c.status === 'DEPLETED' ? 'bg-secondary-subtle text-secondary border' : 'bg-danger-subtle text-danger'}`
+                                                                    }, c.status || 'ACTIVE')
+                                                                ),
+                                                                h('td', { className: 'text-end' },
+                                                                    c.status === 'ACTIVE'
+                                                                        ? h('button', {
+                                                                            type: 'button',
+                                                                            className: 'btn btn-outline-secondary btn-sm py-0 px-2 extra-small',
+                                                                            title: 'Mark as Depleted',
+                                                                            onClick: () => handleUpdateGiftCardStatus(c.id, 'DEPLETED')
+                                                                        }, 'Deplete')
+                                                                        : h('button', {
+                                                                            type: 'button',
+                                                                            className: 'btn btn-outline-success btn-sm py-0 px-2 extra-small',
+                                                                            title: 'Reactivate Card',
+                                                                            onClick: () => handleUpdateGiftCardStatus(c.id, 'ACTIVE')
+                                                                        }, 'Reactivate')
+                                                                )
+                                                            )
+                                                        )
+                                        )
+                                    )
+                                )
+                            )
+                        ),
+
+                        /* Footer */
+                        h('div', { className: 'modal-footer bg-light border-top p-3' },
+                            h('button', {
+                                type: 'button',
+                                className: 'btn btn-secondary btn-sm px-4 fw-semibold',
+                                onClick: () => setGiftCardsModal(prev => ({ ...prev, isOpen: false, error: null }))
                             }, 'Close')
                         )
                     )

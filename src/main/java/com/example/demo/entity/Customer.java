@@ -29,6 +29,9 @@ public class Customer {
     @Column(name = "color_formula", length = 1000)
     private String colorFormula;
 
+    @Column(name = "loyalty_points", nullable = false)
+    private Integer loyaltyPoints = 0;
+
     public Customer() {}
 
     public Customer(String name, String email, String phone) {
@@ -65,4 +68,7 @@ public class Customer {
 
     public String getColorFormula() { return colorFormula; }
     public void setColorFormula(String colorFormula) { this.colorFormula = colorFormula; }
+
+    public Integer getLoyaltyPoints() { return loyaltyPoints != null ? loyaltyPoints : 0; }
+    public void setLoyaltyPoints(Integer loyaltyPoints) { this.loyaltyPoints = loyaltyPoints != null ? loyaltyPoints : 0; }
 }

@@ -4,10 +4,12 @@ import com.example.demo.dto.CheckoutRequestDto;
 import com.example.demo.entity.Appointment;
 import com.example.demo.entity.AppointmentTransaction;
 import com.example.demo.entity.Customer;
+import com.example.demo.entity.GiftCard;
 import com.example.demo.entity.UserEntity;
 import com.example.demo.repository.AppointmentRepository;
 import com.example.demo.repository.AppointmentTransactionRepository;
 import com.example.demo.repository.CustomerRepository;
+import com.example.demo.repository.GiftCardRepository;
 import com.example.demo.repository.UserRepository;
 import com.example.demo.service.AppointmentAuditService;
 import com.example.demo.service.NotificationService;
@@ -44,6 +46,7 @@ public class PosFinancialController {
     private final NotificationService notificationService;
     private final ObjectMapper objectMapper;
     private final UserRepository userRepository;
+    private final GiftCardRepository giftCardRepository;
 
     @Autowired
     public PosFinancialController(
@@ -54,7 +57,8 @@ public class PosFinancialController {
             @Autowired(required = false) AppointmentAuditService auditService,
             @Autowired(required = false) NotificationService notificationService,
             @Autowired(required = false) ObjectMapper objectMapper,
-            @Autowired(required = false) UserRepository userRepository
+            @Autowired(required = false) UserRepository userRepository,
+            @Autowired(required = false) GiftCardRepository giftCardRepository
     ) {
         this.transactionRepository = transactionRepository;
         this.appointmentRepository = appointmentRepository;
@@ -64,6 +68,7 @@ public class PosFinancialController {
         this.notificationService = notificationService;
         this.objectMapper = objectMapper != null ? objectMapper : new ObjectMapper();
         this.userRepository = userRepository;
+        this.giftCardRepository = giftCardRepository;
     }
 
     public PosFinancialController(
@@ -75,7 +80,7 @@ public class PosFinancialController {
             NotificationService notificationService,
             ObjectMapper objectMapper
     ) {
-        this(transactionRepository, appointmentRepository, customerRepository, tenantContextResolver, auditService, notificationService, objectMapper, null);
+        this(transactionRepository, appointmentRepository, customerRepository, tenantContextResolver, auditService, notificationService, objectMapper, null, null);
     }
 
     /**
@@ -147,15 +152,71 @@ public class PosFinancialController {
                     .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
         }
 
-        // 4. Discount
+        // Resolve Customer info early for loyalty points & safety checks
+        Customer customer = null;
+        if (appointment.getCustomerEmail() != null && !appointment.getCustomerEmail().isBlank()) {
+            customer = customerRepository.findByTenantIdAndEmail(tenantId, appointment.getCustomerEmail().trim()).orElse(null);
+        }
+
+        // 4. Loyalty Points Redemption & Discount
         BigDecimal discountAmount = dto.getDiscountAmount() != null ? dto.getDiscountAmount() : BigDecimal.ZERO;
+        int pointsRedeemed = (dto.getRedeemPoints() != null && dto.getRedeemPoints() > 0) ? dto.getRedeemPoints() : 0;
+        BigDecimal pointsDiscount = dto.getPointsDiscountAmount() != null
+                ? dto.getPointsDiscountAmount()
+                : (pointsRedeemed > 0 ? BigDecimal.valueOf(pointsRedeemed).multiply(new BigDecimal("0.10")).setScale(2, RoundingMode.HALF_UP) : BigDecimal.ZERO);
+
+        if (pointsRedeemed > 0) {
+            if (customer == null) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Cannot redeem loyalty points: customer profile not found."));
+            }
+            int availablePts = customer.getLoyaltyPoints();
+            if (availablePts < pointsRedeemed) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "message", String.format("Customer only has %d points available, cannot redeem %d points.", availablePts, pointsRedeemed)
+                ));
+            }
+            if (pointsDiscount.compareTo(BigDecimal.ZERO) > 0) {
+                discountAmount = discountAmount.add(pointsDiscount);
+            }
+        }
 
         // 5. Total Calculation
         BigDecimal totalAmount = dto.getTotalAmount() != null
                 ? dto.getTotalAmount()
                 : subtotal.add(taxAmount).add(tipAmount).subtract(discountAmount).setScale(2, RoundingMode.HALF_UP);
+        if (totalAmount.compareTo(BigDecimal.ZERO) < 0) {
+            totalAmount = BigDecimal.ZERO;
+        }
 
-        // 6. Payment Method & Split Payment Validation
+        // 6. Gift Card Redemption
+        String giftCardCode = (dto.getGiftCardCode() != null && !dto.getGiftCardCode().isBlank())
+                ? dto.getGiftCardCode().trim().toUpperCase() : null;
+        BigDecimal giftCardAmount = dto.getGiftCardAmount() != null ? dto.getGiftCardAmount() : BigDecimal.ZERO;
+
+        if (giftCardCode != null && giftCardRepository != null) {
+            Optional<GiftCard> gcOpt = giftCardRepository.findByTenantIdAndCodeIgnoreCase(tenantId, giftCardCode);
+            if (gcOpt.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Gift card '" + giftCardCode + "' not found."));
+            }
+            GiftCard gc = gcOpt.get();
+            if (!"ACTIVE".equalsIgnoreCase(gc.getStatus()) || gc.getCurrentBalance().compareTo(BigDecimal.ZERO) <= 0) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Gift card '" + giftCardCode + "' is " + gc.getStatus().toLowerCase() + " and cannot be redeemed."));
+            }
+            if (giftCardAmount.compareTo(BigDecimal.ZERO) <= 0) {
+                giftCardAmount = gc.getCurrentBalance().min(totalAmount);
+            }
+            if (giftCardAmount.compareTo(gc.getCurrentBalance()) > 0) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "message", String.format("Gift card balance ($%.2f) is less than requested redemption amount ($%.2f).", gc.getCurrentBalance(), giftCardAmount)
+                ));
+            }
+            gc.setCurrentBalance(gc.getCurrentBalance().subtract(giftCardAmount));
+            giftCardRepository.save(gc);
+        } else if ("GIFT_CARD".equalsIgnoreCase(dto.getPaymentMethod()) && giftCardAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            giftCardAmount = totalAmount;
+        }
+
+        // 7. Payment Method & Split Payment Validation
         String paymentMethod = (dto.getPaymentMethod() != null && !dto.getPaymentMethod().isBlank())
                 ? dto.getPaymentMethod().trim().toUpperCase() : "CARD";
 
@@ -184,15 +245,10 @@ public class PosFinancialController {
             }
         }
 
-        // 7. Resolve Staff and Customer info
+        // 8. Resolve Staff info
         UserEntity tech = appointment.getNailTech();
         Long nailTechId = tech != null ? tech.getId() : null;
         String nailTechName = tech != null ? (tech.getName() != null ? tech.getName() : tech.getUsername()) : "Anyone Available";
-
-        Customer customer = null;
-        if (appointment.getCustomerEmail() != null && !appointment.getCustomerEmail().isBlank()) {
-            customer = customerRepository.findByTenantIdAndEmail(tenantId, appointment.getCustomerEmail().trim()).orElse(null);
-        }
 
         // Serialize line items
         String lineItemsJson = "[]";
@@ -200,7 +256,10 @@ public class PosFinancialController {
             lineItemsJson = objectMapper.writeValueAsString(items);
         } catch (Exception ignored) {}
 
-        // 8. Create and persist POS Transaction
+        // Calculate points earned (1 point per $1 on service/addon subtotal)
+        int pointsEarned = subtotal.intValue();
+
+        // 9. Create and persist POS Transaction
         AppointmentTransaction transaction = new AppointmentTransaction();
         transaction.setTenantId(tenantId);
         transaction.setAppointmentId(appointment.getId());
@@ -218,6 +277,11 @@ public class PosFinancialController {
         transaction.setPaymentMethod(paymentMethod);
         transaction.setSplitDetails(splitDetails);
         transaction.setLineItemsJson(lineItemsJson);
+        transaction.setPointsEarned(pointsEarned);
+        transaction.setPointsRedeemed(pointsRedeemed);
+        transaction.setPointsDiscountAmount(pointsDiscount);
+        transaction.setGiftCardCode(giftCardCode);
+        transaction.setGiftCardAmount(giftCardAmount);
         transaction.setNotes(dto.getNotes());
         transaction.setStatus("COMPLETED");
         transaction.setCreatedAt(LocalDateTime.now());
@@ -248,9 +312,18 @@ public class PosFinancialController {
 
         Appointment savedAppointment = appointmentRepository.save(appointment);
 
-        // 10. Update Customer Profile with color formula / safety alerts
+        // 10. Update Customer Profile with loyalty points, color formula & safety alerts
         if (customer != null) {
             boolean custUpdated = false;
+            if (pointsRedeemed > 0) {
+                int currentPts = customer.getLoyaltyPoints();
+                customer.setLoyaltyPoints(Math.max(0, currentPts - pointsRedeemed));
+                custUpdated = true;
+            }
+            if (pointsEarned > 0) {
+                customer.setLoyaltyPoints(customer.getLoyaltyPoints() + pointsEarned);
+                custUpdated = true;
+            }
             if (dto.getColorFormula() != null && !dto.getColorFormula().isBlank()) {
                 customer.setColorFormula(dto.getColorFormula().trim());
                 custUpdated = true;
@@ -267,8 +340,10 @@ public class PosFinancialController {
         // 11. Audit Logging
         if (auditService != null) {
             String auditNote = String.format(
-                    "Checkout completed: $%.2f total (Subtotal $%.2f + Tax $%.2f + Tip $%.2f to %s) paid via %s",
-                    totalAmount, subtotal, taxAmount, tipAmount, nailTechName, paymentLabel
+                    "Checkout completed: $%.2f total (Subtotal $%.2f + Tax $%.2f + Tip $%.2f to %s) paid via %s%s%s",
+                    totalAmount, subtotal, taxAmount, tipAmount, nailTechName, paymentLabel,
+                    (pointsEarned > 0 ? String.format(" [Earned %d pts]", pointsEarned) : ""),
+                    (giftCardAmount.compareTo(BigDecimal.ZERO) > 0 ? String.format(" [Gift Card $%.2f]", giftCardAmount) : "")
             );
             auditService.logActivity(
                     tenantId,
@@ -290,11 +365,19 @@ public class PosFinancialController {
             } catch (Exception ignored) {}
         }
 
-        return ResponseEntity.ok(Map.of(
-                "message", "Appointment checked out and payment recorded successfully.",
-                "transaction", savedTransaction,
-                "appointment", savedAppointment
-        ));
+        Map<String, Object> responseBody = new java.util.LinkedHashMap<>();
+        responseBody.put("message", "Appointment checked out and payment recorded successfully.");
+        responseBody.put("transaction", savedTransaction);
+        responseBody.put("appointment", savedAppointment);
+        responseBody.put("pointsEarned", pointsEarned);
+        responseBody.put("loyaltyPointsEarned", pointsEarned);
+        responseBody.put("pointsRedeemed", pointsRedeemed);
+        responseBody.put("pointsDiscountAmount", pointsDiscount);
+        responseBody.put("customerLoyaltyBalance", customer != null ? customer.getLoyaltyPoints() : 0);
+        responseBody.put("loyaltyPointsBalance", customer != null ? customer.getLoyaltyPoints() : 0);
+        responseBody.put("giftCardAmountApplied", giftCardAmount);
+
+        return ResponseEntity.ok(responseBody);
     }
 
     /**

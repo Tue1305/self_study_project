@@ -161,6 +161,7 @@
                     <th>Full Name</th>
                     <th>Email</th>
                     <th>Phone</th>
+                    <th>Loyalty Points</th>
                     <th>Safety / Allergy Flags</th>
                     <th>Color Formula</th>
                     <th class="text-end">Actions</th>
@@ -195,6 +196,13 @@
                 <div class="mb-3">
                     <label for="customerPhone" class="form-label fw-semibold text-secondary small">Phone Number</label>
                     <input type="tel" class="form-control rounded-3" id="customerPhone" placeholder="e.g. (555) 123-4567">
+                </div>
+                <div class="mb-3">
+                    <label for="customerLoyaltyPoints" class="form-label fw-semibold text-secondary small mb-1">
+                        <i class="bi bi-star-fill text-warning me-1"></i>Loyalty Points Balance:
+                    </label>
+                    <input type="number" min="0" class="form-control rounded-3" id="customerLoyaltyPoints" placeholder="0">
+                    <div class="form-text extra-small">Clients earn 1 pt / $1 spent. 100 pts = $10 discount ($0.10 / pt).</div>
                 </div>
                 <div class="mb-3">
                     <label for="customerMedicalFlags" class="form-label fw-semibold text-secondary small d-flex justify-content-between align-items-center mb-1">
@@ -395,7 +403,7 @@
             tbody.innerHTML = '';
 
             if (customers.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-4">No customers found in the database.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="8" class="text-center text-muted py-4">No customers found in the database.</td></tr>`;
                 return;
             }
 
@@ -405,6 +413,8 @@
                 const safePhone = (customer.phone || '').replace(/'/g, "\\'");
                 const safeMedicalFlags = (customer.medicalFlags || '').replace(/'/g, "\\'");
                 const safeColorFormula = (customer.colorFormula || '').replace(/'/g, "\\'");
+                const points = customer.loyaltyPoints || 0;
+                const pointsVal = (points * 0.10).toFixed(2);
 
                 let flagsBadge = '<span class="text-muted small fst-italic">None</span>';
                 if (customer.medicalFlags && customer.medicalFlags.trim()) {
@@ -428,13 +438,18 @@
                         </td>
                         <td><a href="mailto:${customer.email || ''}" class="text-decoration-none">${customer.email || 'N/A'}</a></td>
                         <td><a href="tel:${customer.phone || ''}" class="text-decoration-none">${customer.phone || 'N/A'}</a></td>
+                        <td>
+                            <span class="badge bg-warning-subtle text-dark border border-warning-subtle fw-bold">
+                                <i class="bi bi-star-fill text-warning me-1"></i>${points} pts <span class="fw-normal text-muted">($${pointsVal})</span>
+                            </span>
+                        </td>
                         <td>${flagsBadge}</td>
                         <td>${formulaBadge}</td>
                         <td class="text-end">
                             <button class="btn btn-outline-info btn-sm me-1 fw-semibold" onclick="openCustomerHistory(${customer.id}, '${safeName}', '${safeEmail}', '${safePhone}')" title="View Appointment History & Audit Log">
                                 <i class="bi bi-clock-history me-1"></i> History
                             </button>
-                            <button class="btn btn-outline-secondary btn-sm me-1" onclick="openEditModal(${customer.id}, '${safeName}', '${safeEmail}', '${safePhone}', '${safeMedicalFlags}', '${safeColorFormula}')" title="Edit Customer">
+                            <button class="btn btn-outline-secondary btn-sm me-1" onclick="openEditModal(${customer.id}, '${safeName}', '${safeEmail}', '${safePhone}', '${safeMedicalFlags}', '${safeColorFormula}', ${points})" title="Edit Customer">
                                 <i class="bi bi-pencil"></i>
                             </button>
                             <button class="btn btn-outline-danger btn-sm" onclick="deleteCustomer(${customer.id})" title="Delete Customer">
@@ -446,7 +461,7 @@
             });
         } catch (error) {
             console.error('Error loading customers:', error);
-            document.getElementById('customerTableBody').innerHTML = `<tr><td colspan="7" class="text-center text-danger py-4">Error loading customer data from server.</td></tr>`;
+            document.getElementById('customerTableBody').innerHTML = `<tr><td colspan="8" class="text-center text-danger py-4">Error loading customer data from server.</td></tr>`;
         }
     }
 
@@ -465,17 +480,19 @@
         document.getElementById('customerName').value = '';
         document.getElementById('customerEmail').value = '';
         document.getElementById('customerPhone').value = '';
+        document.getElementById('customerLoyaltyPoints').value = '0';
         document.getElementById('customerMedicalFlags').value = '';
         document.getElementById('customerColorFormula').value = '';
         document.getElementById('modalTitle').innerText = 'Add New Customer';
         customerModalInstance.show();
     }
 
-    function openEditModal(id, name, email, phone, medicalFlags, colorFormula) {
+    function openEditModal(id, name, email, phone, medicalFlags, colorFormula, loyaltyPoints) {
         document.getElementById('customerId').value = id;
         document.getElementById('customerName').value = name;
         document.getElementById('customerEmail').value = email;
         document.getElementById('customerPhone').value = phone === 'undefined' ? '' : phone;
+        document.getElementById('customerLoyaltyPoints').value = (loyaltyPoints !== undefined && loyaltyPoints !== null) ? loyaltyPoints : 0;
         document.getElementById('customerMedicalFlags').value = (medicalFlags === 'undefined' || !medicalFlags) ? '' : medicalFlags;
         document.getElementById('customerColorFormula').value = (colorFormula === 'undefined' || !colorFormula) ? '' : colorFormula;
         document.getElementById('modalTitle').innerText = 'Edit Customer';
@@ -487,6 +504,7 @@
         const name = document.getElementById('customerName').value.trim();
         const email = document.getElementById('customerEmail').value.trim();
         const phone = document.getElementById('customerPhone').value.trim();
+        const loyaltyPoints = parseInt(document.getElementById('customerLoyaltyPoints').value) || 0;
         const medicalFlags = document.getElementById('customerMedicalFlags').value.trim();
         const colorFormula = document.getElementById('customerColorFormula').value.trim();
 
@@ -506,7 +524,7 @@
                     'Authorization': 'Bearer ' + token,
                     'X-Tenant-ID': activeTenant
                 },
-                body: JSON.stringify({ name, email, phone, medicalFlags, colorFormula })
+                body: JSON.stringify({ name, email, phone, medicalFlags, colorFormula, loyaltyPoints })
             });
 
             if (response.ok) {
@@ -646,6 +664,31 @@
             `;
         }
 
+        const loyaltyPts = customer.loyaltyPoints || 0;
+        const loyaltyVal = (loyaltyPts * 0.10).toFixed(2);
+        const loyaltyCardHtml = `
+            <div class="card border-0 bg-warning-subtle text-dark rounded-4 p-3 mb-3 border border-warning-subtle shadow-sm">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <span class="small fw-bold text-dark d-flex align-items-center gap-1">
+                        <i class="bi bi-star-fill text-warning"></i> VIP Salon Loyalty Points
+                    </span>
+                    <span class="badge bg-warning text-dark fw-bold">Active Tier</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mt-2">
+                    <div>
+                        <div class="fs-4 fw-bold text-dark">${loyaltyPts} <span class="fs-6 fw-normal text-muted">points</span></div>
+                        <div class="extra-small text-muted">Earns 1 pt per $1 spent on services & add-ons</div>
+                    </div>
+                    <div class="text-end">
+                        <span class="badge bg-white text-success border border-success-subtle px-2 py-1 fs-6 fw-bold">
+                            $${loyaltyVal} Value
+                        </span>
+                        <div class="extra-small text-muted mt-1">Redeemable at POS checkout</div>
+                    </div>
+                </div>
+            </div>
+        `;
+
         let riskBannerHtml = '';
         if (hasRisk) {
             riskBannerHtml = `
@@ -757,6 +800,7 @@
         body.innerHTML = `
             ${medicalBannerHtml}
             ${formulaCardHtml}
+            ${loyaltyCardHtml}
             ${riskBannerHtml}
             ${reliabilityPillsHtml}
             <div class="d-flex justify-content-between align-items-center mb-2">

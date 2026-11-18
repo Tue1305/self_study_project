@@ -46,6 +46,8 @@ class PosFinancialControllerTest {
     private com.example.demo.repository.TenantConfigRepository tenantConfigRepository;
     @Mock
     private com.example.demo.repository.UserRepository userRepository;
+    @Mock
+    private com.example.demo.repository.GiftCardRepository giftCardRepository;
 
     private MockMvc mockMvc;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -61,7 +63,8 @@ class PosFinancialControllerTest {
                 null,
                 null,
                 objectMapper,
-                userRepository
+                userRepository,
+                giftCardRepository
         );
         mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
     }
@@ -348,5 +351,148 @@ class PosFinancialControllerTest {
                         org.hamcrest.Matchers.containsString("\"Tony\",60.00%,1,200.00,120.00,40.00,0.00,40.00,160.00,80.00")))
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().string(
                         org.hamcrest.Matchers.containsString("TOTAL,ALL TECHNICIANS,--,1,200.00,120.00,40.00,0.00,40.00,160.00,80.00")));
+    }
+
+    @Test
+    void testCheckoutEarningLoyaltyPoints() throws Exception {
+        ServiceEntity svc = new ServiceEntity("default", "Classic Manicure", "Mani", new BigDecimal("40.00"), 30);
+        Appointment appt = new Appointment();
+        appt.setId(301L);
+        appt.setTenantId("default");
+        appt.setCustomerEmail("vip@example.com");
+        appt.setService(svc);
+        appt.setStatus(Appointment.AppointmentStatus.CONFIRMED);
+
+        Customer cust = new Customer();
+        cust.setId(50L);
+        cust.setTenantId("default");
+        cust.setEmail("vip@example.com");
+        cust.setLoyaltyPoints(25);
+
+        when(appointmentRepository.findByTenantIdAndId("default", 301L)).thenReturn(Optional.of(appt));
+        when(appointmentRepository.save(any(Appointment.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(transactionRepository.save(any(AppointmentTransaction.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(customerRepository.findByTenantIdAndEmail("default", "vip@example.com")).thenReturn(Optional.of(cust));
+        when(customerRepository.save(any(Customer.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        CheckoutRequestDto dto = new CheckoutRequestDto();
+        dto.setAppointmentId(301L);
+        dto.setLineItems(List.of(
+                new CheckoutRequestDto.LineItemDto("Classic Manicure", new BigDecimal("40.00"), "SERVICE"),
+                new CheckoutRequestDto.LineItemDto("French Tips", new BigDecimal("10.00"), "ADDON")
+        ));
+        dto.setSubtotal(new BigDecimal("50.00"));
+        dto.setTaxRate(new BigDecimal("0.0825"));
+        dto.setTaxAmount(new BigDecimal("4.13"));
+        dto.setTipAmount(new BigDecimal("10.00"));
+        dto.setTotalAmount(new BigDecimal("64.13"));
+        dto.setPaymentMethod("CARD");
+
+        mockMvc.perform(post("/api/pos/checkout")
+                        .header("X-Tenant-ID", "default")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(dto)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.loyaltyPointsEarned").value(50))
+                .andExpect(jsonPath("$.loyaltyPointsBalance").value(75));
+
+        verify(customerRepository).save(cust);
+        org.junit.jupiter.api.Assertions.assertEquals(75, cust.getLoyaltyPoints());
+    }
+
+    @Test
+    void testCheckoutRedeemingLoyaltyPointsForDiscount() throws Exception {
+        ServiceEntity svc = new ServiceEntity("default", "Deluxe Gel", "Mani", new BigDecimal("60.00"), 45);
+        Appointment appt = new Appointment();
+        appt.setId(302L);
+        appt.setTenantId("default");
+        appt.setCustomerEmail("member@example.com");
+        appt.setService(svc);
+        appt.setStatus(Appointment.AppointmentStatus.CONFIRMED);
+
+        Customer cust = new Customer();
+        cust.setId(51L);
+        cust.setTenantId("default");
+        cust.setEmail("member@example.com");
+        cust.setLoyaltyPoints(100);
+
+        when(appointmentRepository.findByTenantIdAndId("default", 302L)).thenReturn(Optional.of(appt));
+        when(appointmentRepository.save(any(Appointment.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(transactionRepository.save(any(AppointmentTransaction.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(customerRepository.findByTenantIdAndEmail("default", "member@example.com")).thenReturn(Optional.of(cust));
+        when(customerRepository.save(any(Customer.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        CheckoutRequestDto dto = new CheckoutRequestDto();
+        dto.setAppointmentId(302L);
+        dto.setLineItems(List.of(
+                new CheckoutRequestDto.LineItemDto("Deluxe Gel", new BigDecimal("60.00"), "SERVICE")
+        ));
+        dto.setSubtotal(new BigDecimal("60.00"));
+        dto.setRedeemPoints(50); // $5.00 discount (50 * $0.10)
+        dto.setPointsDiscountAmount(new BigDecimal("5.00"));
+        dto.setTaxRate(new BigDecimal("0.0825"));
+        dto.setTaxAmount(new BigDecimal("4.95"));
+        dto.setTipAmount(new BigDecimal("10.00"));
+        dto.setTotalAmount(new BigDecimal("69.95"));
+        dto.setPaymentMethod("CARD");
+
+        mockMvc.perform(post("/api/pos/checkout")
+                        .header("X-Tenant-ID", "default")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(dto)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.pointsRedeemed").value(50))
+                .andExpect(jsonPath("$.pointsDiscountAmount").value(5.00))
+                .andExpect(jsonPath("$.loyaltyPointsEarned").value(60))
+                // Starts at 100 - 50 redeemed + 60 earned = 110
+                .andExpect(jsonPath("$.loyaltyPointsBalance").value(110));
+
+        verify(customerRepository).save(cust);
+        org.junit.jupiter.api.Assertions.assertEquals(110, cust.getLoyaltyPoints());
+    }
+
+    @Test
+    void testCheckoutRedeemingGiftCardDeductsBalance() throws Exception {
+        ServiceEntity svc = new ServiceEntity("default", "Spa Pedicure", "Pedi", new BigDecimal("55.00"), 45);
+        Appointment appt = new Appointment();
+        appt.setId(303L);
+        appt.setTenantId("default");
+        appt.setCustomerEmail("guest@example.com");
+        appt.setService(svc);
+        appt.setStatus(Appointment.AppointmentStatus.CONFIRMED);
+
+        GiftCard gc = new GiftCard("default", "GC-GIFT-50", new BigDecimal("50.00"));
+        gc.setStatus("ACTIVE");
+
+        when(appointmentRepository.findByTenantIdAndId("default", 303L)).thenReturn(Optional.of(appt));
+        when(appointmentRepository.save(any(Appointment.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(transactionRepository.save(any(AppointmentTransaction.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(giftCardRepository.findByTenantIdAndCodeIgnoreCase("default", "GC-GIFT-50")).thenReturn(Optional.of(gc));
+        when(giftCardRepository.save(any(GiftCard.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        CheckoutRequestDto dto = new CheckoutRequestDto();
+        dto.setAppointmentId(303L);
+        dto.setLineItems(List.of(
+                new CheckoutRequestDto.LineItemDto("Spa Pedicure", new BigDecimal("55.00"), "SERVICE")
+        ));
+        dto.setSubtotal(new BigDecimal("55.00"));
+        dto.setTaxRate(new BigDecimal("0.0825"));
+        dto.setTaxAmount(new BigDecimal("4.54"));
+        dto.setTipAmount(new BigDecimal("10.00"));
+        dto.setTotalAmount(new BigDecimal("69.54"));
+        dto.setPaymentMethod("GIFT_CARD");
+        dto.setGiftCardCode("GC-GIFT-50");
+        dto.setGiftCardAmount(new BigDecimal("35.00"));
+
+        mockMvc.perform(post("/api/pos/checkout")
+                        .header("X-Tenant-ID", "default")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(dto)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.giftCardAmountApplied").value(35.00));
+
+        verify(giftCardRepository).save(gc);
+        // Original $50.00 - $35.00 = $15.00
+        org.junit.jupiter.api.Assertions.assertEquals(new BigDecimal("15.00"), gc.getCurrentBalance());
     }
 }

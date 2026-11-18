@@ -37,6 +37,31 @@ public class CustomerController {
         return customerService.getAllCustomers(tenantId);
     }
 
+    @GetMapping("/lookup")
+    public ResponseEntity<?> lookupCustomer(
+            @RequestParam(required = false) String email,
+            @RequestParam(required = false) String phone,
+            jakarta.servlet.http.HttpServletRequest request
+    ) {
+        String tenantId = tenantContextResolver.resolveTenantId(request);
+        Optional<Customer> found = Optional.empty();
+        if (email != null && !email.isBlank()) {
+            found = customerRepository.findByTenantIdAndEmail(tenantId, email.trim());
+        }
+        if (found.isEmpty() && phone != null && !phone.isBlank()) {
+            String norm = phone.replaceAll("\\D", "");
+            if (!norm.isEmpty()) {
+                found = customerRepository.findAllByTenantId(tenantId).stream()
+                        .filter(c -> c.getPhone() != null && c.getPhone().replaceAll("\\D", "").equals(norm))
+                        .findFirst();
+            }
+        }
+        if (found.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", "Customer not found."));
+        }
+        return ResponseEntity.ok(found.get());
+    }
+
     @GetMapping("/{customerId}/history")
     public ResponseEntity<?> getCustomerHistory(
             @PathVariable Long customerId,
@@ -103,6 +128,9 @@ public class CustomerController {
         }
         if (updatedCustomer.getColorFormula() != null) {
             existing.setColorFormula(updatedCustomer.getColorFormula().trim());
+        }
+        if (updatedCustomer.getLoyaltyPoints() != null) {
+            existing.setLoyaltyPoints(Math.max(0, updatedCustomer.getLoyaltyPoints()));
         }
 
         customerService.saveCustomer(existing);

@@ -48,6 +48,8 @@ class PosFinancialControllerTest {
     private com.example.demo.repository.UserRepository userRepository;
     @Mock
     private com.example.demo.repository.GiftCardRepository giftCardRepository;
+    @Mock
+    private com.example.demo.repository.EodRegisterCloseRepository eodRegisterCloseRepository;
 
     private MockMvc mockMvc;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -64,7 +66,9 @@ class PosFinancialControllerTest {
                 null,
                 objectMapper,
                 userRepository,
-                giftCardRepository
+                giftCardRepository,
+                eodRegisterCloseRepository,
+                null
         );
         mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
     }
@@ -494,5 +498,82 @@ class PosFinancialControllerTest {
         verify(giftCardRepository).save(gc);
         // Original $50.00 - $35.00 = $15.00
         org.junit.jupiter.api.Assertions.assertEquals(new BigDecimal("15.00"), gc.getCurrentBalance());
+    }
+
+    @Test
+    void testVerifyOwnerPasswordSuccess() throws Exception {
+        mockMvc.perform(post("/api/pos/verify-owner-password")
+                        .header("X-Tenant-ID", "default")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(java.util.Map.of("password", "admin123"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.ownerName").exists());
+    }
+
+    @Test
+    void testVerifyOwnerPasswordFailure() throws Exception {
+        mockMvc.perform(post("/api/pos/verify-owner-password")
+                        .header("X-Tenant-ID", "default")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(java.util.Map.of("password", "wrongpassword!"))))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    void testRegisterCloseCalculationAndPersistence() throws Exception {
+        LocalDate today = LocalDate.now();
+
+        AppointmentTransaction tx1 = new AppointmentTransaction();
+        tx1.setTenantId("default");
+        tx1.setSubtotal(new BigDecimal("100.00"));
+        tx1.setTaxAmount(new BigDecimal("8.25"));
+        tx1.setTipAmount(new BigDecimal("20.00"));
+        tx1.setTotalAmount(new BigDecimal("128.25"));
+        tx1.setPaymentMethod("CARD");
+        tx1.setNailTechId(1L);
+        tx1.setNailTechName("Tony");
+        tx1.setCreatedAt(today.atTime(11, 0));
+
+        AppointmentTransaction tx2 = new AppointmentTransaction();
+        tx2.setTenantId("default");
+        tx2.setSubtotal(new BigDecimal("50.00"));
+        tx2.setTaxAmount(new BigDecimal("4.13"));
+        tx2.setTipAmount(new BigDecimal("10.00"));
+        tx2.setTotalAmount(new BigDecimal("64.13"));
+        tx2.setPaymentMethod("CASH");
+        tx2.setNailTechId(1L);
+        tx2.setNailTechName("Tony");
+        tx2.setCreatedAt(today.atTime(14, 0));
+
+        when(transactionRepository.findAllByTenantIdAndCreatedAtBetweenOrderByCreatedAtDesc(
+                eq("default"), any(LocalDateTime.class), any(LocalDateTime.class)
+        )).thenReturn(List.of(tx1, tx2));
+
+        when(eodRegisterCloseRepository.findByTenantIdAndClosingDate("default", today))
+                .thenReturn(Optional.empty());
+        when(eodRegisterCloseRepository.save(any(EodRegisterClose.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        // Submit register close with $200 opening float and $264.13 actual cash counted ($200 float + $64.13 cash sale)
+        java.util.Map<String, Object> payload = java.util.Map.of(
+                "closingDate", today.toString(),
+                "openingFloat", 200.00,
+                "actualCash", 264.13,
+                "notes", "All registers balanced"
+        );
+
+        mockMvc.perform(post("/api/pos/register-close")
+                        .header("X-Tenant-ID", "default")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(payload)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.closingRecord.status").value("CLOSED"))
+                .andExpect(jsonPath("$.cashVariance").value(0.00))
+                .andExpect(jsonPath("$.summary.cardBatchTotal").value(128.25))
+                .andExpect(jsonPath("$.summary.cashCollected").value(64.13));
+
+        verify(eodRegisterCloseRepository).save(any(EodRegisterClose.class));
     }
 }

@@ -161,6 +161,8 @@ public class AppointmentAuditService {
             m.put("serviceDuration", apt.getService() != null ? apt.getService().getDurationMinutes() : null);
             m.put("technicianName", apt.getNailTech() != null ? (apt.getNailTech().getName() != null ? apt.getNailTech().getName() : apt.getNailTech().getUsername()) : "Anyone Available");
             m.put("notes", apt.getNotes());
+            m.put("medicalFlags", apt.getMedicalFlags());
+            m.put("colorFormula", apt.getColorFormula());
             return m;
         }).toList();
 
@@ -223,6 +225,8 @@ public class AppointmentAuditService {
         virtualCustomer.setEmail(sample.getCustomerEmail());
         virtualCustomer.setPhone(sample.getCustomerPhone());
         virtualCustomer.setTenantId(tenantId);
+        virtualCustomer.setMedicalFlags(sample.getMedicalFlags());
+        virtualCustomer.setColorFormula(sample.getColorFormula());
 
         List<AppointmentActivityLog> logs = activityLogRepository.findByTenantIdAndCustomerEmailIgnoreCaseOrderByCreatedAtDesc(tenantId, email.trim());
 

@@ -24,12 +24,14 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -821,5 +823,96 @@ class AppointmentBookingFlowTest {
 
         org.junit.jupiter.api.Assertions.assertEquals(Appointment.AppointmentStatus.COMPLETED, appt.getStatus());
         org.junit.jupiter.api.Assertions.assertTrue(appt.getNotes().contains("OPI Bubble Bath"));
+    }
+
+    @Test
+    void testCompleteAppointmentWithColorFormulaAndSafetyFlagsUpdatesCustomerProfile() throws Exception {
+        ServiceEntity svc = new ServiceEntity("default", "Signature Gel Manicure", "Mani", new BigDecimal("45.00"), 45);
+        svc.setId(108L);
+
+        Customer cust = new Customer("Rachel Green", "rachel@example.com", "(555) 222-3333", "default");
+        cust.setId(88L);
+
+        Appointment appt = new Appointment();
+        appt.setId(508L);
+        appt.setTenantId("default");
+        appt.setCustomerName("Rachel Green");
+        appt.setCustomerEmail("rachel@example.com");
+        appt.setCustomerPhone("(555) 222-3333");
+        appt.setAppointmentTime(LocalDateTime.of(2026, 11, 22, 11, 0));
+        appt.setService(svc);
+        appt.setStatus(Appointment.AppointmentStatus.CONFIRMED);
+
+        when(appointmentRepository.findByTenantIdAndId("default", 508L)).thenReturn(Optional.of(appt));
+        when(customerRepository.findByTenantIdAndEmail("default", "rachel@example.com")).thenReturn(Optional.of(cust));
+        when(customerRepository.save(any(Customer.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(appointmentRepository.save(any(Appointment.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        String formula = "OPI Bubble Bath Gel #23 with Chrome Topcoat";
+        String safetyFlags = "Diabetic (requires gentle cuticle care), Latex allergy";
+
+        mockMvc.perform(patch("/api/appointments/508/status")
+                        .header("X-Tenant-ID", "default")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"COMPLETED\",\"notes\":\"Great client, rebooked\",\"colorFormula\":\"" + formula + "\",\"medicalFlags\":\"" + safetyFlags + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("COMPLETED"))
+                .andExpect(jsonPath("$.appointment.colorFormula").value(formula))
+                .andExpect(jsonPath("$.appointment.medicalFlags").value(safetyFlags));
+
+        // Verify customer profile was updated with color formula & medical flags
+        org.junit.jupiter.api.Assertions.assertEquals(formula, cust.getColorFormula());
+        org.junit.jupiter.api.Assertions.assertEquals(safetyFlags, cust.getMedicalFlags());
+        verify(customerRepository).save(cust);
+    }
+
+    @Test
+    void testGetAllAppointmentsEnrichesCustomerMedicalFlagsAndColorFormula() throws Exception {
+        Customer cust = new Customer("Monica Geller", "monica@example.com", "(555) 333-4444", "default");
+        cust.setMedicalFlags("MMA acrylic sensitivity");
+        cust.setColorFormula("DND #455 French Tip");
+
+        Appointment appt = new Appointment();
+        appt.setId(509L);
+        appt.setTenantId("default");
+        appt.setCustomerName("Monica Geller");
+        appt.setCustomerEmail("monica@example.com");
+        appt.setStatus(Appointment.AppointmentStatus.CONFIRMED);
+        appt.setAppointmentTime(LocalDateTime.of(2026, 11, 23, 10, 0));
+
+        when(appointmentRepository.findAllByTenantId("default")).thenReturn(new ArrayList<>(List.of(appt)));
+        when(customerRepository.findByTenantIdAndEmail("default", "monica@example.com")).thenReturn(Optional.of(cust));
+
+        mockMvc.perform(get("/api/appointments")
+                        .header("X-Tenant-ID", "default"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].medicalFlags").value("MMA acrylic sensitivity"))
+                .andExpect(jsonPath("$[0].colorFormula").value("DND #455 French Tip"));
+    }
+
+    @Test
+    void testCustomerProfileSafetyAndFormulaMultiTenantIsolation() throws Exception {
+        Customer jennyCust = new Customer("Sarah Connor", "sarah@example.com", "(555) 999-0001", "default");
+        jennyCust.setMedicalFlags("Latex allergy");
+        jennyCust.setColorFormula("OPI Bubble Bath");
+
+        Customer luxeCust = new Customer("Sarah Connor", "sarah@example.com", "(555) 999-0002", "luxe");
+        luxeCust.setMedicalFlags("Diabetic (gentle cuticle care)");
+        luxeCust.setColorFormula("Royal Gold Shimmer #7");
+
+        when(customerRepository.findByTenantIdAndEmail("default", "sarah@example.com")).thenReturn(Optional.of(jennyCust));
+        when(customerRepository.findByTenantIdAndEmail("luxe", "sarah@example.com")).thenReturn(Optional.of(luxeCust));
+
+        // When queried under default tenant
+        Optional<Customer> queriedDefault = customerRepository.findByTenantIdAndEmail("default", "sarah@example.com");
+        org.junit.jupiter.api.Assertions.assertTrue(queriedDefault.isPresent());
+        org.junit.jupiter.api.Assertions.assertEquals("Latex allergy", queriedDefault.get().getMedicalFlags());
+        org.junit.jupiter.api.Assertions.assertEquals("OPI Bubble Bath", queriedDefault.get().getColorFormula());
+
+        // When queried under luxe tenant
+        Optional<Customer> queriedLuxe = customerRepository.findByTenantIdAndEmail("luxe", "sarah@example.com");
+        org.junit.jupiter.api.Assertions.assertTrue(queriedLuxe.isPresent());
+        org.junit.jupiter.api.Assertions.assertEquals("Diabetic (gentle cuticle care)", queriedLuxe.get().getMedicalFlags());
+        org.junit.jupiter.api.Assertions.assertEquals("Royal Gold Shimmer #7", queriedLuxe.get().getColorFormula());
     }
 }

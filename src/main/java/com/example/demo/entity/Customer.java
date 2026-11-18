@@ -23,6 +23,12 @@ public class Customer {
     @Column(name = "tenant_id", length = 64)
     private String tenantId = "default";
 
+    @Column(name = "medical_flags", length = 1000)
+    private String medicalFlags;
+
+    @Column(name = "color_formula", length = 1000)
+    private String colorFormula;
+
     public Customer() {}
 
     public Customer(String name, String email, String phone) {
@@ -53,4 +59,10 @@ public class Customer {
 
     public String getPhone() { return phone; }
     public void setPhone(String phone) { this.phone = phone; }
+
+    public String getMedicalFlags() { return medicalFlags; }
+    public void setMedicalFlags(String medicalFlags) { this.medicalFlags = medicalFlags; }
+
+    public String getColorFormula() { return colorFormula; }
+    public void setColorFormula(String colorFormula) { this.colorFormula = colorFormula; }
 }

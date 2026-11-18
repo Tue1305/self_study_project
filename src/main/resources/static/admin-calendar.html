@@ -1327,6 +1327,8 @@
                 isOpen: true,
                 apt: apt,
                 notes: '',
+                colorFormula: apt.colorFormula || '',
+                medicalFlags: apt.medicalFlags || '',
                 saving: false,
                 error: null
             });
@@ -1347,7 +1349,9 @@
             setCompleteModal(prev => ({ ...prev, saving: true, error: null }));
             try {
                 const effectiveNotes = completeModal.notes ? completeModal.notes.trim() : 'Service completed';
-                const res = await fetch(`/api/appointments/${apt.id}/status?status=COMPLETED&reason=${encodeURIComponent(effectiveNotes)}&notifyCustomer=${notifyCustomer}`, {
+                const effectiveColor = completeModal.colorFormula ? completeModal.colorFormula.trim() : '';
+                const effectiveFlags = completeModal.medicalFlags ? completeModal.medicalFlags.trim() : '';
+                const res = await fetch(`/api/appointments/${apt.id}/status?status=COMPLETED&reason=${encodeURIComponent(effectiveNotes)}&notifyCustomer=${notifyCustomer}&colorFormula=${encodeURIComponent(effectiveColor)}&medicalFlags=${encodeURIComponent(effectiveFlags)}`, {
                     method: 'PATCH',
                     headers: {
                         'Content-Type': 'application/json',
@@ -1358,6 +1362,8 @@
                         status: 'COMPLETED',
                         reason: effectiveNotes,
                         notes: effectiveNotes,
+                        colorFormula: effectiveColor,
+                        medicalFlags: effectiveFlags,
                         notifyCustomer: notifyCustomer
                     })
                 });
@@ -1783,11 +1789,19 @@
                                                 h('div', { className: 'd-flex justify-content-between align-items-start gap-1' },
                                                     h('span', { className: 'appt-time-badge text-truncate' }, `${timeRangeLabel} • ${srvName}`),
                                                     h('div', { className: 'd-flex align-items-center gap-1' },
+                                                        apt.medicalFlags && h('span', {
+                                                            className: 'badge bg-danger text-white border-0 py-0 px-1',
+                                                            style: { fontSize: '0.62rem', letterSpacing: '0.02em', fontWeight: '700' },
+                                                            title: `⚠️ Client Medical/Allergy Alert: ${apt.medicalFlags}`
+                                                        }, '⚠️ ALERT'),
                                                         isColliding && h('span', { className: 'collision-badge', title: 'Side-by-side overlapping appointment' }, 'Overlap'),
                                                         h('i', { className: 'bi bi-grip-vertical text-muted opacity-50', style: { fontSize: '0.75rem' }, title: 'Drag to reassign' })
                                                     )
                                                 ),
-                                                h('div', { className: 'appt-customer-name text-truncate' }, apt.customerName || 'Walk-In Guest'),
+                                                h('div', { className: 'appt-customer-name text-truncate d-flex align-items-center justify-content-between gap-1' },
+                                                    h('span', { className: 'text-truncate' }, apt.customerName || 'Walk-In Guest'),
+                                                    apt.colorFormula && h('i', { className: 'bi bi-palette text-pink flex-shrink-0', style: { fontSize: '0.75rem' }, title: `Saved formula: ${apt.colorFormula}` })
+                                                ),
                                                 h('div', { className: 'appt-service-name text-truncate' }, `${durationMinutes}m • Free ${nextFreeLabel}`)
                                             );
                                         })
@@ -2012,6 +2026,30 @@
                             })
                         ),
                         h('div', { className: 'modal-body p-4' },
+                            /* High-Visibility Red Banner for Allergy & Medical Flags */
+                            selectedAppointment.medicalFlags && h('div', {
+                                className: 'alert alert-danger d-flex align-items-start gap-2 py-3 px-3 mb-3 rounded-3 shadow-sm border-2 border-danger'
+                            },
+                                h('i', { className: 'bi bi-exclamation-triangle-fill fs-4 text-danger flex-shrink-0 mt-1' }),
+                                h('div', null,
+                                    h('div', { className: 'fw-bold text-danger text-uppercase', style: { letterSpacing: '0.05em', fontSize: '0.8rem' } }, '⚠️ Client Safety & Allergy Alert (Technician Warning)'),
+                                    h('div', { className: 'fw-bold text-dark fs-6 mt-1' }, selectedAppointment.medicalFlags),
+                                    h('div', { className: 'extra-small text-muted mt-1' }, 'Caution: Technicians must verify safety instructions (gentle cuticles, latex-free, non-MMA) before beginning.')
+                                )
+                            ),
+
+                            /* Color & Formula History Banner */
+                            selectedAppointment.colorFormula && h('div', {
+                                className: 'alert alert-info d-flex align-items-start gap-2 py-2 px-3 mb-3 rounded-3 shadow-sm border border-info-subtle bg-info-subtle'
+                            },
+                                h('i', { className: 'bi bi-palette-fill fs-5 text-primary flex-shrink-0 mt-1' }),
+                                h('div', null,
+                                    h('div', { className: 'fw-bold text-primary small text-uppercase', style: { letterSpacing: '0.05em' } }, '💅 Color / Formula History'),
+                                    h('div', { className: 'fw-bold text-dark' }, selectedAppointment.colorFormula),
+                                    h('div', { className: 'extra-small text-muted' }, 'Client shade requested / applied on previous visits.')
+                                )
+                            ),
+
                             h('div', { className: 'mb-2 d-flex align-items-center flex-wrap' },
                                 h('strong', null, 'Customer Name: '),
                                 h('span', { className: 'ms-1 fw-semibold' }, selectedAppointment.customerName || 'N/A'),
@@ -2107,7 +2145,8 @@
                                             return h('div', { key: pv.id, className: 'd-flex justify-content-between align-items-center bg-white p-2 rounded border small' },
                                                 h('div', null,
                                                     h('div', { className: 'fw-bold text-dark' }, pvSrv),
-                                                    h('div', { className: 'text-muted', style: { fontSize: '0.75rem' } }, `${pvDate} with ${pvTech}`)
+                                                    h('div', { className: 'text-muted', style: { fontSize: '0.75rem' } }, `${pvDate} with ${pvTech}`),
+                                                    pv.colorFormula && h('div', { className: 'text-pink fw-semibold', style: { fontSize: '0.74rem' } }, `💅 Formula: ${pv.colorFormula}`)
                                                 ),
                                                 h('span', { className: `badge ${pvStatus === 'CONFIRMED' ? 'bg-success' : pvStatus === 'COMPLETED' ? 'bg-primary' : pvStatus === 'CANCELLED' ? 'bg-danger' : pvStatus === 'NO_SHOW' ? 'bg-warning text-dark' : 'bg-secondary'}` }, pvStatus)
                                             );
@@ -2320,6 +2359,17 @@
                         h('div', { className: 'modal-body p-4' },
                             completeModal.error && h('div', { className: 'alert alert-danger py-2 px-3 small mb-3' }, completeModal.error),
 
+                            /* Safety & Allergy Warning in Complete Modal */
+                            completeModal.apt.medicalFlags && h('div', {
+                                className: 'alert alert-danger d-flex align-items-start gap-2 py-2 px-3 mb-3 rounded-3 small border-2 border-danger'
+                            },
+                                h('i', { className: 'bi bi-exclamation-triangle-fill fs-5 text-danger flex-shrink-0' }),
+                                h('div', null,
+                                    h('strong', { className: 'text-danger' }, '⚠️ Client Medical / Allergy Flag: '),
+                                    completeModal.apt.medicalFlags
+                                )
+                            ),
+
                             /* 1. Services being done based on the appointment */
                             h('div', { className: 'card border-0 bg-light rounded-3 p-3 mb-3' },
                                 h('div', { className: 'd-flex justify-content-between align-items-center mb-2 border-bottom pb-2' },
@@ -2352,7 +2402,49 @@
                                 )
                             ),
 
-                            /* 2. Staff typed notes section */
+                            /* 2. Color / Formula Used Today */
+                            h('div', { className: 'mb-3 bg-light p-3 rounded-3 border' },
+                                h('div', { className: 'd-flex justify-content-between align-items-center mb-1' },
+                                    h('label', { className: 'form-label small fw-bold text-dark d-flex align-items-center gap-1 mb-0' }, [
+                                        h('i', { className: 'bi bi-palette text-pink' }),
+                                        'Color / Product Formula Used Today:'
+                                    ]),
+                                    h('span', { className: 'badge bg-white text-secondary border' }, 'Saved to Profile')
+                                ),
+                                h('div', { className: 'small text-muted mb-2', style: { fontSize: '0.76rem' } },
+                                    'Save color shade or brand formula (e.g. OPI "Bubble Bath" Gel #23 or DND #455) for repeat visits:'
+                                ),
+                                h('div', { className: 'd-flex flex-wrap gap-1 mb-2' },
+                                    [
+                                        'OPI Bubble Bath #23',
+                                        'DND #455',
+                                        'Funny Bunny',
+                                        'Chisel Dipping #12',
+                                        'Gel X Natural',
+                                        'Chrome Finish'
+                                    ].map(shade =>
+                                        h('button', {
+                                            key: shade,
+                                            type: 'button',
+                                            className: 'btn btn-outline-secondary btn-sm py-0 px-2 rounded-pill',
+                                            style: { fontSize: '0.72rem' },
+                                            onClick: () => setCompleteModal(prev => ({
+                                                ...prev,
+                                                colorFormula: prev.colorFormula ? `${prev.colorFormula}, ${shade}` : shade
+                                            }))
+                                        }, `+ ${shade}`)
+                                    )
+                                ),
+                                h('input', {
+                                    type: 'text',
+                                    className: 'form-control form-control-sm',
+                                    placeholder: 'e.g. OPI "Bubble Bath" Gel #23 or DND #455',
+                                    value: completeModal.colorFormula || '',
+                                    onChange: (e) => setCompleteModal(prev => ({ ...prev, colorFormula: e.target.value }))
+                                })
+                            ),
+
+                            /* 3. Staff typed notes section */
                             h('div', { className: 'mb-3' },
                                 h('label', { className: 'form-label small fw-bold text-dark d-flex align-items-center gap-1 mb-1' }, [
                                     h('i', { className: 'bi bi-pencil-fill text-pink' }),
@@ -2449,6 +2541,24 @@
                             ),
                             customerHistoryModal.error && h('div', { className: 'alert alert-warning' }, customerHistoryModal.error),
                             customerHistoryModal.data && h('div', null,
+                                customerHistoryModal.data.customer?.medicalFlags && h('div', {
+                                    className: 'alert alert-danger d-flex align-items-center gap-2 py-2 px-3 mb-3 rounded-3 shadow-sm border-2 border-danger'
+                                },
+                                    h('i', { className: 'bi bi-exclamation-triangle-fill fs-5 text-danger flex-shrink-0' }),
+                                    h('div', null,
+                                        h('strong', { className: 'text-danger' }, '⚠️ Allergy / Safety Flags: '),
+                                        customerHistoryModal.data.customer.medicalFlags
+                                    )
+                                ),
+                                customerHistoryModal.data.customer?.colorFormula && h('div', {
+                                    className: 'alert alert-info d-flex align-items-center gap-2 py-2 px-3 mb-3 rounded-3 shadow-sm border border-info-subtle bg-info-subtle'
+                                },
+                                    h('i', { className: 'bi bi-palette-fill fs-5 text-primary flex-shrink-0' }),
+                                    h('div', null,
+                                        h('strong', { className: 'text-primary' }, '💅 Preferred / Prior Color Formula: '),
+                                        customerHistoryModal.data.customer.colorFormula
+                                    )
+                                ),
                                 h('div', { className: 'row g-2 mb-4 text-center' },
                                     h('div', { className: 'col' },
                                         h('div', { className: 'p-2 bg-light rounded-3 border' },

@@ -161,6 +161,8 @@
                     <th>Full Name</th>
                     <th>Email</th>
                     <th>Phone</th>
+                    <th>Safety / Allergy Flags</th>
+                    <th>Color Formula</th>
                     <th class="text-end">Actions</th>
                 </tr>
                 </thead>
@@ -193,6 +195,25 @@
                 <div class="mb-3">
                     <label for="customerPhone" class="form-label fw-semibold text-secondary small">Phone Number</label>
                     <input type="tel" class="form-control rounded-3" id="customerPhone" placeholder="e.g. (555) 123-4567">
+                </div>
+                <div class="mb-3">
+                    <label for="customerMedicalFlags" class="form-label fw-semibold text-secondary small d-flex justify-content-between align-items-center mb-1">
+                        <span><i class="bi bi-exclamation-triangle-fill text-danger me-1"></i>Safety & Allergy Flags:</span>
+                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle" style="font-size: 0.7rem;">Technician Alert</span>
+                    </label>
+                    <input type="text" class="form-control rounded-3" id="customerMedicalFlags" placeholder="e.g. Diabetic (requires gentle cuticle care), Latex allergy">
+                    <div class="d-flex flex-wrap gap-1 mt-2">
+                        <button type="button" class="btn btn-outline-danger btn-sm py-0 px-2 rounded-pill" style="font-size: 0.72rem;" onclick="appendFlag('Diabetic (gentle cuticle care)')">+ Diabetic</button>
+                        <button type="button" class="btn btn-outline-danger btn-sm py-0 px-2 rounded-pill" style="font-size: 0.72rem;" onclick="appendFlag('Latex allergy')">+ Latex allergy</button>
+                        <button type="button" class="btn btn-outline-danger btn-sm py-0 px-2 rounded-pill" style="font-size: 0.72rem;" onclick="appendFlag('MMA acrylic sensitivity')">+ MMA sensitivity</button>
+                        <button type="button" class="btn btn-outline-danger btn-sm py-0 px-2 rounded-pill" style="font-size: 0.72rem;" onclick="appendFlag('Sensitive cuticles')">+ Sensitive cuticles</button>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label for="customerColorFormula" class="form-label fw-semibold text-secondary small mb-1">
+                        <i class="bi bi-palette-fill text-pink me-1"></i>Color / Formula History Preference:
+                    </label>
+                    <input type="text" class="form-control rounded-3" id="customerColorFormula" placeholder="e.g. OPI &quot;Bubble Bath&quot; Gel #23 or DND #455">
                 </div>
             </div>
             <div class="modal-footer border-0 pt-0">
@@ -374,7 +395,7 @@
             tbody.innerHTML = '';
 
             if (customers.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-4">No customers found in the database.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-4">No customers found in the database.</td></tr>`;
                 return;
             }
 
@@ -382,6 +403,22 @@
                 const safeName = (customer.name || '').replace(/'/g, "\\'");
                 const safeEmail = (customer.email || '').replace(/'/g, "\\'");
                 const safePhone = (customer.phone || '').replace(/'/g, "\\'");
+                const safeMedicalFlags = (customer.medicalFlags || '').replace(/'/g, "\\'");
+                const safeColorFormula = (customer.colorFormula || '').replace(/'/g, "\\'");
+
+                let flagsBadge = '<span class="text-muted small fst-italic">None</span>';
+                if (customer.medicalFlags && customer.medicalFlags.trim()) {
+                    flagsBadge = `<span class="badge bg-danger text-white border-0 shadow-sm d-inline-flex align-items-center gap-1 py-1 px-2" title="${customer.medicalFlags}">
+                        <i class="bi bi-exclamation-triangle-fill"></i> ${customer.medicalFlags}
+                    </span>`;
+                }
+
+                let formulaBadge = '<span class="text-muted small fst-italic">No shade saved</span>';
+                if (customer.colorFormula && customer.colorFormula.trim()) {
+                    formulaBadge = `<span class="badge bg-light text-dark border d-inline-flex align-items-center gap-1 py-1 px-2" title="${customer.colorFormula}">
+                        <i class="bi bi-palette text-pink"></i> ${customer.colorFormula}
+                    </span>`;
+                }
 
                 tbody.innerHTML += `
                     <tr>
@@ -391,11 +428,13 @@
                         </td>
                         <td><a href="mailto:${customer.email || ''}" class="text-decoration-none">${customer.email || 'N/A'}</a></td>
                         <td><a href="tel:${customer.phone || ''}" class="text-decoration-none">${customer.phone || 'N/A'}</a></td>
+                        <td>${flagsBadge}</td>
+                        <td>${formulaBadge}</td>
                         <td class="text-end">
                             <button class="btn btn-outline-info btn-sm me-1 fw-semibold" onclick="openCustomerHistory(${customer.id}, '${safeName}', '${safeEmail}', '${safePhone}')" title="View Appointment History & Audit Log">
                                 <i class="bi bi-clock-history me-1"></i> History
                             </button>
-                            <button class="btn btn-outline-secondary btn-sm me-1" onclick="openEditModal(${customer.id}, '${safeName}', '${safeEmail}', '${safePhone}')" title="Edit Customer">
+                            <button class="btn btn-outline-secondary btn-sm me-1" onclick="openEditModal(${customer.id}, '${safeName}', '${safeEmail}', '${safePhone}', '${safeMedicalFlags}', '${safeColorFormula}')" title="Edit Customer">
                                 <i class="bi bi-pencil"></i>
                             </button>
                             <button class="btn btn-outline-danger btn-sm" onclick="deleteCustomer(${customer.id})" title="Delete Customer">
@@ -407,7 +446,17 @@
             });
         } catch (error) {
             console.error('Error loading customers:', error);
-            document.getElementById('customerTableBody').innerHTML = `<tr><td colspan="5" class="text-center text-danger py-4">Error loading customer data from server.</td></tr>`;
+            document.getElementById('customerTableBody').innerHTML = `<tr><td colspan="7" class="text-center text-danger py-4">Error loading customer data from server.</td></tr>`;
+        }
+    }
+
+    function appendFlag(flag) {
+        const input = document.getElementById('customerMedicalFlags');
+        const cur = input.value.trim();
+        if (!cur) {
+            input.value = flag;
+        } else if (!cur.toLowerCase().includes(flag.toLowerCase())) {
+            input.value = cur + ', ' + flag;
         }
     }
 
@@ -416,15 +465,19 @@
         document.getElementById('customerName').value = '';
         document.getElementById('customerEmail').value = '';
         document.getElementById('customerPhone').value = '';
+        document.getElementById('customerMedicalFlags').value = '';
+        document.getElementById('customerColorFormula').value = '';
         document.getElementById('modalTitle').innerText = 'Add New Customer';
         customerModalInstance.show();
     }
 
-    function openEditModal(id, name, email, phone) {
+    function openEditModal(id, name, email, phone, medicalFlags, colorFormula) {
         document.getElementById('customerId').value = id;
         document.getElementById('customerName').value = name;
         document.getElementById('customerEmail').value = email;
         document.getElementById('customerPhone').value = phone === 'undefined' ? '' : phone;
+        document.getElementById('customerMedicalFlags').value = (medicalFlags === 'undefined' || !medicalFlags) ? '' : medicalFlags;
+        document.getElementById('customerColorFormula').value = (colorFormula === 'undefined' || !colorFormula) ? '' : colorFormula;
         document.getElementById('modalTitle').innerText = 'Edit Customer';
         customerModalInstance.show();
     }
@@ -434,6 +487,8 @@
         const name = document.getElementById('customerName').value.trim();
         const email = document.getElementById('customerEmail').value.trim();
         const phone = document.getElementById('customerPhone').value.trim();
+        const medicalFlags = document.getElementById('customerMedicalFlags').value.trim();
+        const colorFormula = document.getElementById('customerColorFormula').value.trim();
 
         if (!name || !email) {
             alert('Please fill in Full Name and Email.');
@@ -451,7 +506,7 @@
                     'Authorization': 'Bearer ' + token,
                     'X-Tenant-ID': activeTenant
                 },
-                body: JSON.stringify({ name, email, phone })
+                body: JSON.stringify({ name, email, phone, medicalFlags, colorFormula })
             });
 
             if (response.ok) {
@@ -558,6 +613,38 @@
         const totalCancelled = rel.totalCancelled || 0;
         const totalNoShows = rel.totalNoShows || 0;
         const hasRisk = rel.hasHighNoShowRisk || totalNoShows >= 2;
+
+        let medicalBannerHtml = '';
+        if (customer.medicalFlags && customer.medicalFlags.trim()) {
+            medicalBannerHtml = `
+                <div class="alert alert-danger d-flex align-items-start gap-2 py-3 px-3 mb-3 rounded-4 shadow-sm border-2 border-danger">
+                    <i class="bi bi-exclamation-triangle-fill fs-4 text-danger flex-shrink-0"></i>
+                    <div>
+                        <div class="fw-bold text-danger text-uppercase" style="letter-spacing: 0.05em; font-size: 0.82rem;">⚠️ Safety & Allergy Alert</div>
+                        <div class="fw-bold text-dark fs-6 mt-1">${customer.medicalFlags}</div>
+                        <div class="extra-small text-muted mt-1">Technicians: Always verify customer sensitivity & consult care guidelines before service.</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        let formulaCardHtml = '';
+        if (customer.colorFormula && customer.colorFormula.trim()) {
+            formulaCardHtml = `
+                <div class="card border-0 bg-light rounded-4 p-3 mb-3 border">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="small fw-bold text-dark d-flex align-items-center gap-1">
+                            <i class="bi bi-palette-fill text-pink"></i> Color & Formula History
+                        </span>
+                        <span class="badge bg-white text-secondary border">Saved Preference</span>
+                    </div>
+                    <div class="bg-white p-2 rounded-3 border mt-1">
+                        <div class="fw-bold text-dark">${customer.colorFormula}</div>
+                        <div class="extra-small text-muted mt-1">Clients can request "the same color I had last month".</div>
+                    </div>
+                </div>
+            `;
+        }
 
         let riskBannerHtml = '';
         if (hasRisk) {
@@ -668,6 +755,8 @@
         }
 
         body.innerHTML = `
+            ${medicalBannerHtml}
+            ${formulaCardHtml}
             ${riskBannerHtml}
             ${reliabilityPillsHtml}
             <div class="d-flex justify-content-between align-items-center mb-2">

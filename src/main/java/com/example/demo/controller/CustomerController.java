@@ -98,6 +98,12 @@ public class CustomerController {
             existing.setName(updatedCustomer.getName().trim());
         }
         existing.setPhone(updatedCustomer.getPhone());
+        if (updatedCustomer.getMedicalFlags() != null) {
+            existing.setMedicalFlags(updatedCustomer.getMedicalFlags().trim());
+        }
+        if (updatedCustomer.getColorFormula() != null) {
+            existing.setColorFormula(updatedCustomer.getColorFormula().trim());
+        }
 
         customerService.saveCustomer(existing);
         return ResponseEntity.ok(existing);

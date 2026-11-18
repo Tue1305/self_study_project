@@ -98,7 +98,21 @@ public class AppointmentController {
         } catch (Exception e) {
             // Log but don't prevent appointments fetch
         }
-        return appointmentRepository.findAllByTenantId(tenantId);
+        List<Appointment> list = appointmentRepository.findAllByTenantId(tenantId);
+        for (Appointment apt : list) {
+            if ((apt.getMedicalFlags() == null || apt.getMedicalFlags().isBlank() || apt.getColorFormula() == null || apt.getColorFormula().isBlank())
+                    && apt.getCustomerEmail() != null && !apt.getCustomerEmail().isBlank()) {
+                customerRepository.findByTenantIdAndEmail(tenantId, apt.getCustomerEmail().trim()).ifPresent(c -> {
+                    if ((apt.getMedicalFlags() == null || apt.getMedicalFlags().isBlank()) && c.getMedicalFlags() != null && !c.getMedicalFlags().isBlank()) {
+                        apt.setMedicalFlags(c.getMedicalFlags());
+                    }
+                    if ((apt.getColorFormula() == null || apt.getColorFormula().isBlank()) && c.getColorFormula() != null && !c.getColorFormula().isBlank()) {
+                        apt.setColorFormula(c.getColorFormula());
+                    }
+                });
+            }
+        }
+        return list;
     }
 
     /**
@@ -934,6 +948,14 @@ public class AppointmentController {
                     appt.setAppointmentTime(serviceApptTime);
                     appt.setStationPreference(bookingRequest.getStationPreference());
                     appt.setCancellationToken(UUID.randomUUID().toString());
+                    if (guestCustomer != null) {
+                        if (guestCustomer.getMedicalFlags() != null && !guestCustomer.getMedicalFlags().isBlank()) {
+                            appt.setMedicalFlags(guestCustomer.getMedicalFlags());
+                        }
+                        if (guestCustomer.getColorFormula() != null && !guestCustomer.getColorFormula().isBlank()) {
+                            appt.setColorFormula(guestCustomer.getColorFormula());
+                        }
+                    }
 
                     // Check if per-service staff selection was assigned for this service
                     UserEntity serviceSpecificTech = resolvedTech;
@@ -1151,6 +1173,14 @@ public class AppointmentController {
         appointment.setNotes(bookingRequest.getNotes());
         appointment.setStationPreference(bookingRequest.getStationPreference());
         appointment.setCancellationToken(UUID.randomUUID().toString());
+        if (customer != null) {
+            if (customer.getMedicalFlags() != null && !customer.getMedicalFlags().isBlank()) {
+                appointment.setMedicalFlags(customer.getMedicalFlags());
+            }
+            if (customer.getColorFormula() != null && !customer.getColorFormula().isBlank()) {
+                appointment.setColorFormula(customer.getColorFormula());
+            }
+        }
         appointment.setService(tenantService.get());
         appointment.setNailTech(resolvedTech);
 
@@ -1231,12 +1261,16 @@ public class AppointmentController {
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String reason,
             @RequestParam(required = false) String notes,
+            @RequestParam(required = false) String colorFormula,
+            @RequestParam(required = false) String medicalFlags,
             @RequestParam(required = false, defaultValue = "true") Boolean notifyCustomer,
             @RequestBody(required = false) Map<String, Object> body,
             HttpServletRequest request
     ) {
         String effectiveStatus = status;
         String effectiveReason = reason != null ? reason : notes;
+        String effectiveColor = colorFormula;
+        String effectiveFlags = medicalFlags;
         boolean shouldNotify = (notifyCustomer != null) ? notifyCustomer : true;
         if (body != null) {
             if (effectiveStatus == null && body.containsKey("status")) {
@@ -1245,6 +1279,12 @@ public class AppointmentController {
             if (effectiveReason == null) {
                 if (body.containsKey("reason")) effectiveReason = String.valueOf(body.get("reason"));
                 else if (body.containsKey("notes")) effectiveReason = String.valueOf(body.get("notes"));
+            }
+            if (effectiveColor == null && body.containsKey("colorFormula")) {
+                effectiveColor = String.valueOf(body.get("colorFormula"));
+            }
+            if (effectiveFlags == null && body.containsKey("medicalFlags")) {
+                effectiveFlags = String.valueOf(body.get("medicalFlags"));
             }
             if (body.containsKey("notifyCustomer")) {
                 shouldNotify = Boolean.parseBoolean(String.valueOf(body.get("notifyCustomer")));
@@ -1257,6 +1297,8 @@ public class AppointmentController {
         String tenantId = tenantContextResolver.resolveTenantId(request);
         final String finalStatus = effectiveStatus.trim();
         final String finalReason = effectiveReason != null ? effectiveReason.trim() : null;
+        final String finalColor = (effectiveColor != null && !effectiveColor.isBlank()) ? effectiveColor.trim() : null;
+        final String finalFlags = (effectiveFlags != null && !effectiveFlags.isBlank()) ? effectiveFlags.trim() : null;
         final boolean finalShouldNotify = shouldNotify;
 
         Optional<Appointment> apptOpt = appointmentRepository.findByTenantIdAndId(tenantId, id);
@@ -1272,6 +1314,33 @@ public class AppointmentController {
         try {
             Appointment.AppointmentStatus newStatus = Appointment.AppointmentStatus.valueOf(finalStatus.toUpperCase());
             appointment.setStatus(newStatus);
+
+            if (finalColor != null) {
+                appointment.setColorFormula(finalColor);
+            }
+            if (finalFlags != null) {
+                appointment.setMedicalFlags(finalFlags);
+            }
+
+            // Look up customer record to link customer_id & sync color/safety profile
+            Customer customer = null;
+            if (appointment.getCustomerEmail() != null && !appointment.getCustomerEmail().isBlank()) {
+                customer = customerRepository.findByTenantIdAndEmail(appointment.getTenantId(), appointment.getCustomerEmail().trim()).orElse(null);
+                if (customer != null) {
+                    boolean customerUpdated = false;
+                    if (finalColor != null) {
+                        customer.setColorFormula(finalColor);
+                        customerUpdated = true;
+                    }
+                    if (finalFlags != null) {
+                        customer.setMedicalFlags(finalFlags);
+                        customerUpdated = true;
+                    }
+                    if (customerUpdated) {
+                        customerRepository.save(customer);
+                    }
+                }
+            }
 
             String serviceName = (appointment.getService() != null && appointment.getService().getName() != null)
                     ? appointment.getService().getName() : "Nail Service";
@@ -1297,9 +1366,11 @@ public class AppointmentController {
                 noteTag = "[NO_SHOW Reason: " + why + "]";
             } else if (newStatus == Appointment.AppointmentStatus.COMPLETED) {
                 auditDescription = "Service completed: " + serviceName + " with " + staffName +
-                        (finalReason != null && !finalReason.isBlank() ? " | " + finalReason : "");
+                        (finalReason != null && !finalReason.isBlank() ? " | " + finalReason : "") +
+                        (finalColor != null ? " | Formula: " + finalColor : "");
                 noteTag = "[COMPLETED: " + serviceName + " with " + staffName +
-                        (finalReason != null && !finalReason.isBlank() ? " | Notes: " + finalReason : "") + "]";
+                        (finalReason != null && !finalReason.isBlank() ? " | Notes: " + finalReason : "") +
+                        (finalColor != null ? " | Formula: " + finalColor : "") + "]";
             } else {
                 auditDescription = "Status changed to " + newStatus.name() +
                         (finalReason != null && !finalReason.isBlank() ? " (" + finalReason + ")" : "");
@@ -1310,12 +1381,6 @@ public class AppointmentController {
             appointment.setNotes(existingNotes.isEmpty() ? noteTag : existingNotes + " | " + noteTag);
 
             Appointment updated = appointmentRepository.save(appointment);
-
-            // Look up customer record to link customer_id
-            Customer customer = null;
-            if (appointment.getCustomerEmail() != null && !appointment.getCustomerEmail().isBlank()) {
-                customer = customerRepository.findByTenantIdAndEmail(appointment.getTenantId(), appointment.getCustomerEmail().trim()).orElse(null);
-            }
 
             if (auditService != null) {
                 String performedBy = auditService.resolvePerformedBy("ADMIN");

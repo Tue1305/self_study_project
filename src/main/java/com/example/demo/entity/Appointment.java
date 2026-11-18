@@ -38,6 +38,12 @@ public class Appointment {
     @Column(name = "reminder_sent_at")
     private LocalDateTime reminderSentAt;
 
+    @Column(name = "medical_flags", length = 500)
+    private String medicalFlags;
+
+    @Column(name = "color_formula", length = 500)
+    private String colorFormula;
+
     @ManyToOne
     @JoinColumn(name = "service_id", nullable = false)
     private ServiceEntity service;
@@ -83,6 +89,12 @@ public class Appointment {
 
     public LocalDateTime getReminderSentAt() { return reminderSentAt; }
     public void setReminderSentAt(LocalDateTime reminderSentAt) { this.reminderSentAt = reminderSentAt; }
+
+    public String getMedicalFlags() { return medicalFlags; }
+    public void setMedicalFlags(String medicalFlags) { this.medicalFlags = medicalFlags; }
+
+    public String getColorFormula() { return colorFormula; }
+    public void setColorFormula(String colorFormula) { this.colorFormula = colorFormula; }
 
     public ServiceEntity getService() { return service; }
     public void setService(ServiceEntity service) { this.service = service; }

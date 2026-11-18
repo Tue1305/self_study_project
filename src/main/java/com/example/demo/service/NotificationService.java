@@ -697,6 +697,182 @@ public class NotificationService {
         return scheme + "://" + domain + "/manage-booking?token=" + token + "&action=manage";
     }
 
+    public String buildBookingLink(TenantConfig config) {
+        String domain = (config != null && config.getCustomDomain() != null && !config.getCustomDomain().isBlank())
+                ? config.getCustomDomain().trim()
+                : "localhost:8080";
+        String scheme = domain.contains("localhost") ? "http" : "https";
+        String path = (config != null && "luxe".equalsIgnoreCase(config.getTenantKey())) ? "/book/luxe" : "/";
+        return scheme + "://" + domain + path;
+    }
+
+    /**
+     * Dispatches Birthday Celebration Email and SMS with bonus VIP loyalty points / gift card voucher.
+     */
+    public NotificationResult sendBirthdayPerkNotification(
+            com.example.demo.entity.Customer customer,
+            int bonusPoints,
+            String giftCardCode,
+            BigDecimal voucherAmount,
+            String tenantId
+    ) {
+        if (customer == null) {
+            return new NotificationResult(false, true, null, "Customer was null");
+        }
+        try {
+            TenantConfig config = resolveTenantConfig(tenantId != null ? tenantId : customer.getTenantId());
+            String salonName = config.getSalonName() != null ? config.getSalonName() : "Jenny's Nail Studio";
+            String primaryColor = config.getPrimaryColor() != null ? config.getPrimaryColor() : "#e83e8c";
+            String supportPhone = resolveSupportPhone(config.getTenantKey());
+            String bookingUrl = buildBookingLink(config);
+
+            String customerName = customer.getName() != null ? customer.getName().trim() : "Valued Client";
+            String customerEmail = customer.getEmail() != null ? customer.getEmail().trim() : "";
+            String customerPhone = customer.getPhone() != null ? customer.getPhone().trim() : "";
+
+            String subject = "🎂 Happy Birthday, " + customerName + "! Celebrate with a gift from " + salonName;
+
+            String perkText = bonusPoints > 0
+                    ? String.format("<strong>%d VIP Loyalty Points</strong> ($%.2f value)", bonusPoints, bonusPoints * 0.10)
+                    : (giftCardCode != null ? String.format("a <strong>$%.2f Gift Voucher</strong> (Code: <code style='font-size:16px;font-weight:700;'>%s</code>)", voucherAmount, giftCardCode) : "VIP Birthday Perks");
+
+            String smsPerk = bonusPoints > 0
+                    ? bonusPoints + " VIP bonus points ($" + String.format("%.2f", bonusPoints * 0.10) + " value)"
+                    : (giftCardCode != null ? "$" + String.format("%.2f", voucherAmount) + " gift voucher (Code: " + giftCardCode + ")" : "VIP Birthday perks");
+
+            String htmlBody = String.format("""
+                    <!DOCTYPE html>
+                    <html>
+                    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f7fafc; margin: 0; padding: 20px; color: #2d3748;">
+                        <div style="max-width: 600px; margin: 20px auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
+                            <div style="background-color: %s; padding: 28px 24px; text-align: center; color: #ffffff;">
+                                <h1 style="margin: 0; font-size: 26px; font-weight: 700;">%s</h1>
+                                <p style="margin: 6px 0 0 0; font-size: 16px; opacity: 0.95;">🎂 Happy Birthday Celebration!</p>
+                            </div>
+                            <div style="padding: 28px;">
+                                <p style="font-size: 18px; margin: 0 0 16px 0;">Happy Birthday, <strong>%s</strong>! 🥳</p>
+                                <p style="color: #4a5568; line-height: 1.6; margin: 0 0 20px 0;">
+                                    We hope your day is filled with joy! To help you celebrate and treat yourself to some well-deserved pampering, we've awarded your account with %s!
+                                </p>
+                                <div style="background-color: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 18px; text-align: center; margin-bottom: 24px;">
+                                    <div style="font-size: 13px; text-transform: uppercase; color: #b45309; font-weight: 700; letter-spacing: 0.5px;">Your Birthday Gift</div>
+                                    <div style="font-size: 20px; font-weight: 700; color: #92400e; margin-top: 4px;">%s</div>
+                                    <div style="font-size: 13px; color: #b45309; margin-top: 4px;">Redeemable on services, add-ons, or deluxe treatments at checkout!</div>
+                                </div>
+                                <div style="text-align: center; margin-top: 24px;">
+                                    <a href="%s" style="background-color: %s; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 6px; font-weight: 700; font-size: 15px; display: inline-block;">
+                                        Book Your Birthday Pampering
+                                    </a>
+                                </div>
+                            </div>
+                            <div style="background-color: #edf2f7; padding: 16px; text-align: center; font-size: 12px; color: #718096;">
+                                %s | Questions or special requests? Call %s
+                            </div>
+                        </div>
+                    </body>
+                    </html>
+                    """,
+                    primaryColor,
+                    salonName,
+                    customerName,
+                    perkText,
+                    perkText,
+                    bookingUrl,
+                    primaryColor,
+                    salonName,
+                    supportPhone
+            );
+
+            String smsBody = String.format("%s: Happy Birthday %s! 🎂 Celebrate with %s on us! Book your pampering visit: %s",
+                    salonName, customerName, smsPerk, bookingUrl);
+
+            return dispatchNotification(customerEmail, customerPhone, subject, htmlBody, smsBody, config);
+        } catch (Exception e) {
+            logger.warn("[NotificationService] Error sending birthday notification: {}", e.getMessage(), e);
+            return new NotificationResult(false, true, null, "Error: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Dispatches Win-Back / Lapsed Customer Retention Email and SMS.
+     */
+    public NotificationResult sendWinBackReminderNotification(
+            com.example.demo.entity.Customer customer,
+            java.time.LocalDate lastVisitDate,
+            String lastServiceName,
+            String tenantId
+    ) {
+        if (customer == null) {
+            return new NotificationResult(false, true, null, "Customer was null");
+        }
+        try {
+            TenantConfig config = resolveTenantConfig(tenantId != null ? tenantId : customer.getTenantId());
+            String salonName = config.getSalonName() != null ? config.getSalonName() : "Jenny's Nail Studio";
+            String primaryColor = config.getPrimaryColor() != null ? config.getPrimaryColor() : "#e83e8c";
+            String supportPhone = resolveSupportPhone(config.getTenantKey());
+            String bookingUrl = buildBookingLink(config);
+
+            String customerName = customer.getName() != null ? customer.getName().trim() : "Valued Client";
+            String customerEmail = customer.getEmail() != null ? customer.getEmail().trim() : "";
+            String customerPhone = customer.getPhone() != null ? customer.getPhone().trim() : "";
+
+            String subject = "✨ We miss you at " + salonName + ", " + customerName + "! Time for a fresh pampering?";
+
+            String visitContext = lastVisitDate != null
+                    ? "It's been a few weeks since your last visit on " + lastVisitDate.format(DateTimeFormatter.ofPattern("MMMM d, yyyy")) + (lastServiceName != null ? " (" + lastServiceName + ")" : "")
+                    : "It has been a while since your last visit";
+
+            String htmlBody = String.format("""
+                    <!DOCTYPE html>
+                    <html>
+                    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f7fafc; margin: 0; padding: 20px; color: #2d3748;">
+                        <div style="max-width: 600px; margin: 20px auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
+                            <div style="background-color: %s; padding: 28px 24px; text-align: center; color: #ffffff;">
+                                <h1 style="margin: 0; font-size: 26px; font-weight: 700;">%s</h1>
+                                <p style="margin: 6px 0 0 0; font-size: 16px; opacity: 0.95;">💕 We've Missed You!</p>
+                            </div>
+                            <div style="padding: 28px;">
+                                <p style="font-size: 18px; margin: 0 0 16px 0;">Hi <strong>%s</strong>,</p>
+                                <p style="color: #4a5568; line-height: 1.6; margin: 0 0 20px 0;">
+                                    %s. Your nails and lashes deserve regular care and relaxation. Our expert specialists are ready to make your hands and feet look flawless again!
+                                </p>
+                                <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 18px; text-align: center; margin-bottom: 24px;">
+                                    <div style="font-size: 15px; font-weight: 700; color: #2d3748;">Ready for your next refill or new look?</div>
+                                    <div style="font-size: 13px; color: #718096; margin-top: 4px;">Book in advance to secure your favorite specialist and time slot.</div>
+                                </div>
+                                <div style="text-align: center; margin-top: 24px;">
+                                    <a href="%s" style="background-color: %s; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 6px; font-weight: 700; font-size: 15px; display: inline-block;">
+                                        Book Your Next Appointment
+                                    </a>
+                                </div>
+                            </div>
+                            <div style="background-color: #edf2f7; padding: 16px; text-align: center; font-size: 12px; color: #718096;">
+                                %s | Call %s | Reply STOP to unsubscribe
+                            </div>
+                        </div>
+                    </body>
+                    </html>
+                    """,
+                    primaryColor,
+                    salonName,
+                    customerName,
+                    visitContext,
+                    bookingUrl,
+                    primaryColor,
+                    salonName,
+                    supportPhone
+            );
+
+            String smsBody = String.format("%s: Hi %s! We miss you! It's time for your refill / fresh nails. Book your next visit: %s (Reply STOP to opt out)",
+                    salonName, customerName, bookingUrl);
+
+            return dispatchNotification(customerEmail, customerPhone, subject, htmlBody, smsBody, config);
+        } catch (Exception e) {
+            logger.warn("[NotificationService] Error sending win-back notification: {}", e.getMessage(), e);
+            return new NotificationResult(false, true, null, "Error: " + e.getMessage());
+        }
+    }
+
     private String buildSmsBody(
             String salonName,
             String customerName,

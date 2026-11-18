@@ -142,13 +142,18 @@
 
 <!-- Main Container -->
 <main class="container my-5 flex-grow-1">
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
         <h2 class="h3 fw-bold text-dark mb-0">
             <i class="bi bi-person-lines-fill text-pink me-2"></i><span id="customerHeading">Customer Database</span>
         </h2>
-        <button class="btn btn-pink btn-sm fw-semibold" onclick="openAddModal()">
-            <i class="bi bi-plus-lg me-1"></i> Add Customer
-        </button>
+        <div class="d-flex align-items-center gap-2">
+            <button class="btn btn-outline-warning btn-sm fw-bold text-dark d-flex align-items-center gap-1 shadow-sm" onclick="openMarketingModal()">
+                <i class="bi bi-megaphone-fill text-warning"></i> Automated Marketing & Win-Back Hub
+            </button>
+            <button class="btn btn-pink btn-sm fw-semibold" onclick="openAddModal()">
+                <i class="bi bi-plus-lg me-1"></i> Add Customer
+            </button>
+        </div>
     </div>
 
     <!-- Customers Table Card -->
@@ -161,6 +166,7 @@
                     <th>Full Name</th>
                     <th>Email</th>
                     <th>Phone</th>
+                    <th>Birthday</th>
                     <th>Loyalty Points</th>
                     <th>Safety / Allergy Flags</th>
                     <th>Color Formula</th>
@@ -204,6 +210,21 @@
                     <input type="number" min="0" class="form-control rounded-3" id="customerLoyaltyPoints" placeholder="0">
                     <div class="form-text extra-small">Clients earn 1 pt / $1 spent. 100 pts = $10 discount ($0.10 / pt).</div>
                 </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-md-7">
+                        <label for="customerBirthDate" class="form-label fw-semibold text-secondary small mb-1">
+                            <i class="bi bi-cake2-fill text-pink me-1"></i>Birth Date (Birthday):
+                        </label>
+                        <input type="date" class="form-control rounded-3" id="customerBirthDate">
+                        <div class="form-text extra-small">Used for automated birthday perks & campaigns.</div>
+                    </div>
+                    <div class="col-md-5 d-flex align-items-end pb-1">
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="customerOptOutMarketing">
+                            <label class="form-check-label extra-small fw-semibold text-secondary" for="customerOptOutMarketing">Opt out marketing</label>
+                        </div>
+                    </div>
+                </div>
                 <div class="mb-3">
                     <label for="customerMedicalFlags" class="form-label fw-semibold text-secondary small d-flex justify-content-between align-items-center mb-1">
                         <span><i class="bi bi-exclamation-triangle-fill text-danger me-1"></i>Safety & Allergy Flags:</span>
@@ -246,6 +267,174 @@
     </div>
     <div class="offcanvas-body p-4" id="drawerBody">
         <!-- Dynamically rendered via JavaScript -->
+    </div>
+</div>
+
+<!-- Automated Marketing & Retention Hub Modal -->
+<div class="modal fade" id="marketingModal" tabindex="-1" aria-labelledby="marketingModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+            <div class="modal-header bg-light border-bottom py-3 px-4 d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="p-2 bg-warning-subtle text-warning rounded-3 fs-4">
+                        <i class="bi bi-megaphone-fill"></i>
+                    </div>
+                    <div>
+                        <h5 class="modal-title fw-bold text-dark mb-0" id="marketingModalLabel">Automated Marketing & Win-Back Hub</h5>
+                        <div class="small text-muted">Retain clients with automated birthday perks and 4+ week lapsed customer win-back reminders</div>
+                    </div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4" style="max-height: 80vh; overflow-y: auto;">
+                <!-- Notification Banner -->
+                <div id="marketingAlertBanner" class="d-none alert mb-3 py-2 px-3 small"></div>
+
+                <!-- KPI Row -->
+                <div class="row g-3 mb-4 text-center" id="marketingKpisRow">
+                    <div class="col-md-3 col-6">
+                        <div class="p-3 bg-white rounded-3 border shadow-sm">
+                            <div class="text-muted extra-small text-uppercase fw-bold">Birthdays This Month</div>
+                            <div class="fs-3 fw-bold text-dark mt-1" id="kpiBirthdaysThisMonth">0</div>
+                            <div class="extra-small text-muted">Eligible for Celebration</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <div class="p-3 bg-white rounded-3 border shadow-sm">
+                            <div class="text-muted extra-small text-uppercase fw-bold">Lapsed Clients (30+ Days)</div>
+                            <div class="fs-3 fw-bold text-danger mt-1" id="kpiLapsedCount">0</div>
+                            <div class="extra-small text-muted">No upcoming booking</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <div class="p-3 bg-white rounded-3 border shadow-sm">
+                            <div class="text-muted extra-small text-uppercase fw-bold">Birthdays Celebrated (2026)</div>
+                            <div class="fs-3 fw-bold text-success mt-1" id="kpiBirthdaysAwarded">0</div>
+                            <div class="extra-small text-muted">VIP Perks Granted</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <div class="p-3 bg-white rounded-3 border shadow-sm">
+                            <div class="text-muted extra-small text-uppercase fw-bold">Win-Backs Dispatched</div>
+                            <div class="fs-3 fw-bold text-primary mt-1" id="kpiWinBacksSent">0</div>
+                            <div class="extra-small text-muted">Last 30 Days</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tabs Navigation -->
+                <ul class="nav nav-pills nav-fill bg-light p-1 rounded-3 mb-3" id="marketingTab" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active fw-bold py-2 rounded-3 d-flex align-items-center justify-content-center gap-2" id="birthdays-tab" data-bs-toggle="pill" data-bs-target="#birthdaysPanel" type="button" role="tab">
+                            <i class="bi bi-cake2-fill text-warning"></i> Birthday Perks Automation
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link fw-bold py-2 rounded-3 d-flex align-items-center justify-content-center gap-2" id="winback-tab" data-bs-toggle="pill" data-bs-target="#winbackPanel" type="button" role="tab">
+                            <i class="bi bi-heart-fill text-danger"></i> Lapsed Client Retention (Win-Back)
+                        </button>
+                    </li>
+                </ul>
+
+                <div class="tab-content" id="marketingTabContent">
+                    <!-- Tab 1: Birthday Perks -->
+                    <div class="tab-pane fade show active" id="birthdaysPanel" role="tabpanel">
+                        <div class="card border-0 bg-light rounded-4 p-3 mb-3">
+                            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                <div>
+                                    <h6 class="fw-bold text-dark mb-1 d-flex align-items-center gap-2">
+                                        <i class="bi bi-gift-fill text-warning"></i> Run Birthday Celebration Campaign
+                                    </h6>
+                                    <div class="small text-muted">Auto-award VIP perk and dispatch personalized celebration SMS & Email receipt</div>
+                                </div>
+                                <div class="d-flex align-items-center gap-2">
+                                    <select class="form-select form-select-sm" id="birthdayPerkType" style="max-width: 220px;">
+                                        <option value="POINTS">⭐ 100 VIP Points ($10 Value)</option>
+                                        <option value="VOUCHER">🎁 $10 Salon Gift Voucher</option>
+                                    </select>
+                                    <button class="btn btn-warning btn-sm fw-bold px-3 text-dark d-flex align-items-center gap-1 shadow-sm" id="btnAwardAllBirthdays" onclick="dispatchAllBirthdayPerks()">
+                                        <i class="bi bi-send-fill"></i> Award Perks to All Eligible
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Birthday Table -->
+                        <div class="card border-0 shadow-sm rounded-4">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead class="table-light small text-uppercase text-secondary">
+                                    <tr>
+                                        <th>Client Name</th>
+                                        <th>Birth Date</th>
+                                        <th>Current Points</th>
+                                        <th>Celebration Status</th>
+                                        <th class="text-end">Action</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody id="birthdayTableBody">
+                                    <!-- Populated dynamically -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tab 2: Lapsed Client Win-Back -->
+                    <div class="tab-pane fade" id="winbackPanel" role="tabpanel">
+                        <div class="card border-0 bg-light rounded-4 p-3 mb-3">
+                            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                <div>
+                                    <h6 class="fw-bold text-dark mb-1 d-flex align-items-center gap-2">
+                                        <i class="bi bi-clock-history text-danger"></i> Win-Back Lapsed Clients
+                                    </h6>
+                                    <div class="small text-muted">Re-engage clients who haven't visited in 4+ weeks and don't have an upcoming appointment</div>
+                                </div>
+                                <div class="d-flex align-items-center gap-2">
+                                    <div class="d-flex align-items-center gap-1">
+                                        <label for="lapsedDaysSelect" class="extra-small fw-bold text-secondary mb-0 text-nowrap">Inactive For:</label>
+                                        <select class="form-select form-select-sm" id="lapsedDaysSelect" onchange="loadLapsedCustomers(this.value)">
+                                            <option value="21">3+ Weeks (21 Days)</option>
+                                            <option value="28">4+ Weeks (28 Days)</option>
+                                            <option value="30" selected>30 Days</option>
+                                            <option value="45">6+ Weeks (45 Days)</option>
+                                            <option value="60">2+ Months (60 Days)</option>
+                                        </select>
+                                    </div>
+                                    <button class="btn btn-danger btn-sm fw-bold px-3 d-flex align-items-center gap-1 shadow-sm" id="btnDispatchWinBackAll" onclick="dispatchAllWinBack()">
+                                        <i class="bi bi-envelope-heart-fill"></i> Dispatch Win-Back Campaign
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Lapsed Table -->
+                        <div class="card border-0 shadow-sm rounded-4">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead class="table-light small text-uppercase text-secondary">
+                                    <tr>
+                                        <th>Client Name</th>
+                                        <th>Days Inactive</th>
+                                        <th>Last Visit Date</th>
+                                        <th>Last Service</th>
+                                        <th>Retention Status</th>
+                                        <th class="text-end">Action</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody id="lapsedTableBody">
+                                    <!-- Populated dynamically -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer bg-light border-top p-3">
+                <button type="button" class="btn btn-secondary btn-sm px-4 fw-semibold" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -403,7 +592,7 @@
             tbody.innerHTML = '';
 
             if (customers.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="8" class="text-center text-muted py-4">No customers found in the database.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="9" class="text-center text-muted py-4">No customers found in the database.</td></tr>`;
                 return;
             }
 
@@ -413,6 +602,8 @@
                 const safePhone = (customer.phone || '').replace(/'/g, "\\'");
                 const safeMedicalFlags = (customer.medicalFlags || '').replace(/'/g, "\\'");
                 const safeColorFormula = (customer.colorFormula || '').replace(/'/g, "\\'");
+                const safeBirthDate = customer.birthDate || '';
+                const optOut = customer.optOutMarketing === true;
                 const points = customer.loyaltyPoints || 0;
                 const pointsVal = (points * 0.10).toFixed(2);
 
@@ -430,14 +621,27 @@
                     </span>`;
                 }
 
+                let birthdayBadge = '<span class="text-muted small fst-italic">Not set</span>';
+                if (customer.birthDate) {
+                    const [bY, bM, bD] = customer.birthDate.split('-').map(Number);
+                    const bDate = new Date(bY, bM - 1, bD);
+                    const bMonthName = bDate.toLocaleString('en-US', { month: 'short' });
+                    const isThisMonth = (new Date().getMonth() + 1) === bM;
+                    birthdayBadge = `<span class="badge ${isThisMonth ? 'bg-warning-subtle text-dark border border-warning fw-bold' : 'bg-light text-secondary border'}">
+                        <i class="bi bi-cake2-fill text-pink me-1"></i>${bMonthName} ${bD} ${isThisMonth ? '🎉' : ''}
+                    </span>`;
+                }
+
                 tbody.innerHTML += `
                     <tr>
                         <td>#${index + 1}</td>
                         <td class="fw-semibold customer-row-clickable" onclick="openCustomerHistory(${customer.id}, '${safeName}', '${safeEmail}', '${safePhone}')" title="Click to view history and audit log">
                             <i class="bi bi-person-fill text-pink me-1"></i>${customer.name || 'N/A'}
+                            ${optOut ? '<span class="badge bg-secondary-subtle text-secondary ms-1 extra-small" title="Opted out of marketing">No Promo</span>' : ''}
                         </td>
                         <td><a href="mailto:${customer.email || ''}" class="text-decoration-none">${customer.email || 'N/A'}</a></td>
                         <td><a href="tel:${customer.phone || ''}" class="text-decoration-none">${customer.phone || 'N/A'}</a></td>
+                        <td>${birthdayBadge}</td>
                         <td>
                             <span class="badge bg-warning-subtle text-dark border border-warning-subtle fw-bold">
                                 <i class="bi bi-star-fill text-warning me-1"></i>${points} pts <span class="fw-normal text-muted">($${pointsVal})</span>
@@ -449,7 +653,7 @@
                             <button class="btn btn-outline-info btn-sm me-1 fw-semibold" onclick="openCustomerHistory(${customer.id}, '${safeName}', '${safeEmail}', '${safePhone}')" title="View Appointment History & Audit Log">
                                 <i class="bi bi-clock-history me-1"></i> History
                             </button>
-                            <button class="btn btn-outline-secondary btn-sm me-1" onclick="openEditModal(${customer.id}, '${safeName}', '${safeEmail}', '${safePhone}', '${safeMedicalFlags}', '${safeColorFormula}', ${points})" title="Edit Customer">
+                            <button class="btn btn-outline-secondary btn-sm me-1" onclick="openEditModal(${customer.id}, '${safeName}', '${safeEmail}', '${safePhone}', '${safeMedicalFlags}', '${safeColorFormula}', ${points}, '${safeBirthDate}', ${optOut})" title="Edit Customer">
                                 <i class="bi bi-pencil"></i>
                             </button>
                             <button class="btn btn-outline-danger btn-sm" onclick="deleteCustomer(${customer.id})" title="Delete Customer">
@@ -461,7 +665,7 @@
             });
         } catch (error) {
             console.error('Error loading customers:', error);
-            document.getElementById('customerTableBody').innerHTML = `<tr><td colspan="8" class="text-center text-danger py-4">Error loading customer data from server.</td></tr>`;
+            document.getElementById('customerTableBody').innerHTML = `<tr><td colspan="9" class="text-center text-danger py-4">Error loading customer data from server.</td></tr>`;
         }
     }
 
@@ -481,18 +685,22 @@
         document.getElementById('customerEmail').value = '';
         document.getElementById('customerPhone').value = '';
         document.getElementById('customerLoyaltyPoints').value = '0';
+        document.getElementById('customerBirthDate').value = '';
+        document.getElementById('customerOptOutMarketing').checked = false;
         document.getElementById('customerMedicalFlags').value = '';
         document.getElementById('customerColorFormula').value = '';
         document.getElementById('modalTitle').innerText = 'Add New Customer';
         customerModalInstance.show();
     }
 
-    function openEditModal(id, name, email, phone, medicalFlags, colorFormula, loyaltyPoints) {
+    function openEditModal(id, name, email, phone, medicalFlags, colorFormula, loyaltyPoints, birthDate, optOutMarketing) {
         document.getElementById('customerId').value = id;
         document.getElementById('customerName').value = name;
         document.getElementById('customerEmail').value = email;
         document.getElementById('customerPhone').value = phone === 'undefined' ? '' : phone;
         document.getElementById('customerLoyaltyPoints').value = (loyaltyPoints !== undefined && loyaltyPoints !== null) ? loyaltyPoints : 0;
+        document.getElementById('customerBirthDate').value = (birthDate && birthDate !== 'undefined') ? birthDate : '';
+        document.getElementById('customerOptOutMarketing').checked = (optOutMarketing === true || optOutMarketing === 'true');
         document.getElementById('customerMedicalFlags').value = (medicalFlags === 'undefined' || !medicalFlags) ? '' : medicalFlags;
         document.getElementById('customerColorFormula').value = (colorFormula === 'undefined' || !colorFormula) ? '' : colorFormula;
         document.getElementById('modalTitle').innerText = 'Edit Customer';
@@ -505,6 +713,8 @@
         const email = document.getElementById('customerEmail').value.trim();
         const phone = document.getElementById('customerPhone').value.trim();
         const loyaltyPoints = parseInt(document.getElementById('customerLoyaltyPoints').value) || 0;
+        const birthDate = document.getElementById('customerBirthDate').value || null;
+        const optOutMarketing = document.getElementById('customerOptOutMarketing').checked;
         const medicalFlags = document.getElementById('customerMedicalFlags').value.trim();
         const colorFormula = document.getElementById('customerColorFormula').value.trim();
 
@@ -524,7 +734,7 @@
                     'Authorization': 'Bearer ' + token,
                     'X-Tenant-ID': activeTenant
                 },
-                body: JSON.stringify({ name, email, phone, medicalFlags, colorFormula, loyaltyPoints })
+                body: JSON.stringify({ name, email, phone, medicalFlags, colorFormula, loyaltyPoints, birthDate, optOutMarketing })
             });
 
             if (response.ok) {
@@ -548,6 +758,238 @@
             console.error('Error saving customer:', error);
             alert('Server connection error.');
         }
+    }
+
+    // --- AUTOMATED MARKETING & RETENTION HUB METHODS ---
+    let marketingModalInstance = null;
+
+    function openMarketingModal() {
+        if (!marketingModalInstance && window.bootstrap) {
+            marketingModalInstance = new bootstrap.Modal(document.getElementById('marketingModal'));
+        }
+        loadMarketingSummary();
+        loadBirthdayCustomers();
+        loadLapsedCustomers(document.getElementById('lapsedDaysSelect').value || 30);
+        marketingModalInstance.show();
+    }
+
+    async function loadMarketingSummary() {
+        try {
+            const res = await fetch('/api/admin/marketing/summary', {
+                headers: { 'Authorization': 'Bearer ' + token, 'X-Tenant-ID': activeTenant }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                document.getElementById('kpiBirthdaysThisMonth').innerText = data.birthdaysThisMonth || 0;
+                document.getElementById('kpiLapsedCount').innerText = data.lapsedCustomersCount || 0;
+                document.getElementById('kpiBirthdaysAwarded').innerText = data.birthdaysAwardedThisYear || 0;
+                document.getElementById('kpiWinBacksSent').innerText = data.winBacksSentLast30Days || 0;
+            }
+        } catch (e) {
+            console.error('Error loading marketing summary:', e);
+        }
+    }
+
+    async function loadBirthdayCustomers() {
+        const tbody = document.getElementById('birthdayTableBody');
+        tbody.innerHTML = `<tr><td colspan="5" class="text-center py-3"><div class="spinner-border spinner-border-sm text-warning me-2"></div>Loading birthdays...</td></tr>`;
+        try {
+            const res = await fetch('/api/admin/marketing/birthdays', {
+                headers: { 'Authorization': 'Bearer ' + token, 'X-Tenant-ID': activeTenant }
+            });
+            if (!res.ok) throw new Error('Failed to load birthdays');
+            const list = await res.json();
+            tbody.innerHTML = '';
+            if (list.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-4">No client birthdays found for this month. Set birth dates in client edit profiles.</td></tr>`;
+                return;
+            }
+            list.forEach(c => {
+                const statusBadge = c.awardedThisYear
+                    ? '<span class="badge bg-success-subtle text-success border border-success-subtle">✅ Celebrated for 2026</span>'
+                    : '<span class="badge bg-warning-subtle text-dark border border-warning">🎁 Eligible for Perk</span>';
+                tbody.innerHTML += `
+                    <tr>
+                        <td class="fw-bold text-dark">
+                            <i class="bi bi-person-fill text-pink me-1"></i>${c.name}
+                            ${c.email ? `<div class="extra-small text-muted">${c.email}</div>` : ''}
+                        </td>
+                        <td>
+                            <span class="badge bg-light text-dark border">
+                                <i class="bi bi-cake2-fill text-warning me-1"></i>Day ${c.dayOfMonth}
+                            </span>
+                        </td>
+                        <td><span class="fw-semibold">${c.loyaltyPoints || 0} pts</span></td>
+                        <td>${statusBadge}</td>
+                        <td class="text-end">
+                            <button class="btn btn-sm ${c.awardedThisYear ? 'btn-outline-secondary' : 'btn-warning text-dark fw-bold'} py-1 px-3 shadow-sm"
+                                    onclick="dispatchSingleBirthdayPerk(${c.id}, '${(c.name || '').replace(/'/g, "\\'")}')">
+                                ${c.awardedThisYear ? 'Re-Award Perk' : '🎉 Celebrate Client'}
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+        } catch (e) {
+            tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger py-3">Error loading birthday clients.</td></tr>`;
+        }
+    }
+
+    async function loadLapsedCustomers(days) {
+        const tbody = document.getElementById('lapsedTableBody');
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center py-3"><div class="spinner-border spinner-border-sm text-danger me-2"></div>Finding lapsed clients...</td></tr>`;
+        try {
+            const res = await fetch(`/api/admin/marketing/lapsed?days=${days || 30}`, {
+                headers: { 'Authorization': 'Bearer ' + token, 'X-Tenant-ID': activeTenant }
+            });
+            if (!res.ok) throw new Error('Failed to load lapsed customers');
+            const list = await res.json();
+            tbody.innerHTML = '';
+            if (list.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="text-center text-success py-4">🎉 Excellent! No clients are inactive past ${days || 30} days without an upcoming appointment.</td></tr>`;
+                return;
+            }
+            list.forEach(c => {
+                const reminderBadge = c.recentlyReminded
+                    ? `<span class="badge bg-info-subtle text-info-emphasis border border-info-subtle" title="Reminded recently">Reminded ${new Date(c.lastReminderSentAt).toLocaleDateString()}</span>`
+                    : '<span class="badge bg-danger-subtle text-danger border border-danger-subtle">Needs Re-engagement</span>';
+
+                tbody.innerHTML += `
+                    <tr>
+                        <td class="fw-bold text-dark">
+                            <i class="bi bi-person-fill text-pink me-1"></i>${c.name}
+                            ${c.email ? `<div class="extra-small text-muted">${c.email}</div>` : ''}
+                        </td>
+                        <td>
+                            <span class="badge bg-danger text-white fw-bold">${c.daysInactive} days</span>
+                        </td>
+                        <td class="small text-muted">${c.lastVisitDate}</td>
+                        <td class="small fw-semibold text-dark">${c.lastServiceName || 'Salon Service'}</td>
+                        <td>${reminderBadge}</td>
+                        <td class="text-end">
+                            <button class="btn btn-sm btn-outline-danger py-1 px-3 fw-bold shadow-sm"
+                                    onclick="dispatchSingleWinBack(${c.id}, '${(c.name || '').replace(/'/g, "\\'")}')">
+                                <i class="bi bi-send me-1"></i> Send Win-Back
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+        } catch (e) {
+            tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger py-3">Error finding lapsed clients.</td></tr>`;
+        }
+    }
+
+    async function dispatchAllBirthdayPerks() {
+        const perkType = document.getElementById('birthdayPerkType').value;
+        const btn = document.getElementById('btnAwardAllBirthdays');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Celebrating...';
+
+        try {
+            const res = await fetch('/api/admin/marketing/birthdays/dispatch', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + token,
+                    'X-Tenant-ID': activeTenant
+                },
+                body: JSON.stringify({ perkType: perkType })
+            });
+            const data = await res.json();
+            showMarketingAlert(data.message || 'Birthday perks dispatched successfully!', 'success');
+            loadMarketingSummary();
+            loadBirthdayCustomers();
+            loadCustomers();
+        } catch (e) {
+            showMarketingAlert('Failed to dispatch birthday perks: ' + e.message, 'danger');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-send-fill me-1"></i> Award Perks to All Eligible';
+        }
+    }
+
+    async function dispatchSingleBirthdayPerk(customerId, customerName) {
+        const perkType = document.getElementById('birthdayPerkType').value;
+        if (!confirm(`Award birthday perk to ${customerName}?`)) return;
+
+        try {
+            const res = await fetch('/api/admin/marketing/birthdays/dispatch', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + token,
+                    'X-Tenant-ID': activeTenant
+                },
+                body: JSON.stringify({ perkType: perkType, customerId: customerId })
+            });
+            const data = await res.json();
+            showMarketingAlert(data.message || `Awarded birthday perk to ${customerName}!`, 'success');
+            loadMarketingSummary();
+            loadBirthdayCustomers();
+            loadCustomers();
+        } catch (e) {
+            showMarketingAlert('Failed: ' + e.message, 'danger');
+        }
+    }
+
+    async function dispatchAllWinBack() {
+        const days = parseInt(document.getElementById('lapsedDaysSelect').value) || 30;
+        const btn = document.getElementById('btnDispatchWinBackAll');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Sending Campaign...';
+
+        try {
+            const res = await fetch('/api/admin/marketing/win-back/dispatch', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + token,
+                    'X-Tenant-ID': activeTenant
+                },
+                body: JSON.stringify({ daysThreshold: days })
+            });
+            const data = await res.json();
+            showMarketingAlert(data.message || 'Win-back campaign dispatched!', 'success');
+            loadMarketingSummary();
+            loadLapsedCustomers(days);
+        } catch (e) {
+            showMarketingAlert('Failed to dispatch win-back campaign: ' + e.message, 'danger');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-envelope-heart-fill me-1"></i> Dispatch Win-Back Campaign';
+        }
+    }
+
+    async function dispatchSingleWinBack(customerId, customerName) {
+        if (!confirm(`Send win-back retention reminder to ${customerName}?`)) return;
+        try {
+            const res = await fetch('/api/admin/marketing/win-back/dispatch', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + token,
+                    'X-Tenant-ID': activeTenant
+                },
+                body: JSON.stringify({ customerIds: [customerId] })
+            });
+            const data = await res.json();
+            showMarketingAlert(data.message || `Sent win-back reminder to ${customerName}!`, 'success');
+            loadMarketingSummary();
+            loadLapsedCustomers(document.getElementById('lapsedDaysSelect').value || 30);
+        } catch (e) {
+            showMarketingAlert('Failed: ' + e.message, 'danger');
+        }
+    }
+
+    function showMarketingAlert(msg, type) {
+        const banner = document.getElementById('marketingAlertBanner');
+        banner.className = `alert alert-${type} mb-3 py-2 px-3 small d-flex align-items-center justify-content-between`;
+        banner.innerHTML = `<span>${msg}</span><button type="button" class="btn-close btn-close-sm" onclick="this.parentElement.classList.add('d-none')"></button>`;
+        banner.classList.remove('d-none');
+        setTimeout(() => {
+            if (banner) banner.classList.add('d-none');
+        }, 5000);
     }
 
     async function deleteCustomer(id) {
@@ -689,6 +1131,29 @@
             </div>
         `;
 
+        let birthdayCardHtml = '';
+        if (customer.birthDate) {
+            const [bY, bM, bD] = customer.birthDate.split('-').map(Number);
+            const bDate = new Date(bY, bM - 1, bD);
+            const bMonthName = bDate.toLocaleString('en-US', { month: 'long' });
+            birthdayCardHtml = `
+                <div class="card border-0 bg-light rounded-4 p-3 mb-3 border">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="small fw-bold text-dark d-flex align-items-center gap-1">
+                            <i class="bi bi-cake2-fill text-pink"></i> Client Birthday & Retention
+                        </span>
+                        ${customer.optOutMarketing ? '<span class="badge bg-secondary">Opted Out Marketing</span>' : '<span class="badge bg-success-subtle text-success border">Opted-In</span>'}
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mt-1">
+                        <div class="fw-bold text-dark fs-6">🎂 ${bMonthName} ${bD}</div>
+                        <div class="extra-small text-muted">
+                            ${customer.lastBirthdayPerkYear ? `Celebrated for ${customer.lastBirthdayPerkYear}` : 'Eligible for birthday perk'}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
         let riskBannerHtml = '';
         if (hasRisk) {
             riskBannerHtml = `
@@ -801,6 +1266,7 @@
             ${medicalBannerHtml}
             ${formulaCardHtml}
             ${loyaltyCardHtml}
+            ${birthdayCardHtml}
             ${riskBannerHtml}
             ${reliabilityPillsHtml}
             <div class="d-flex justify-content-between align-items-center mb-2">

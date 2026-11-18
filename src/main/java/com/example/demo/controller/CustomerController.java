@@ -132,6 +132,12 @@ public class CustomerController {
         if (updatedCustomer.getLoyaltyPoints() != null) {
             existing.setLoyaltyPoints(Math.max(0, updatedCustomer.getLoyaltyPoints()));
         }
+        if (updatedCustomer.getBirthDate() != null) {
+            existing.setBirthDate(updatedCustomer.getBirthDate());
+        }
+        if (updatedCustomer.getOptOutMarketing() != null) {
+            existing.setOptOutMarketing(updatedCustomer.getOptOutMarketing());
+        }
 
         customerService.saveCustomer(existing);
         return ResponseEntity.ok(existing);

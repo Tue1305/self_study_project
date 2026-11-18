@@ -32,6 +32,18 @@ public class Customer {
     @Column(name = "loyalty_points", nullable = false)
     private Integer loyaltyPoints = 0;
 
+    @Column(name = "birth_date")
+    private java.time.LocalDate birthDate;
+
+    @Column(name = "last_birthday_perk_year")
+    private Integer lastBirthdayPerkYear;
+
+    @Column(name = "last_retention_reminder_sent_at")
+    private java.time.LocalDateTime lastRetentionReminderSentAt;
+
+    @Column(name = "opt_out_marketing", nullable = false)
+    private Boolean optOutMarketing = false;
+
     public Customer() {}
 
     public Customer(String name, String email, String phone) {
@@ -71,4 +83,16 @@ public class Customer {
 
     public Integer getLoyaltyPoints() { return loyaltyPoints != null ? loyaltyPoints : 0; }
     public void setLoyaltyPoints(Integer loyaltyPoints) { this.loyaltyPoints = loyaltyPoints != null ? loyaltyPoints : 0; }
+
+    public java.time.LocalDate getBirthDate() { return birthDate; }
+    public void setBirthDate(java.time.LocalDate birthDate) { this.birthDate = birthDate; }
+
+    public Integer getLastBirthdayPerkYear() { return lastBirthdayPerkYear; }
+    public void setLastBirthdayPerkYear(Integer lastBirthdayPerkYear) { this.lastBirthdayPerkYear = lastBirthdayPerkYear; }
+
+    public java.time.LocalDateTime getLastRetentionReminderSentAt() { return lastRetentionReminderSentAt; }
+    public void setLastRetentionReminderSentAt(java.time.LocalDateTime lastRetentionReminderSentAt) { this.lastRetentionReminderSentAt = lastRetentionReminderSentAt; }
+
+    public Boolean getOptOutMarketing() { return optOutMarketing != null ? optOutMarketing : false; }
+    public void setOptOutMarketing(Boolean optOutMarketing) { this.optOutMarketing = optOutMarketing != null ? optOutMarketing : false; }
 }

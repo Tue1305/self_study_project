@@ -112,16 +112,23 @@ public class BookingRequestDto {
             this.serviceStaffAssignments = new java.util.HashMap<>();
             if (rawAssignments != null) {
                 for (java.util.Map.Entry<?, ?> entry : rawAssignments.entrySet()) {
-                    if (entry.getKey() != null && entry.getValue() != null) {
-                        try {
-                            String valStr = String.valueOf(entry.getValue()).trim();
-                            if (!valStr.isBlank() && !"anyone".equalsIgnoreCase(valStr) && !"null".equalsIgnoreCase(valStr)) {
-                                long parsed = Long.parseLong(valStr);
-                                if (parsed > 0) {
-                                    this.serviceStaffAssignments.put(String.valueOf(entry.getKey()), parsed);
+                    if (entry.getKey() != null) {
+                        String k = String.valueOf(entry.getKey()).trim();
+                        if (entry.getValue() == null) {
+                            this.serviceStaffAssignments.put(k, null);
+                        } else {
+                            try {
+                                String valStr = String.valueOf(entry.getValue()).trim();
+                                if (valStr.isBlank() || "anyone".equalsIgnoreCase(valStr) || "null".equalsIgnoreCase(valStr)) {
+                                    this.serviceStaffAssignments.put(k, null);
+                                } else {
+                                    long parsed = Long.parseLong(valStr);
+                                    this.serviceStaffAssignments.put(k, parsed > 0 ? parsed : null);
                                 }
+                            } catch (Exception e) {
+                                this.serviceStaffAssignments.put(k, null);
                             }
-                        } catch (Exception ignored) {}
+                        }
                     }
                 }
             }
@@ -227,16 +234,23 @@ public class BookingRequestDto {
         this.serviceStaffAssignments = new java.util.HashMap<>();
         if (rawAssignments != null) {
             for (java.util.Map.Entry<?, ?> entry : rawAssignments.entrySet()) {
-                if (entry.getKey() != null && entry.getValue() != null) {
-                    try {
-                        String valStr = String.valueOf(entry.getValue()).trim();
-                        if (!valStr.isBlank() && !"anyone".equalsIgnoreCase(valStr) && !"null".equalsIgnoreCase(valStr)) {
-                            long parsed = Long.parseLong(valStr);
-                            if (parsed > 0) {
-                                this.serviceStaffAssignments.put(String.valueOf(entry.getKey()), parsed);
+                if (entry.getKey() != null) {
+                    String k = String.valueOf(entry.getKey()).trim();
+                    if (entry.getValue() == null) {
+                        this.serviceStaffAssignments.put(k, null);
+                    } else {
+                        try {
+                            String valStr = String.valueOf(entry.getValue()).trim();
+                            if (valStr.isBlank() || "anyone".equalsIgnoreCase(valStr) || "null".equalsIgnoreCase(valStr)) {
+                                this.serviceStaffAssignments.put(k, null);
+                            } else {
+                                long parsed = Long.parseLong(valStr);
+                                this.serviceStaffAssignments.put(k, parsed > 0 ? parsed : null);
                             }
+                        } catch (Exception e) {
+                            this.serviceStaffAssignments.put(k, null);
                         }
-                    } catch (Exception ignored) {}
+                    }
                 }
             }
         }

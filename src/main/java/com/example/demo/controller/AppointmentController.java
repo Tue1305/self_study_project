@@ -592,6 +592,7 @@ public class AppointmentController {
                 if (bList != null && bList.stream().anyMatch(b -> Boolean.FALSE.equals(b.get("available")))) {
                     Map<String, Object> sc = new LinkedHashMap<>();
                     sc.put("time", s.get("label"));
+                    sc.put("value", s.get("value"));
                     sc.put("timeRangeLabel", s.get("timeRangeLabel"));
                     sc.put("staffBookedDesc", s.get("staffBookedDesc"));
                     sc.put("reason", s.get("reason"));
@@ -781,7 +782,22 @@ public class AppointmentController {
                 ? a.getService().getDurationMinutes()
                 : 45;
         LocalDateTime apptBusyEnd = apptStart.plusMinutes(apptDuration + Math.max(0, bufferMinutes));
-        return slotStart.isBefore(apptBusyEnd) && slotEnd.isAfter(apptStart);
+
+        // Direct overlap: candidate slot overlaps existing appointment busy window
+        if (slotStart.isBefore(apptBusyEnd) && slotEnd.isAfter(apptStart)) {
+            return true;
+        }
+
+        // Insufficient lead-time buffer: if candidate slot starts within 15 minutes before an existing appointment,
+        // it is impossible for the technician to complete a viable session and prepare for the next client.
+        if (bufferMinutes > 0 && slotStart.isBefore(apptStart)) {
+            long minutesUntilAppt = java.time.Duration.between(slotStart, apptStart).toMinutes();
+            if (minutesUntilAppt <= 15) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private boolean isTechBusyAtWindow(

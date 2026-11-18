@@ -51,6 +51,8 @@ class PosFinancialControllerTest {
     @Mock
     private com.example.demo.repository.EodRegisterCloseRepository eodRegisterCloseRepository;
 
+    private final com.example.demo.security.JwtUtil jwtUtil = new com.example.demo.security.JwtUtil();
+
     private MockMvc mockMvc;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -68,7 +70,8 @@ class PosFinancialControllerTest {
                 userRepository,
                 giftCardRepository,
                 eodRegisterCloseRepository,
-                null
+                null,
+                jwtUtil
         );
         mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
     }
@@ -508,6 +511,8 @@ class PosFinancialControllerTest {
                         .content(objectMapper.writeValueAsString(java.util.Map.of("password", "admin123"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.token").isString())
+                .andExpect(jsonPath("$.accessToken").isString())
                 .andExpect(jsonPath("$.ownerName").exists());
     }
 

@@ -67,6 +67,10 @@ public class JwtUtil {
         return createToken(userDetails.getUsername(), role, tenantId);
     }
 
+    public String generateToken(String subject, String role, String tenantId) {
+        return createToken(subject, role, tenantId);
+    }
+
     private String createToken(String subject, String role) {
         return createToken(subject, role, "default");
     }

@@ -424,7 +424,7 @@
     let selectedEodDate = new Date().toISOString().split('T')[0];
 
     function getAuthToken() {
-        return localStorage.getItem('token') || localStorage.getItem('jwt_token') || '';
+        return localStorage.getItem('accessToken') || localStorage.getItem('token') || localStorage.getItem('jwt_token') || sessionStorage.getItem('accessToken') || '';
     }
 
     function getActiveTenant() {
@@ -498,8 +498,14 @@
                 body: JSON.stringify({ password: password })
             });
 
-            const data = await res.json();
+            const data = await res.json().catch(() => ({ success: false, message: 'Invalid server response.' }));
             if (res.ok && data.success) {
+                if (data.token || data.accessToken) {
+                    localStorage.setItem('accessToken', data.token || data.accessToken);
+                    if (!localStorage.getItem('userRole')) {
+                        localStorage.setItem('userRole', 'ROLE_ADMIN');
+                    }
+                }
                 sessionStorage.setItem('eod_owner_verified', 'true');
                 sessionStorage.setItem('eod_owner_name', data.ownerName || 'Store Owner');
 

@@ -13,6 +13,7 @@ import com.example.demo.repository.CustomerRepository;
 import com.example.demo.repository.EodRegisterCloseRepository;
 import com.example.demo.repository.GiftCardRepository;
 import com.example.demo.repository.UserRepository;
+import com.example.demo.security.JwtUtil;
 import com.example.demo.service.AppointmentAuditService;
 import com.example.demo.service.NotificationService;
 import com.example.demo.service.TenantContextResolver;
@@ -54,6 +55,7 @@ public class PosFinancialController {
     private final GiftCardRepository giftCardRepository;
     private final EodRegisterCloseRepository eodRegisterCloseRepository;
     private final PasswordEncoder passwordEncoder;
+    private final JwtUtil jwtUtil;
 
     @Autowired
     public PosFinancialController(
@@ -67,7 +69,8 @@ public class PosFinancialController {
             @Autowired(required = false) UserRepository userRepository,
             @Autowired(required = false) GiftCardRepository giftCardRepository,
             @Autowired(required = false) EodRegisterCloseRepository eodRegisterCloseRepository,
-            @Autowired(required = false) PasswordEncoder passwordEncoder
+            @Autowired(required = false) PasswordEncoder passwordEncoder,
+            @Autowired(required = false) JwtUtil jwtUtil
     ) {
         this.transactionRepository = transactionRepository;
         this.appointmentRepository = appointmentRepository;
@@ -80,6 +83,23 @@ public class PosFinancialController {
         this.giftCardRepository = giftCardRepository;
         this.eodRegisterCloseRepository = eodRegisterCloseRepository;
         this.passwordEncoder = passwordEncoder;
+        this.jwtUtil = jwtUtil;
+    }
+
+    public PosFinancialController(
+            AppointmentTransactionRepository transactionRepository,
+            AppointmentRepository appointmentRepository,
+            CustomerRepository customerRepository,
+            TenantContextResolver tenantContextResolver,
+            AppointmentAuditService auditService,
+            NotificationService notificationService,
+            ObjectMapper objectMapper,
+            UserRepository userRepository,
+            GiftCardRepository giftCardRepository,
+            EodRegisterCloseRepository eodRegisterCloseRepository,
+            PasswordEncoder passwordEncoder
+    ) {
+        this(transactionRepository, appointmentRepository, customerRepository, tenantContextResolver, auditService, notificationService, objectMapper, userRepository, giftCardRepository, eodRegisterCloseRepository, passwordEncoder, null);
     }
 
     public PosFinancialController(
@@ -444,6 +464,7 @@ public class PosFinancialController {
      * to the End-of-Day Register Closing and Staff Commission Payouts.
      */
     @PostMapping("/verify-owner-password")
+    @PreAuthorize("permitAll()")
     public ResponseEntity<?> verifyOwnerPassword(
             @RequestBody(required = false) Map<String, String> body,
             HttpServletRequest request
@@ -511,12 +532,29 @@ public class PosFinancialController {
         }
 
         if (passwordValid) {
-            return ResponseEntity.ok(Map.of(
-                    "success", true,
-                    "message", "Owner password verified successfully.",
-                    "ownerName", verifiedOwnerName,
-                    "verifiedAt", LocalDateTime.now().toString()
-            ));
+            String adminUsername = "admin";
+            if (verifiedOwnerName != null && !verifiedOwnerName.isBlank()
+                    && !"Store Owner".equalsIgnoreCase(verifiedOwnerName)
+                    && !"Salon Administrator".equalsIgnoreCase(verifiedOwnerName)) {
+                adminUsername = verifiedOwnerName;
+            }
+            String token = null;
+            if (jwtUtil != null) {
+                try {
+                    token = jwtUtil.generateToken(adminUsername, "ROLE_ADMIN", tenantId);
+                } catch (Exception ignored) {}
+            }
+
+            Map<String, Object> resp = new HashMap<>();
+            resp.put("success", true);
+            resp.put("message", "Owner password verified successfully.");
+            resp.put("ownerName", verifiedOwnerName);
+            resp.put("verifiedAt", LocalDateTime.now().toString());
+            if (token != null) {
+                resp.put("token", token);
+                resp.put("accessToken", token);
+            }
+            return ResponseEntity.ok(resp);
         }
 
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(

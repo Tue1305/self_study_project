@@ -1,9 +1,12 @@
 package com.example.demo.controller;
 
 import com.example.demo.entity.GiftCard;
+import com.example.demo.repository.AppointmentTransactionRepository;
 import com.example.demo.repository.GiftCardRepository;
+import com.example.demo.service.NotificationService;
 import com.example.demo.service.TenantContextResolver;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
@@ -12,9 +15,7 @@ import org.springframework.web.bind.annotation.*;
 import java.math.BigDecimal;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 @RestController
 @RequestMapping("/api/gift-cards")
@@ -22,11 +23,25 @@ public class GiftCardController {
 
     private final GiftCardRepository giftCardRepository;
     private final TenantContextResolver tenantContextResolver;
+    private final NotificationService notificationService;
+    private final AppointmentTransactionRepository appointmentTransactionRepository;
     private final SecureRandom random = new SecureRandom();
 
-    public GiftCardController(GiftCardRepository giftCardRepository, TenantContextResolver tenantContextResolver) {
+    @Autowired
+    public GiftCardController(
+            GiftCardRepository giftCardRepository,
+            TenantContextResolver tenantContextResolver,
+            @Autowired(required = false) NotificationService notificationService,
+            @Autowired(required = false) AppointmentTransactionRepository appointmentTransactionRepository
+    ) {
         this.giftCardRepository = giftCardRepository;
         this.tenantContextResolver = tenantContextResolver;
+        this.notificationService = notificationService;
+        this.appointmentTransactionRepository = appointmentTransactionRepository;
+    }
+
+    public GiftCardController(GiftCardRepository giftCardRepository, TenantContextResolver tenantContextResolver) {
+        this(giftCardRepository, tenantContextResolver, null, null);
     }
 
     /**
@@ -85,6 +100,94 @@ public class GiftCardController {
     }
 
     /**
+     * Public Digital Gift Card Purchase Endpoint (Online Storefront).
+     * Creates an active gift card and dispatches e-gift voucher to recipient & receipt to purchaser.
+     */
+    @PostMapping("/purchase")
+    @Transactional
+    public ResponseEntity<?> purchaseGiftCard(@RequestBody Map<String, Object> body, HttpServletRequest request) {
+        String tenantId = tenantContextResolver.resolveTenantId(request);
+
+        BigDecimal amount = BigDecimal.ZERO;
+        if (body.get("amount") != null) {
+            try {
+                amount = new BigDecimal(String.valueOf(body.get("amount")).trim());
+            } catch (Exception ignored) {}
+        } else if (body.get("initialBalance") != null) {
+            try {
+                amount = new BigDecimal(String.valueOf(body.get("initialBalance")).trim());
+            } catch (Exception ignored) {}
+        }
+
+        if (amount.compareTo(new BigDecimal("5.00")) < 0) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Gift card amount must be at least $5.00."));
+        }
+
+        String purchaserName = body.get("purchaserName") != null ? String.valueOf(body.get("purchaserName")).trim() : "";
+        String purchaserEmail = body.get("purchaserEmail") != null ? String.valueOf(body.get("purchaserEmail")).trim() : "";
+        String recipientName = body.get("recipientName") != null ? String.valueOf(body.get("recipientName")).trim() : "";
+        String recipientEmail = body.get("recipientEmail") != null ? String.valueOf(body.get("recipientEmail")).trim() : "";
+        String personalMessage = body.get("personalMessage") != null ? String.valueOf(body.get("personalMessage")).trim() : "";
+        String theme = body.get("theme") != null ? String.valueOf(body.get("theme")).trim().toUpperCase() : "CLASSIC";
+        String paymentMethod = body.get("paymentMethod") != null ? String.valueOf(body.get("paymentMethod")).trim().toUpperCase() : "CARD";
+
+        if (purchaserName.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Your name (purchaser) is required."));
+        }
+        if (purchaserEmail.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Your email (purchaser) is required."));
+        }
+        if (recipientName.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Recipient name is required."));
+        }
+        if (recipientEmail.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Recipient email is required."));
+        }
+
+        String code = generateUniqueCode(tenantId);
+        GiftCard gc = new GiftCard(tenantId, code, amount);
+        gc.setPurchaserName(purchaserName);
+        gc.setPurchaserEmail(purchaserEmail);
+        gc.setRecipientName(recipientName);
+        gc.setRecipientEmail(recipientEmail);
+
+        StringBuilder notesBuilder = new StringBuilder();
+        notesBuilder.append("[Theme: ").append(theme).append("]");
+        if (!personalMessage.isBlank()) {
+            notesBuilder.append(" [Message: ").append(personalMessage).append("]");
+        }
+        notesBuilder.append(" [Paid by: ").append(paymentMethod).append("]");
+        gc.setNotes(notesBuilder.toString());
+
+        GiftCard saved = giftCardRepository.save(gc);
+
+        // Send notifications
+        if (notificationService != null) {
+            try {
+                notificationService.sendGiftCardPurchaseNotification(saved, personalMessage, theme, tenantId);
+            } catch (Exception e) {
+                System.err.println("Failed to send gift card email: " + e.getMessage());
+            }
+        }
+
+        Map<String, Object> responseMap = new LinkedHashMap<>();
+        responseMap.put("success", true);
+        responseMap.put("message", "Gift card purchased successfully!");
+        responseMap.put("giftCard", saved);
+        responseMap.put("code", saved.getCode());
+        responseMap.put("initialBalance", saved.getInitialBalance());
+        responseMap.put("currentBalance", saved.getCurrentBalance());
+        responseMap.put("recipientName", saved.getRecipientName());
+        responseMap.put("recipientEmail", saved.getRecipientEmail());
+        responseMap.put("purchaserName", saved.getPurchaserName());
+        responseMap.put("theme", theme);
+        responseMap.put("personalMessage", personalMessage);
+        responseMap.put("createdAt", saved.getCreatedAt() != null ? saved.getCreatedAt().toString() : "");
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(responseMap);
+    }
+
+    /**
      * List all gift cards for the active tenant
      */
     @GetMapping
@@ -119,15 +222,36 @@ public class GiftCardController {
         }
 
         boolean isValid = "ACTIVE".equalsIgnoreCase(gc.getStatus()) && gc.getCurrentBalance().compareTo(BigDecimal.ZERO) > 0;
-        return ResponseEntity.ok(Map.of(
-                "valid", isValid,
-                "code", gc.getCode(),
-                "status", gc.getStatus(),
-                "currentBalance", gc.getCurrentBalance(),
-                "initialBalance", gc.getInitialBalance(),
-                "recipientName", gc.getRecipientName() != null ? gc.getRecipientName() : "",
-                "expiresAt", gc.getExpiresAt() != null ? gc.getExpiresAt().toString() : ""
-        ));
+
+        List<Map<String, Object>> redemptions = List.of();
+        if (appointmentTransactionRepository != null) {
+            try {
+                List<com.example.demo.entity.AppointmentTransaction> txList =
+                        appointmentTransactionRepository.findAllByTenantIdAndGiftCardCodeOrderByCreatedAtDesc(tenantId, gc.getCode());
+                redemptions = txList.stream().map(tx -> Map.<String, Object>of(
+                        "transactionId", tx.getId(),
+                        "appointmentId", tx.getAppointmentId() != null ? tx.getAppointmentId() : 0L,
+                        "amountRedeemed", tx.getGiftCardAmount(),
+                        "totalPaid", tx.getTotalAmount(),
+                        "date", tx.getCreatedAt() != null ? tx.getCreatedAt().toString() : ""
+                )).toList();
+            } catch (Exception ignored) {}
+        }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("valid", isValid);
+        response.put("code", gc.getCode());
+        response.put("status", gc.getStatus());
+        response.put("currentBalance", gc.getCurrentBalance());
+        response.put("initialBalance", gc.getInitialBalance());
+        response.put("recipientName", gc.getRecipientName() != null ? gc.getRecipientName() : "");
+        response.put("purchaserName", gc.getPurchaserName() != null ? gc.getPurchaserName() : "");
+        response.put("createdAt", gc.getCreatedAt() != null ? gc.getCreatedAt().toString() : "");
+        response.put("expiresAt", gc.getExpiresAt() != null ? gc.getExpiresAt().toString() : "");
+        response.put("notes", gc.getNotes() != null ? gc.getNotes() : "");
+        response.put("redemptions", redemptions);
+
+        return ResponseEntity.ok(response);
     }
 
     /**

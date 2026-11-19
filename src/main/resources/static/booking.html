@@ -1729,6 +1729,7 @@
                 <a href="/" class="nav-link fw-semibold text-dark">Home</a>
                 <a href="/dashboard" class="nav-link fw-semibold text-dark">Showcase</a>
                 <a href="/services" class="nav-link fw-semibold text-dark">Services</a>
+                <a href="/gift-cards" class="nav-link fw-semibold text-dark">Gift Cards</a>
                 <a href="/book" class="nav-btn-book"><i class="bi bi-calendar2-check-fill"></i>Book Now</a>
                 ${adminLinkHtml}
                 <a href="/profile" class="nav-link fw-semibold text-dark">Profile</a>
@@ -1771,6 +1772,7 @@
                 <a href="/" class="nav-link fw-semibold text-dark">Home</a>
                 <a href="/dashboard" class="nav-link fw-semibold text-dark">Showcase</a>
                 <a href="/services" class="nav-link fw-semibold text-dark">Services</a>
+                <a href="/gift-cards" class="nav-link fw-semibold text-dark">Gift Cards</a>
                 <a href="/book" class="nav-btn-book"><i class="bi bi-calendar2-check-fill"></i>Book Now</a>
             `;
         }
@@ -1782,6 +1784,25 @@
             if (notesInput && !notesInput.value) {
                 notesInput.value = `Requested: ${selectedDesign}`;
                 if (bookingState.guests[0]) bookingState.guests[0].notes = `Requested: ${selectedDesign}`;
+            }
+        }
+
+        // Check for Gift Card Code passed in URL (e.g., from Gift Card balance checker or purchase voucher)
+        const urlParams = new URLSearchParams(window.location.search);
+        const gcParam = urlParams.get('giftCard') || urlParams.get('gc');
+        if (gcParam) {
+            const cleanGc = gcParam.trim().toUpperCase();
+            const notesInput = document.getElementById('appointmentNotes');
+            if (notesInput) {
+                const gcText = `[Gift Card: ${cleanGc}]`;
+                if (!notesInput.value.includes(cleanGc)) {
+                    notesInput.value = notesInput.value ? `${notesInput.value} ${gcText}` : gcText;
+                    if (bookingState.guests[0]) bookingState.guests[0].notes = notesInput.value;
+                }
+            }
+            const banner = document.getElementById('selectedDesignBanner');
+            if (banner && !selectedDesign) {
+                banner.textContent = `Applying Gift Card Voucher: ${cleanGc}`;
             }
         }
     }

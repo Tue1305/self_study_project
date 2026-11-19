@@ -7,9 +7,9 @@ const TenantTheme = (function() {
 
     function resolveTenantId() {
         try {
-            // 1. Check path slug for public booking routes: /book/{tenantSlug} or /booking/{tenantSlug}
+            // 1. Check path slug for public booking routes: /book/{tenantSlug}, /booking/{tenantSlug}, /gift-cards/{tenantSlug}, /giftcards/{tenantSlug}
             const path = window.location.pathname || '';
-            const slugMatch = path.match(/^\/(?:book|booking)\/([a-zA-Z0-9_-]+)/i);
+            const slugMatch = path.match(/^\/(?:book|booking|gift-cards|giftcards)\/([a-zA-Z0-9_-]+)/i);
             if (slugMatch && slugMatch[1]) {
                 const candidate = slugMatch[1].trim().toLowerCase();
                 // Exclude system keywords if any

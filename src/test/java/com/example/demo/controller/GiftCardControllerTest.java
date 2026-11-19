@@ -194,4 +194,75 @@ class GiftCardControllerTest {
                 .andExpect(jsonPath("$.message").value("Gift card status updated."))
                 .andExpect(jsonPath("$.giftCard.status").value("DEPLETED"));
     }
+
+    @Test
+    void testPurchaseGiftCardSuccess() throws Exception {
+        when(giftCardRepository.existsByTenantIdAndCodeIgnoreCase(eq("default"), any())).thenReturn(false);
+        when(giftCardRepository.save(any(GiftCard.class))).thenAnswer(inv -> {
+            GiftCard gc = inv.getArgument(0);
+            gc.setId(25L);
+            return gc;
+        });
+
+        Map<String, Object> body = Map.of(
+                "amount", 75.00,
+                "purchaserName", "Jessica Day",
+                "purchaserEmail", "jess@example.com",
+                "recipientName", "Cece Parekh",
+                "recipientEmail", "cece@example.com",
+                "personalMessage", "Treat yourself to a deluxe mani-pedi!",
+                "theme", "BIRTHDAY",
+                "paymentMethod", "CARD"
+        );
+
+        mockMvc.perform(post("/api/gift-cards/purchase")
+                        .header("X-Tenant-ID", "default")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(body)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.initialBalance").value(75.00))
+                .andExpect(jsonPath("$.currentBalance").value(75.00))
+                .andExpect(jsonPath("$.recipientName").value("Cece Parekh"))
+                .andExpect(jsonPath("$.purchaserName").value("Jessica Day"))
+                .andExpect(jsonPath("$.code").isNotEmpty());
+
+        verify(giftCardRepository).save(any(GiftCard.class));
+    }
+
+    @Test
+    void testPurchaseGiftCardInvalidAmountFails() throws Exception {
+        Map<String, Object> body = Map.of(
+                "amount", 2.00, // Less than $5.00 minimum
+                "purchaserName", "Jessica",
+                "purchaserEmail", "jess@example.com",
+                "recipientName", "Cece",
+                "recipientEmail", "cece@example.com"
+        );
+
+        mockMvc.perform(post("/api/gift-cards/purchase")
+                        .header("X-Tenant-ID", "default")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(body)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Gift card amount must be at least $5.00."));
+    }
+
+    @Test
+    void testPurchaseGiftCardMissingFieldsFails() throws Exception {
+        Map<String, Object> body = Map.of(
+                "amount", 50.00,
+                "purchaserName", "", // Missing
+                "purchaserEmail", "jess@example.com",
+                "recipientName", "Cece",
+                "recipientEmail", "cece@example.com"
+        );
+
+        mockMvc.perform(post("/api/gift-cards/purchase")
+                        .header("X-Tenant-ID", "default")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(body)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Your name (purchaser) is required."));
+    }
 }

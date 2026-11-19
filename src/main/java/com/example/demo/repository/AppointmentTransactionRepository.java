@@ -23,4 +23,7 @@ public interface AppointmentTransactionRepository extends JpaRepository<Appointm
 
     List<AppointmentTransaction> findAllByTenantIdAndCustomerIdOrderByCreatedAtDesc(
             String tenantId, Long customerId);
+
+    List<AppointmentTransaction> findAllByTenantIdAndGiftCardCodeOrderByCreatedAtDesc(
+            String tenantId, String giftCardCode);
 }

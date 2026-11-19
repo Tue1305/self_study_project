@@ -1,0 +1,1217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>E-Gift Cards & Balance Checker</title>
+    <!-- Favicon Tag -->
+    <link rel="icon" type="image/x-icon" href="/favicon.ico?v=2">
+
+    <!-- Synchronous Zero-Delay Tenant Theme Preloader -->
+    <script src="/js/tenant-theme.js"></script>
+    <style id="tenant-theme-vars">
+        :root {
+            --primary-color: #e91e63;
+            --secondary-color: #343a40;
+            --bs-primary-pink: #e91e63;
+            --bs-primary-pink-hover: #d81b60;
+            --bs-soft-pink: #fce4ec;
+            --bs-secondary-accent: #343a40;
+            --bs-secondary-color: #343a40;
+            --tenant-font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+            --font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        }
+        :root, html, body {
+            transition: none !important;
+        }
+    </style>
+
+    <!-- Bootstrap 5.3 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+
+    <style>
+        body {
+            font-family: var(--font-family, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif);
+            background-color: #f8f9fa;
+        }
+        .text-pink { color: var(--bs-primary-pink) !important; }
+        .bg-pink { background-color: var(--bs-primary-pink) !important; }
+        .btn-pink {
+            background-color: var(--bs-primary-pink);
+            color: #fff;
+            border: none;
+            transition: all 0.2s ease-in-out;
+        }
+        .btn-pink:hover, .btn-pink:focus {
+            background-color: var(--bs-primary-pink-hover);
+            color: #fff;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(233, 30, 99, 0.25);
+        }
+        .btn-outline-pink {
+            color: var(--bs-primary-pink);
+            border-color: var(--bs-primary-pink);
+        }
+        .btn-outline-pink:hover {
+            background-color: var(--bs-primary-pink);
+            color: #fff;
+        }
+
+        /* Nav Book Button */
+        .nav-btn-book {
+            background: linear-gradient(135deg, #e91e63, #ff4081) !important;
+            color: #ffffff !important;
+            font-weight: 700 !important;
+            padding: 0.5rem 1.35rem !important;
+            border-radius: 50rem !important;
+            box-shadow: 0 4px 14px rgba(233, 30, 99, 0.35) !important;
+            transition: all 0.25s ease-in-out !important;
+            border: none !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            gap: 0.35rem !important;
+            text-decoration: none !important;
+        }
+        .nav-btn-book:hover {
+            transform: translateY(-2px) scale(1.03) !important;
+            box-shadow: 0 6px 20px rgba(233, 30, 99, 0.45) !important;
+            color: #ffffff !important;
+        }
+
+        .user-badge-link {
+            text-decoration: none;
+            transition: all 0.2s ease-in-out;
+            cursor: pointer;
+        }
+        .user-badge-link:hover {
+            transform: translateY(-1px);
+            background-color: #f8d7da !important;
+            box-shadow: 0 2px 5px rgba(233, 30, 99, 0.15);
+        }
+
+        /* Custom Tabs */
+        .nav-pills-custom .nav-link {
+            color: #495057;
+            font-weight: 600;
+            border-radius: 50rem;
+            padding: 0.65rem 1.6rem;
+            transition: all 0.25s ease;
+            border: 1px solid transparent;
+        }
+        .nav-pills-custom .nav-link.active {
+            background-color: var(--bs-primary-pink);
+            color: #ffffff;
+            box-shadow: 0 4px 12px rgba(233, 30, 99, 0.25);
+        }
+
+        /* Amount Selector Buttons */
+        .btn-amount {
+            border: 2px solid #dee2e6;
+            background-color: #ffffff;
+            color: #333333;
+            font-weight: 700;
+            font-size: 1.1rem;
+            border-radius: 0.75rem;
+            padding: 0.65rem 1rem;
+            transition: all 0.2s ease;
+        }
+        .btn-amount:hover {
+            border-color: var(--bs-primary-pink);
+            color: var(--bs-primary-pink);
+            background-color: #fff9fb;
+        }
+        .btn-amount.active {
+            border-color: var(--bs-primary-pink);
+            background-color: var(--bs-primary-pink);
+            color: #ffffff;
+            box-shadow: 0 4px 12px rgba(233, 30, 99, 0.25);
+        }
+
+        /* Card Theme Selector Options */
+        .theme-card-option {
+            cursor: pointer;
+            border: 2px solid transparent;
+            border-radius: 0.85rem;
+            padding: 0.5rem 0.75rem;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.65rem;
+            background: #ffffff;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+        }
+        .theme-card-option:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+        }
+        .theme-card-option.active {
+            border-color: var(--bs-primary-pink);
+            background-color: #fff9fb;
+        }
+        .theme-swatch {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            border: 2px solid #ffffff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+            flex-shrink: 0;
+        }
+
+        /* Virtual Gift Card Preview */
+        .virtual-card-container {
+            position: sticky;
+            top: 6rem;
+        }
+        .virtual-gift-card {
+            border-radius: 1.25rem;
+            color: #ffffff;
+            padding: 1.85rem;
+            min-height: 230px;
+            box-shadow: 0 16px 36px rgba(0,0,0,0.18);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: background 0.4s ease, transform 0.3s ease;
+        }
+        .virtual-gift-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 42px rgba(0,0,0,0.22);
+        }
+        .virtual-gift-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0) 65%);
+            pointer-events: none;
+        }
+
+        /* Card Theme Styles */
+        .theme-luxury {
+            background: linear-gradient(135deg, #d81b60 0%, #ad1457 50%, #4a148c 100%);
+        }
+        .theme-classic {
+            background: linear-gradient(135deg, #212529 0%, #343a40 50%, #1a1e21 100%);
+            border: 1px solid rgba(255,215,0,0.4);
+        }
+        .theme-birthday {
+            background: linear-gradient(135deg, #ff4081 0%, #7c4dff 50%, #536dfe 100%);
+        }
+        .theme-spa {
+            background: linear-gradient(135deg, #00b4d8 0%, #0077b6 50%, #03045e 100%);
+        }
+        .theme-lavender {
+            background: linear-gradient(135deg, #8e24aa 0%, #5e35b1 60%, #3949ab 100%);
+        }
+
+        /* Shimmer Ribbon on Card */
+        .card-chip {
+            background: rgba(255,255,255,0.2);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 50rem;
+            padding: 0.25rem 0.75rem;
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+
+        /* Voucher Monospace Code Box */
+        .code-display-box {
+            background: #f8f9fa;
+            border: 2px dashed #ced4da;
+            border-radius: 0.75rem;
+            padding: 0.85rem 1.25rem;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 1.65rem;
+            letter-spacing: 0.15em;
+            font-weight: 800;
+            color: #212529;
+            text-align: center;
+        }
+
+        /* Balance History Table */
+        .table-redemptions th {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #6c757d;
+            border-bottom-width: 1px;
+        }
+
+        /* Print Styling */
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #printableVoucher, #printableVoucher * {
+                visibility: visible;
+            }
+            #printableVoucher {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                margin: 0;
+                padding: 20px;
+                background: white !important;
+            }
+            .no-print {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
+<body class="d-flex flex-column min-vh-100">
+
+<!-- Navigation Header -->
+<header class="navbar navbar-expand-lg bg-white shadow-sm sticky-top px-3 px-lg-4 no-print">
+    <div class="container-fluid">
+        <div class="d-flex align-items-center gap-3">
+            <a href="/" class="navbar-brand fw-bold text-pink fs-4 mb-0" id="salonBrandTitle">Jenny's Nail Studio</a>
+            <a href="/profile"
+               id="userBadge"
+               class="badge bg-danger-subtle text-pink border border-danger-subtle rounded-pill px-3 py-2 fs-6 d-none align-items-center gap-1 user-badge-link"
+               title="Click to view and edit profile settings">
+                <i class="bi bi-person-fill"></i>
+                <span id="usernameDisplay">Client</span>
+            </a>
+        </div>
+
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <div class="navbar-nav ms-auto align-items-lg-center gap-2 gap-lg-3 pt-3 pt-lg-0" id="authNav">
+                <!-- Injected dynamically via JavaScript -->
+            </div>
+        </div>
+    </div>
+</header>
+
+<!-- Hero Section -->
+<section class="bg-white border-bottom py-5 text-center no-print">
+    <div class="container py-2">
+        <span class="badge bg-danger-subtle text-pink rounded-pill px-3 py-2 mb-3 fw-bold">
+            <i class="bi bi-gift-fill me-1"></i> Official Digital Gift Vouchers
+        </span>
+        <h1 class="display-5 fw-bold text-dark mb-3">Give the Gift of Pampering &amp; Relaxation</h1>
+        <p class="lead text-muted mx-auto mb-4" style="max-width: 680px;">
+            Treat family, friends, or colleagues to luxury manicures, pedicures, and nail art. Delivered instantly to their email with custom designs and your personal note.
+        </p>
+
+        <!-- Tab Pills Switcher -->
+        <ul class="nav nav-pills nav-pills-custom justify-content-center gap-2 p-1 bg-light rounded-pill d-inline-flex border" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="buy-tab" data-bs-toggle="pill" data-bs-target="#tab-buy" type="button" role="tab" aria-controls="tab-buy" aria-selected="true">
+                    <i class="bi bi-gift-fill me-1"></i> Buy an E-Gift Card
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="balance-tab" data-bs-toggle="pill" data-bs-target="#tab-balance" type="button" role="tab" aria-controls="tab-balance" aria-selected="false">
+                    <i class="bi bi-search me-1"></i> Check Balance &amp; History
+                </button>
+            </li>
+        </ul>
+    </div>
+</section>
+
+<!-- Main Container -->
+<main class="container my-5 flex-grow-1">
+    <div class="tab-content">
+
+        <!-- ========================================== -->
+        <!-- TAB 1: BUY AN E-GIFT CARD                  -->
+        <!-- ========================================== -->
+        <div class="tab-pane fade show active" id="tab-buy" role="tabpanel" aria-labelledby="buy-tab">
+            <div class="row g-4 g-lg-5 align-items-start">
+
+                <!-- Left Column: Order Form -->
+                <div class="col-lg-7">
+                    <div class="card border-0 shadow-sm rounded-4 p-4 p-md-5 bg-white">
+                        <form id="giftCardPurchaseForm" onsubmit="handlePurchaseSubmit(event)">
+
+                            <!-- Section 1: Choose Denomination -->
+                            <div class="mb-4">
+                                <label class="form-label fw-bold text-dark fs-5 mb-2">1. Choose Gift Amount</label>
+                                <div class="row g-2 mb-3" id="amountPresets">
+                                    <div class="col-4 col-sm-2">
+                                        <button type="button" class="btn btn-amount w-100" data-value="25" onclick="selectAmount(25, this)">$25</button>
+                                    </div>
+                                    <div class="col-4 col-sm-2">
+                                        <button type="button" class="btn btn-amount w-100" data-value="50" onclick="selectAmount(50, this)">$50</button>
+                                    </div>
+                                    <div class="col-4 col-sm-2">
+                                        <button type="button" class="btn btn-amount w-100 active" data-value="75" onclick="selectAmount(75, this)">$75</button>
+                                    </div>
+                                    <div class="col-4 col-sm-2">
+                                        <button type="button" class="btn btn-amount w-100" data-value="100" onclick="selectAmount(100, this)">$100</button>
+                                    </div>
+                                    <div class="col-4 col-sm-2">
+                                        <button type="button" class="btn btn-amount w-100" data-value="150" onclick="selectAmount(150, this)">$150</button>
+                                    </div>
+                                    <div class="col-4 col-sm-2">
+                                        <button type="button" class="btn btn-amount w-100" data-value="200" onclick="selectAmount(200, this)">$200</button>
+                                    </div>
+                                </div>
+
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light fw-bold text-muted">$</span>
+                                    <input type="number" step="1" min="5" max="2000" id="customAmountInput" class="form-control"
+                                           placeholder="Or enter custom amount (min $5)" oninput="handleCustomAmount(this.value)">
+                                </div>
+                                <div class="form-text text-muted">Card balance never expires and can be used across multiple studio visits.</div>
+                            </div>
+
+                            <hr class="my-4 text-muted opacity-25">
+
+                            <!-- Section 2: Choose Theme -->
+                            <div class="mb-4">
+                                <label class="form-label fw-bold text-dark fs-5 mb-2">2. Choose Card Design Theme</label>
+                                <div class="row g-2" id="themeSelectorGroup">
+                                    <div class="col-6 col-sm-4">
+                                        <div class="theme-card-option active" data-theme="LUXURY" onclick="selectTheme('LUXURY', this)">
+                                            <span class="theme-swatch" style="background: linear-gradient(135deg, #d81b60, #4a148c);"></span>
+                                            <div>
+                                                <div class="fw-bold small text-dark">Luxury Rose</div>
+                                                <div class="text-muted" style="font-size: 0.7rem;">Shimmer &amp; Pink</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-sm-4">
+                                        <div class="theme-card-option" data-theme="BIRTHDAY" onclick="selectTheme('BIRTHDAY', this)">
+                                            <span class="theme-swatch" style="background: linear-gradient(135deg, #ff4081, #536dfe);"></span>
+                                            <div>
+                                                <div class="fw-bold small text-dark">Birthday</div>
+                                                <div class="text-muted" style="font-size: 0.7rem;">Celebration</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-sm-4">
+                                        <div class="theme-card-option" data-theme="SPA" onclick="selectTheme('SPA', this)">
+                                            <span class="theme-swatch" style="background: linear-gradient(135deg, #00b4d8, #03045e);"></span>
+                                            <div>
+                                                <div class="fw-bold small text-dark">Tranquil Spa</div>
+                                                <div class="text-muted" style="font-size: 0.7rem;">Serene Waters</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-sm-4">
+                                        <div class="theme-card-option" data-theme="CLASSIC" onclick="selectTheme('CLASSIC', this)">
+                                            <span class="theme-swatch" style="background: linear-gradient(135deg, #212529, #ffd700);"></span>
+                                            <div>
+                                                <div class="fw-bold small text-dark">Classic Noir</div>
+                                                <div class="text-muted" style="font-size: 0.7rem;">Gold &amp; Slate</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-sm-4">
+                                        <div class="theme-card-option" data-theme="LAVENDER" onclick="selectTheme('LAVENDER', this)">
+                                            <span class="theme-swatch" style="background: linear-gradient(135deg, #8e24aa, #3949ab);"></span>
+                                            <div>
+                                                <div class="fw-bold small text-dark">Lavender</div>
+                                                <div class="text-muted" style="font-size: 0.7rem;">Dream Mist</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <hr class="my-4 text-muted opacity-25">
+
+                            <!-- Section 3: Recipient & Purchaser Details -->
+                            <div class="mb-4">
+                                <label class="form-label fw-bold text-dark fs-5 mb-2">3. Recipient &amp; Sender Details</label>
+
+                                <div class="row g-3 mb-3">
+                                    <div class="col-sm-6">
+                                        <label for="recipientName" class="form-label small fw-semibold text-secondary">Recipient Name *</label>
+                                        <input type="text" class="form-control" id="recipientName" required
+                                               placeholder="e.g. Jessica Miller" oninput="updateCardPreview()">
+                                    </div>
+                                    <div class="col-sm-6">
+                                        <label for="recipientEmail" class="form-label small fw-semibold text-secondary">Recipient Email *</label>
+                                        <input type="email" class="form-control" id="recipientEmail" required
+                                               placeholder="jessica@example.com">
+                                    </div>
+                                </div>
+
+                                <div class="row g-3 mb-3">
+                                    <div class="col-sm-6">
+                                        <label for="purchaserName" class="form-label small fw-semibold text-secondary">Your Name (Purchaser) *</label>
+                                        <input type="text" class="form-control" id="purchaserName" required
+                                               placeholder="e.g. Alex Taylor" oninput="updateCardPreview()">
+                                    </div>
+                                    <div class="col-sm-6">
+                                        <label for="purchaserEmail" class="form-label small fw-semibold text-secondary">Your Email (Receipt) *</label>
+                                        <input type="email" class="form-control" id="purchaserEmail" required
+                                               placeholder="alex@example.com">
+                                    </div>
+                                </div>
+
+                                <div class="mb-2">
+                                    <label for="personalMessage" class="form-label small fw-semibold text-secondary">
+                                        Personal Gift Message <span class="text-muted fw-normal">(Optional, max 300 chars)</span>
+                                    </label>
+                                    <textarea class="form-control" id="personalMessage" rows="3" maxlength="300"
+                                              placeholder="Happy Birthday! Enjoy an afternoon of pampering on me ✨"
+                                              oninput="updateCardPreview()"></textarea>
+                                    <div class="d-flex justify-content-end text-muted small mt-1">
+                                        <span id="charCounter">0</span> / 300
+                                    </div>
+                                </div>
+                            </div>
+
+                            <hr class="my-4 text-muted opacity-25">
+
+                            <!-- Section 4: Simulated Payment & Submit -->
+                            <div class="mb-4">
+                                <label class="form-label fw-bold text-dark fs-5 mb-2">4. Payment &amp; Instant Delivery</label>
+
+                                <div class="p-3 bg-light rounded-3 border mb-3">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <span class="text-muted">Digital Gift Card Amount:</span>
+                                        <span class="fw-bold fs-5 text-dark" id="summaryAmountText">$75.00</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center mb-1 text-muted small">
+                                        <span>Delivery:</span>
+                                        <span class="badge bg-success-subtle text-success">Instant Email Delivery</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center text-muted small">
+                                        <span>Processing Fee:</span>
+                                        <span class="text-success fw-semibold">FREE ($0.00)</span>
+                                    </div>
+                                </div>
+
+                                <div class="row g-2 mb-3">
+                                    <div class="col-12">
+                                        <label class="form-label small fw-semibold text-secondary">Demo Card Checkout (Simulated)</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text bg-white"><i class="bi bi-credit-card-2-front text-muted"></i></span>
+                                            <input type="text" class="form-control bg-white" readonly value="•••• •••• •••• 4242 (Instant Approval)">
+                                            <span class="input-group-text bg-white text-success small fw-semibold"><i class="bi bi-shield-check me-1"></i>Secure</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div id="purchaseAlertContainer"></div>
+
+                                <button type="submit" id="btnSubmitPurchase" class="btn btn-pink w-100 py-3 rounded-pill fw-bold fs-5 shadow-sm">
+                                    <i class="bi bi-lock-fill me-1"></i> Complete Purchase (<span id="btnAmountText">$75.00</span>)
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Right Column: Interactive Live Preview Card -->
+                <div class="col-lg-5">
+                    <div class="virtual-card-container">
+                        <div class="text-center mb-2">
+                            <span class="badge bg-white text-secondary border rounded-pill px-3 py-1 small fw-semibold shadow-xs">
+                                <i class="bi bi-eye-fill me-1 text-pink"></i> Live Card Preview
+                            </span>
+                        </div>
+
+                        <!-- Card Element -->
+                        <div id="liveGiftCard" class="virtual-gift-card theme-luxury">
+                            <!-- Top row: Salon Name & Chip -->
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <div class="small text-uppercase tracking-wider opacity-75" style="letter-spacing: 0.1em;">E-Gift Voucher</div>
+                                    <h4 class="fw-bold mb-0 text-white" id="previewSalonName">Jenny's Nail Studio</h4>
+                                </div>
+                                <span class="card-chip">
+                                    <i class="bi bi-sparkles"></i> Valid Forever
+                                </span>
+                            </div>
+
+                            <!-- Middle row: Amount & Code Watermark -->
+                            <div class="my-4">
+                                <div class="display-5 fw-bold text-white mb-1" id="previewAmount">$75.00</div>
+                                <div class="opacity-75 font-monospace small" style="letter-spacing: 0.15em;">
+                                    CODE: <span id="previewCode">GC-••••-••••</span>
+                                </div>
+                            </div>
+
+                            <!-- Bottom row: Recipient & Sender -->
+                            <div class="pt-2 border-top border-white border-opacity-25">
+                                <div class="row g-2 align-items-end">
+                                    <div class="col-7">
+                                        <div class="small opacity-75" style="font-size: 0.72rem; text-transform: uppercase;">Presented To:</div>
+                                        <div class="fw-bold text-truncate" id="previewRecipient">Valued Guest</div>
+                                    </div>
+                                    <div class="col-5 text-end">
+                                        <div class="small opacity-75" style="font-size: 0.72rem; text-transform: uppercase;">From:</div>
+                                        <div class="fw-bold text-truncate" id="previewPurchaser">A Special Friend</div>
+                                    </div>
+                                </div>
+                                <div class="mt-2 pt-2 border-top border-white border-opacity-10" id="previewMessageWrapper" style="display: none;">
+                                    <p class="fst-italic small mb-0 opacity-90 text-truncate" id="previewMessage" style="font-size: 0.82rem;"></p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Highlights list below card -->
+                        <div class="card border-0 bg-white shadow-sm rounded-4 p-3 mt-3">
+                            <div class="row g-2 text-center">
+                                <div class="col-4">
+                                    <div class="p-2">
+                                        <i class="bi bi-envelope-check-fill text-pink fs-4"></i>
+                                        <div class="fw-bold small text-dark mt-1">Instant Email</div>
+                                        <div class="text-muted" style="font-size: 0.7rem;">Sent in seconds</div>
+                                    </div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="p-2">
+                                        <i class="bi bi-infinity text-pink fs-4"></i>
+                                        <div class="fw-bold small text-dark mt-1">No Expiry</div>
+                                        <div class="text-muted" style="font-size: 0.7rem;">Use anytime</div>
+                                    </div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="p-2">
+                                        <i class="bi bi-shield-lock-fill text-pink fs-4"></i>
+                                        <div class="fw-bold small text-dark mt-1">100% Secure</div>
+                                        <div class="text-muted" style="font-size: 0.7rem;">Protected code</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- TAB 2: CHECK BALANCE & HISTORY             -->
+        <!-- ========================================== -->
+        <div class="tab-pane fade" id="tab-balance" role="tabpanel" aria-labelledby="balance-tab">
+            <div class="row justify-content-center">
+                <div class="col-lg-8">
+                    <!-- Search Input Card -->
+                    <div class="card border-0 shadow-sm rounded-4 p-4 p-md-5 bg-white mb-4">
+                        <div class="text-center mb-4">
+                            <div class="d-inline-flex align-items-center justify-content-center bg-danger-subtle text-pink rounded-circle mb-3" style="width: 56px; height: 56px;">
+                                <i class="bi bi-credit-card-2-front-fill fs-3"></i>
+                            </div>
+                            <h3 class="fw-bold text-dark">Gift Card Balance Checker</h3>
+                            <p class="text-muted small">Enter the 10-character code printed on your voucher or received via email.</p>
+                        </div>
+
+                        <form id="balanceCheckForm" onsubmit="handleCheckBalance(event)">
+                            <div class="mb-3">
+                                <label for="inputCardCode" class="form-label fw-bold small text-secondary">GIFT CARD CODE</label>
+                                <div class="input-group input-group-lg">
+                                    <span class="input-group-text bg-light text-muted"><i class="bi bi-upc-scan"></i></span>
+                                    <input type="text" class="form-control text-uppercase font-monospace fw-bold" id="inputCardCode"
+                                           placeholder="GC-XXXX-XXXX" maxlength="20" required autocomplete="off"
+                                           style="letter-spacing: 0.1em;">
+                                    <button class="btn btn-pink px-4 fw-bold" type="submit" id="btnCheckBalance">
+                                        <span id="btnCheckSpinner" class="spinner-border spinner-border-sm me-1 d-none"></span>
+                                        Check Balance
+                                    </button>
+                                </div>
+                                <div class="form-text text-muted">Example: <code>GC-E91E-63A1</code></div>
+                            </div>
+                        </form>
+
+                        <div id="balanceAlertContainer"></div>
+                    </div>
+
+                    <!-- Balance Result Display Container -->
+                    <div id="balanceResultCard" class="card border-0 shadow-sm rounded-4 p-4 p-md-5 bg-white d-none">
+                        <!-- Top status & remaining amount -->
+                        <div class="d-flex flex-wrap justify-content-between align-items-center pb-4 border-bottom mb-4 gap-3">
+                            <div>
+                                <span class="text-muted small text-uppercase tracking-wider">Remaining Balance</span>
+                                <h1 class="display-4 fw-bold text-dark mb-0" id="resCurrentBalance">$0.00</h1>
+                                <div class="text-muted small mt-1">
+                                    Original Face Value: <span class="fw-bold text-dark" id="resInitialBalance">$0.00</span>
+                                </div>
+                            </div>
+                            <div class="text-sm-end">
+                                <span class="badge px-3 py-2 fs-6 rounded-pill" id="resStatusBadge">ACTIVE</span>
+                                <div class="text-muted small mt-2 font-monospace fw-bold" id="resCodeDisplay">GC-XXXX-XXXX</div>
+                            </div>
+                        </div>
+
+                        <!-- Card Details Grid -->
+                        <div class="row g-3 mb-4 p-3 bg-light rounded-3">
+                            <div class="col-sm-6">
+                                <div class="text-muted small">Recipient</div>
+                                <div class="fw-bold text-dark" id="resRecipientName">—</div>
+                            </div>
+                            <div class="col-sm-6">
+                                <div class="text-muted small">Purchaser</div>
+                                <div class="fw-bold text-dark" id="resPurchaserName">—</div>
+                            </div>
+                            <div class="col-sm-6">
+                                <div class="text-muted small">Issued Date</div>
+                                <div class="fw-semibold text-dark" id="resIssuedDate">—</div>
+                            </div>
+                            <div class="col-sm-6">
+                                <div class="text-muted small">Expiration</div>
+                                <div class="fw-semibold text-success" id="resExpiration">Never Expires</div>
+                            </div>
+                        </div>
+
+                        <!-- Action buttons -->
+                        <div class="d-flex flex-wrap gap-2 mb-4">
+                            <a href="/book" id="btnBookWithCard" class="btn btn-pink rounded-pill px-4 py-2 fw-bold">
+                                <i class="bi bi-calendar-check-fill me-1"></i> Book Appointment with this Card
+                            </a>
+                            <button type="button" class="btn btn-outline-secondary rounded-pill px-3 py-2 fw-semibold" onclick="copyCardCodeFromChecker()">
+                                <i class="bi bi-clipboard me-1"></i> Copy Code
+                            </button>
+                        </div>
+
+                        <!-- Redemption History Table -->
+                        <h5 class="fw-bold text-dark mb-3">Redemption &amp; Transaction History</h5>
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle table-redemptions mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Description</th>
+                                        <th class="text-end">Amount Used</th>
+                                        <th class="text-end">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="resRedemptionsTbody">
+                                    <!-- Populated dynamically -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+    </div>
+</main>
+
+<!-- Success Voucher Modal -->
+<div class="modal fade" id="voucherSuccessModal" tabindex="-1" aria-labelledby="voucherModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+            <div class="modal-header border-0 pb-0 text-end">
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4 p-md-5 pt-0 text-center">
+
+                <div class="d-inline-flex align-items-center justify-content-center bg-success-subtle text-success rounded-circle mb-3" style="width: 64px; height: 64px;">
+                    <i class="bi bi-check-circle-fill fs-2"></i>
+                </div>
+
+                <h3 class="fw-bold text-dark mb-1">Gift Card Activated!</h3>
+                <p class="text-muted mb-4">A digital voucher email and purchase receipt have been sent to the recipient &amp; purchaser.</p>
+
+                <!-- Printable Voucher Section -->
+                <div id="printableVoucher" class="card border border-2 rounded-4 p-4 text-start mb-4 shadow-sm bg-white">
+                    <div class="d-flex justify-content-between align-items-center pb-3 border-bottom mb-3">
+                        <div>
+                            <span class="badge bg-danger-subtle text-pink fw-bold rounded-pill mb-1">OFFICIAL VOUCHER</span>
+                            <h4 class="fw-bold text-dark mb-0" id="modalSalonName">Jenny's Nail Studio</h4>
+                        </div>
+                        <div class="text-end">
+                            <div class="display-6 fw-bold text-pink" id="modalVoucherAmount">$75.00</div>
+                            <span class="text-muted small">Face Value</span>
+                        </div>
+                    </div>
+
+                    <div class="text-center my-3">
+                        <div class="text-muted small mb-1">VOUCHER REDEMPTION CODE</div>
+                        <div class="code-display-box" id="modalVoucherCode">GC-XXXX-XXXX</div>
+                    </div>
+
+                    <div class="row g-2 pt-2 border-top text-muted small">
+                        <div class="col-6">
+                            <span>To: </span><strong class="text-dark" id="modalRecipient">Valued Guest</strong>
+                        </div>
+                        <div class="col-6 text-end">
+                            <span>From: </span><strong class="text-dark" id="modalPurchaser">Alex Taylor</strong>
+                        </div>
+                        <div class="col-12 mt-2 fst-italic text-secondary" id="modalMessage"></div>
+                    </div>
+                </div>
+
+                <!-- Modal Action Buttons -->
+                <div class="d-flex flex-wrap justify-content-center gap-2 no-print">
+                    <button type="button" class="btn btn-pink rounded-pill px-4 py-2 fw-bold" onclick="copyVoucherCode()">
+                        <i class="bi bi-clipboard-check-fill me-1" id="copyIcon"></i> <span id="copyText">Copy Code</span>
+                    </button>
+                    <button type="button" class="btn btn-outline-dark rounded-pill px-4 py-2 fw-semibold" onclick="window.print()">
+                        <i class="bi bi-printer-fill me-1"></i> Print Voucher
+                    </button>
+                    <a href="/book" id="modalBookLink" class="btn btn-outline-pink rounded-pill px-4 py-2 fw-semibold">
+                        <i class="bi bi-calendar2-check-fill me-1"></i> Book an Appointment
+                    </a>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Footer -->
+<footer class="bg-white border-top py-4 mt-auto no-print">
+    <div class="container text-center">
+        <p class="text-muted small mb-0">&copy; <span id="footerSalonName">Jenny's Nail Studio</span>. All rights reserved. E-Gift Cards are non-refundable and redeemable for services and retail products.</p>
+    </div>
+</footer>
+
+<!-- Bootstrap Bundle JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+    // State
+    let selectedAmount = 75;
+    let selectedTheme = 'LUXURY';
+    let voucherModalInstance = null;
+    let lastGeneratedCode = '';
+
+    // JWT Token Parser
+    function parseJwt(token) {
+        try {
+            const base64Url = token.split('.')[1];
+            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+            const jsonPayload = decodeURIComponent(atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+            const payload = JSON.parse(jsonPayload);
+            if (payload.exp && Date.now() >= payload.exp * 1000) return null;
+            return payload;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    // Resolves active tenant ID using TenantTheme
+    function getTenantId() {
+        if (typeof TenantTheme !== 'undefined' && TenantTheme.resolveTenantId) {
+            return TenantTheme.resolveTenantId();
+        }
+        return 'default';
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        voucherModalInstance = new bootstrap.Modal(document.getElementById('voucherSuccessModal'));
+
+        // Initialize tenant branding
+        const tenantId = getTenantId();
+        let salonName = "Jenny's Nail Studio";
+        try {
+            const cached = localStorage.getItem('tenant_theme_' + tenantId);
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                if (parsed.salonName) salonName = parsed.salonName;
+            } else if (tenantId === 'luxe') {
+                salonName = 'Luxe Nail & Spa Sanctuary';
+            }
+        } catch (e) {}
+
+        document.getElementById('salonBrandTitle').textContent = salonName;
+        document.getElementById('previewSalonName').textContent = salonName;
+        document.getElementById('modalSalonName').textContent = salonName;
+        document.getElementById('footerSalonName').textContent = salonName;
+        document.title = `E-Gift Cards - ${salonName}`;
+
+        // Initialize Navbar based on Auth State
+        setupAuthNavbar();
+
+        // Check if URL has a card code query parameter (e.g. /gift-cards?code=GC-XXXX-XXXX)
+        const urlParams = new URLSearchParams(window.location.search);
+        const codeParam = urlParams.get('code') || urlParams.get('gc');
+        if (codeParam) {
+            const balanceTabTrigger = document.getElementById('balance-tab');
+            const balanceTab = new bootstrap.Tab(balanceTabTrigger);
+            balanceTab.show();
+            document.getElementById('inputCardCode').value = codeParam.toUpperCase();
+            triggerBalanceCheck(codeParam.toUpperCase());
+        }
+
+        updateCardPreview();
+    });
+
+    function setupAuthNavbar() {
+        const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
+        const username = localStorage.getItem('username');
+        const authNav = document.getElementById('authNav');
+        const userBadge = document.getElementById('userBadge');
+        const usernameDisplay = document.getElementById('usernameDisplay');
+
+        const decodedToken = token ? parseJwt(token) : null;
+
+        if (token && decodedToken) {
+            const activeUser = username || decodedToken.sub || decodedToken.username || 'Client';
+            const role = decodedToken.role || decodedToken.authorities || (decodedToken.roles ? decodedToken.roles[0] : 'ROLE_USER');
+            const isAdmin = role === 'ROLE_ADMIN' || role === 'ADMIN';
+
+            usernameDisplay.textContent = activeUser;
+            userBadge.classList.remove('d-none');
+            userBadge.classList.add('d-inline-flex');
+
+            let adminLinkHtml = '';
+            if (isAdmin) {
+                adminLinkHtml = `<a href="/admin/dashboard" class="nav-link fw-bold text-danger"><i class="bi bi-shield-lock-fill me-1"></i>Admin Portal</a>`;
+            }
+
+            if (authNav) {
+                authNav.innerHTML = `
+                    <a href="/" class="nav-link fw-semibold text-dark">Home</a>
+                    <a href="/dashboard" class="nav-link fw-semibold text-dark">Showcase</a>
+                    <a href="/services" class="nav-link fw-semibold text-dark">Services</a>
+                    <a href="/gift-cards" class="nav-link fw-semibold text-pink active">Gift Cards</a>
+                    <a href="/book" class="nav-btn-book"><i class="bi bi-calendar2-check-fill"></i>Book Now</a>
+                    ${adminLinkHtml}
+                    <a href="/profile" class="nav-link fw-semibold text-dark">Profile</a>
+                    <a href="#" onclick="handleLogout()" class="nav-link fw-semibold text-dark">Logout</a>
+                `;
+            }
+
+            // Autofill purchaser info if client is logged in
+            const purchaserNameInput = document.getElementById('purchaserName');
+            const purchaserEmailInput = document.getElementById('purchaserEmail');
+            if (purchaserNameInput && !purchaserNameInput.value) purchaserNameInput.value = activeUser;
+            if (purchaserEmailInput && !purchaserEmailInput.value && decodedToken.email) purchaserEmailInput.value = decodedToken.email;
+        } else {
+            if (token) {
+                localStorage.removeItem('accessToken');
+                localStorage.removeItem('token');
+                localStorage.removeItem('username');
+                localStorage.removeItem('userRole');
+            }
+            if (userBadge) {
+                userBadge.classList.add('d-none');
+                userBadge.classList.remove('d-inline-flex');
+            }
+            if (authNav) {
+                authNav.innerHTML = `
+                    <a href="/" class="nav-link fw-semibold text-dark">Home</a>
+                    <a href="/dashboard" class="nav-link fw-semibold text-dark">Showcase</a>
+                    <a href="/services" class="nav-link fw-semibold text-dark">Services</a>
+                    <a href="/gift-cards" class="nav-link fw-semibold text-pink active">Gift Cards</a>
+                    <a href="/book" class="nav-btn-book"><i class="bi bi-calendar2-check-fill"></i>Book Now</a>
+                `;
+            }
+        }
+    }
+
+    function handleLogout() {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('token');
+        localStorage.removeItem('username');
+        localStorage.removeItem('userRole');
+        window.location.reload();
+    }
+
+    // Amount Selection
+    function selectAmount(val, btnEl) {
+        selectedAmount = Number(val);
+        document.querySelectorAll('.btn-amount').forEach(b => b.classList.remove('active'));
+        if (btnEl) btnEl.classList.add('active');
+        document.getElementById('customAmountInput').value = '';
+        updateAmountDisplays();
+    }
+
+    function handleCustomAmount(val) {
+        const num = parseFloat(val);
+        if (!isNaN(num) && num > 0) {
+            selectedAmount = num;
+            document.querySelectorAll('.btn-amount').forEach(b => b.classList.remove('active'));
+        } else {
+            selectedAmount = 75;
+        }
+        updateAmountDisplays();
+    }
+
+    function updateAmountDisplays() {
+        const formatted = '$' + selectedAmount.toFixed(2);
+        document.getElementById('previewAmount').textContent = formatted;
+        document.getElementById('summaryAmountText').textContent = formatted;
+        document.getElementById('btnAmountText').textContent = formatted;
+    }
+
+    // Theme Selection
+    function selectTheme(themeKey, el) {
+        selectedTheme = themeKey;
+        document.querySelectorAll('.theme-card-option').forEach(o => o.classList.remove('active'));
+        if (el) el.classList.add('active');
+
+        const card = document.getElementById('liveGiftCard');
+        card.className = 'virtual-gift-card';
+        if (themeKey === 'LUXURY') card.classList.add('theme-luxury');
+        else if (themeKey === 'BIRTHDAY') card.classList.add('theme-birthday');
+        else if (themeKey === 'SPA') card.classList.add('theme-spa');
+        else if (themeKey === 'CLASSIC') card.classList.add('theme-classic');
+        else if (themeKey === 'LAVENDER') card.classList.add('theme-lavender');
+    }
+
+    // Live Preview Synchronizer
+    function updateCardPreview() {
+        const recipient = document.getElementById('recipientName').value.trim();
+        const purchaser = document.getElementById('purchaserName').value.trim();
+        const message = document.getElementById('personalMessage').value.trim();
+
+        document.getElementById('previewRecipient').textContent = recipient || 'Valued Guest';
+        document.getElementById('previewPurchaser').textContent = purchaser || 'A Special Friend';
+
+        const charCount = document.getElementById('personalMessage').value.length;
+        document.getElementById('charCounter').textContent = charCount;
+
+        const msgWrapper = document.getElementById('previewMessageWrapper');
+        const previewMsg = document.getElementById('previewMessage');
+        if (message) {
+            msgWrapper.style.display = 'block';
+            previewMsg.textContent = `"${message}"`;
+        } else {
+            msgWrapper.style.display = 'none';
+        }
+    }
+
+    // Purchase Submission
+    async function handlePurchaseSubmit(event) {
+        event.preventDefault();
+
+        const btnSubmit = document.getElementById('btnSubmitPurchase');
+        const alertBox = document.getElementById('purchaseAlertContainer');
+        alertBox.innerHTML = '';
+
+        if (selectedAmount < 5.0) {
+            alertBox.innerHTML = `<div class="alert alert-danger py-2 small">Minimum gift card amount is $5.00.</div>`;
+            return;
+        }
+
+        const purchaserName = document.getElementById('purchaserName').value.trim();
+        const purchaserEmail = document.getElementById('purchaserEmail').value.trim();
+        const recipientName = document.getElementById('recipientName').value.trim();
+        const recipientEmail = document.getElementById('recipientEmail').value.trim();
+        const personalMessage = document.getElementById('personalMessage').value.trim();
+
+        btnSubmit.disabled = true;
+        btnSubmit.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Activating Gift Card...`;
+
+        const tenantId = getTenantId();
+        const payload = {
+            amount: selectedAmount,
+            purchaserName: purchaserName,
+            purchaserEmail: purchaserEmail,
+            recipientName: recipientName,
+            recipientEmail: recipientEmail,
+            notes: personalMessage,
+            theme: selectedTheme
+        };
+
+        try {
+            const response = await fetch('/api/gift-cards/purchase', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Tenant-ID': tenantId
+                },
+                body: JSON.stringify(payload)
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                const errorMsg = result.message || 'Failed to complete gift card purchase. Please try again.';
+                alertBox.innerHTML = `<div class="alert alert-danger py-2 small">${errorMsg}</div>`;
+                btnSubmit.disabled = false;
+                btnSubmit.innerHTML = `<i class="bi bi-lock-fill me-1"></i> Complete Purchase ($${selectedAmount.toFixed(2)})`;
+                return;
+            }
+
+            // Success! Populate voucher modal
+            lastGeneratedCode = result.code;
+            document.getElementById('modalVoucherCode').textContent = result.code;
+            document.getElementById('modalVoucherAmount').textContent = '$' + Number(result.currentBalance).toFixed(2);
+            document.getElementById('modalRecipient').textContent = result.recipientName || recipientName;
+            document.getElementById('modalPurchaser').textContent = result.purchaserName || purchaserName;
+            document.getElementById('modalMessage').textContent = personalMessage ? `"${personalMessage}"` : '';
+
+            // Update booking link with pre-filled gift card code
+            const bookLink = document.getElementById('modalBookLink');
+            if (bookLink) {
+                bookLink.href = `/book?giftCard=${encodeURIComponent(result.code)}`;
+            }
+
+            voucherModalInstance.show();
+
+            // Reset Form
+            document.getElementById('giftCardPurchaseForm').reset();
+            selectAmount(75, document.querySelector('.btn-amount[data-value="75"]'));
+            updateCardPreview();
+
+        } catch (err) {
+            console.error('Purchase error:', err);
+            alertBox.innerHTML = `<div class="alert alert-danger py-2 small">Network error occurred. Please check your connection and retry.</div>`;
+        } finally {
+            btnSubmit.disabled = false;
+            btnSubmit.innerHTML = `<i class="bi bi-lock-fill me-1"></i> Complete Purchase ($${selectedAmount.toFixed(2)})`;
+        }
+    }
+
+    // Copy Voucher Code Handler
+    function copyVoucherCode() {
+        if (!lastGeneratedCode) return;
+        navigator.clipboard.writeText(lastGeneratedCode).then(() => {
+            const copyText = document.getElementById('copyText');
+            const copyIcon = document.getElementById('copyIcon');
+            copyText.textContent = 'Copied!';
+            copyIcon.className = 'bi bi-check2 me-1';
+            setTimeout(() => {
+                copyText.textContent = 'Copy Code';
+                copyIcon.className = 'bi bi-clipboard-check-fill me-1';
+            }, 2500);
+        }).catch(() => {
+            alert('Code: ' + lastGeneratedCode);
+        });
+    }
+
+    // Check Balance Submission
+    function handleCheckBalance(event) {
+        event.preventDefault();
+        const code = document.getElementById('inputCardCode').value.trim().toUpperCase();
+        triggerBalanceCheck(code);
+    }
+
+    async function triggerBalanceCheck(code) {
+        if (!code) return;
+
+        const btn = document.getElementById('btnCheckBalance');
+        const spinner = document.getElementById('btnCheckSpinner');
+        const alertBox = document.getElementById('balanceAlertContainer');
+        const resultCard = document.getElementById('balanceResultCard');
+
+        alertBox.innerHTML = '';
+        resultCard.classList.add('d-none');
+        btn.disabled = true;
+        spinner.classList.remove('d-none');
+
+        const tenantId = getTenantId();
+
+        try {
+            const response = await fetch(`/api/gift-cards/verify?code=${encodeURIComponent(code)}`, {
+                headers: { 'X-Tenant-ID': tenantId }
+            });
+
+            const data = await response.json();
+
+            if (!response.ok || !data.valid) {
+                alertBox.innerHTML = `
+                    <div class="alert alert-danger d-flex align-items-center mt-3">
+                        <i class="bi bi-exclamation-triangle-fill fs-5 me-2"></i>
+                        <div>${data.message || 'Gift card code was not found or is invalid for this salon.'}</div>
+                    </div>
+                `;
+                return;
+            }
+
+            // Display Results
+            resultCard.classList.remove('d-none');
+            document.getElementById('resCurrentBalance').textContent = '$' + Number(data.currentBalance || 0).toFixed(2);
+            document.getElementById('resInitialBalance').textContent = '$' + Number(data.initialBalance || 0).toFixed(2);
+            document.getElementById('resCodeDisplay').textContent = data.code;
+            document.getElementById('resRecipientName').textContent = data.recipientName || 'Valued Guest';
+            document.getElementById('resPurchaserName').textContent = data.purchaserName || 'Anonymous';
+
+            // Status badge
+            const badge = document.getElementById('resStatusBadge');
+            const status = (data.status || 'ACTIVE').toUpperCase();
+            badge.textContent = status;
+            if (status === 'ACTIVE') {
+                badge.className = 'badge bg-success-subtle text-success border border-success-subtle px-3 py-2 fs-6 rounded-pill';
+            } else if (status === 'DEPLETED') {
+                badge.className = 'badge bg-secondary-subtle text-secondary border border-secondary px-3 py-2 fs-6 rounded-pill';
+            } else {
+                badge.className = 'badge bg-danger-subtle text-danger border border-danger-subtle px-3 py-2 fs-6 rounded-pill';
+            }
+
+            // Dates
+            if (data.createdAt) {
+                const dateObj = new Date(data.createdAt);
+                document.getElementById('resIssuedDate').textContent = dateObj.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+            } else {
+                document.getElementById('resIssuedDate').textContent = 'N/A';
+            }
+
+            if (data.expiresAt) {
+                const expObj = new Date(data.expiresAt);
+                document.getElementById('resExpiration').textContent = expObj.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+                document.getElementById('resExpiration').className = 'fw-semibold text-warning';
+            } else {
+                document.getElementById('resExpiration').textContent = 'Never Expires';
+                document.getElementById('resExpiration').className = 'fw-semibold text-success';
+            }
+
+            // Book with Card CTA
+            const bookBtn = document.getElementById('btnBookWithCard');
+            bookBtn.href = `/book?giftCard=${encodeURIComponent(data.code)}`;
+
+            // Populate Redemption History
+            const tbody = document.getElementById('resRedemptionsTbody');
+            tbody.innerHTML = '';
+
+            if (data.redemptions && data.redemptions.length > 0) {
+                data.redemptions.forEach(r => {
+                    const tr = document.createElement('tr');
+                    const rDate = r.createdAt ? new Date(r.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recent';
+                    const amountDeducted = Number(r.giftCardAmount || r.amount || 0).toFixed(2);
+                    tr.innerHTML = `
+                        <td class="text-muted small">${rDate}</td>
+                        <td class="fw-semibold text-dark">Appointment #${r.appointmentId || 'Direct'}</td>
+                        <td class="text-end text-danger fw-bold">-$${amountDeducted}</td>
+                        <td class="text-end"><span class="badge bg-success-subtle text-success">Redeemed</span></td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } else {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td colspan="4" class="text-center text-muted py-3 small">
+                        <i class="bi bi-info-circle me-1"></i> No redemptions recorded yet. Full face value is available!
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            }
+
+            // Smooth scroll to results
+            resultCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+        } catch (err) {
+            console.error('Balance check error:', err);
+            alertBox.innerHTML = `
+                <div class="alert alert-danger mt-3 small">
+                    Unable to verify card balance right now. Please verify your code and retry.
+                </div>
+            `;
+        } finally {
+            btn.disabled = false;
+            spinner.classList.add('d-none');
+        }
+    }
+
+    function copyCardCodeFromChecker() {
+        const code = document.getElementById('resCodeDisplay').textContent;
+        if (code && code !== 'GC-XXXX-XXXX') {
+            navigator.clipboard.writeText(code).then(() => {
+                alert(`Copied gift card code ${code} to clipboard!`);
+            });
+        }
+    }
+</script>
+</body>
+</html>

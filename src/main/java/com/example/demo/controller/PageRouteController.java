@@ -85,4 +85,20 @@ public class PageRouteController {
     public String userDashboard() {
         return "forward:/dashboard.html";
     }
+
+    // Clean Public Gift Cards Store & Balance Checker Routes
+    @GetMapping({"/gift-cards", "/giftcard", "/giftcards"})
+    public String giftCardsPage() {
+        return "forward:/gift-cards.html";
+    }
+
+    @GetMapping({"/gift-cards/{tenantSlug}", "/giftcards/{tenantSlug}"})
+    public String giftCardsPageWithSlug(@PathVariable String tenantSlug, HttpServletRequest request) {
+        if (tenantSlug != null && !tenantSlug.isBlank()) {
+            String normalized = tenantSlug.trim().toLowerCase();
+            request.setAttribute("tenant_id", normalized);
+            TenantContext.setCurrentTenant(normalized);
+        }
+        return "forward:/gift-cards.html";
+    }
 }

@@ -97,6 +97,11 @@ public class SecurityConfig {
                                 "/forgot-password.html",
                                 "/profile",
                                 "/profile.html",
+                                "/gift-cards",
+                                "/gift-cards/**",
+                                "/gift-cards.html",
+                                "/giftcard",
+                                "/giftcards",
                                 "/dashboard",
                                 "/dashboard.html",
                                 "/api/appointments",
@@ -135,7 +140,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/customers", "/api/customers/**").hasAnyAuthority("ROLE_ADMIN", "ADMIN")
                         .requestMatchers("/api/pos/verify-owner-password").permitAll()
                         .requestMatchers("/api/pos", "/api/pos/**").hasAnyAuthority("ROLE_ADMIN", "ADMIN", "ROLE_STAFF", "STAFF", "ROLE_NAIL_TECH")
-                        .requestMatchers("/api/gift-cards/verify").permitAll()
+                        .requestMatchers("/api/gift-cards/verify", "/api/gift-cards/purchase").permitAll()
                         .requestMatchers("/api/gift-cards", "/api/gift-cards/**").hasAnyAuthority("ROLE_ADMIN", "ADMIN", "ROLE_STAFF", "STAFF", "ROLE_NAIL_TECH")
                         .requestMatchers("/api/admin/**").hasAnyAuthority("ROLE_ADMIN", "ADMIN")
                         .requestMatchers("/api/auth/**").permitAll()

@@ -1133,6 +1133,151 @@ public class NotificationService {
         }
     }
 
+    /**
+     * Dispatches Gift Card Delivery Email to the Recipient and Purchase Confirmation to the Buyer.
+     */
+    public NotificationResult sendGiftCardPurchaseNotification(
+            com.example.demo.entity.GiftCard giftCard,
+            String personalMessage,
+            String theme,
+            String tenantId
+    ) {
+        if (giftCard == null) {
+            return new NotificationResult(false, true, null, "Gift card was null");
+        }
+        try {
+            TenantConfig config = resolveTenantConfig(tenantId != null ? tenantId : giftCard.getTenantId());
+            String salonName = config.getSalonName() != null ? config.getSalonName() : "Jenny's Nail Studio";
+            String primaryColor = config.getPrimaryColor() != null ? config.getPrimaryColor() : "#e83e8c";
+            String supportPhone = resolveSupportPhone(config.getTenantKey());
+            String bookingUrl = buildBookingLink(config);
+
+            String recipientName = giftCard.getRecipientName() != null ? giftCard.getRecipientName().trim() : "Valued Guest";
+            String recipientEmail = giftCard.getRecipientEmail() != null ? giftCard.getRecipientEmail().trim() : "";
+            String purchaserName = giftCard.getPurchaserName() != null ? giftCard.getPurchaserName().trim() : "A Generous Friend";
+            String purchaserEmail = giftCard.getPurchaserEmail() != null ? giftCard.getPurchaserEmail().trim() : "";
+            String code = giftCard.getCode();
+            BigDecimal amount = giftCard.getInitialBalance();
+
+            String noteText = (personalMessage != null && !personalMessage.isBlank())
+                    ? personalMessage.trim()
+                    : "Enjoy a luxurious self-care experience at " + salonName + "!";
+
+            String themeHeading = switch (theme != null ? theme.toUpperCase() : "CLASSIC") {
+                case "BIRTHDAY" -> "🎂 A Birthday Gift For You!";
+                case "THANK_YOU" -> "💐 A Special Thank You Gift!";
+                case "HOLIDAY" -> "✨ Happy Holidays & Celebrations!";
+                case "LUXURY" -> "🌸 Pampering & Luxury Spa Experience";
+                default -> "🎁 You've Received a Gift Card!";
+            };
+
+            String subject = String.format("🎁 %s sent you a $%.2f Gift Card to %s!", purchaserName, amount, salonName);
+
+            String recipientHtml = String.format("""
+                    <!DOCTYPE html>
+                    <html>
+                    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f7fafc; margin: 0; padding: 20px; color: #2d3748;">
+                        <div style="max-width: 600px; margin: 20px auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
+                            <div style="background-color: %s; padding: 28px 24px; text-align: center; color: #ffffff;">
+                                <h1 style="margin: 0; font-size: 26px; font-weight: 700;">%s</h1>
+                                <p style="margin: 6px 0 0 0; font-size: 16px; opacity: 0.95;">%s</p>
+                            </div>
+                            <div style="padding: 28px;">
+                                <p style="font-size: 18px; margin: 0 0 16px 0;">Hi <strong>%s</strong>,</p>
+                                <p style="color: #4a5568; line-height: 1.6; margin: 0 0 20px 0;">
+                                    <strong>%s</strong> has gifted you an e-gift card for luxurious nail artistry and spa care!
+                                </p>
+                                <div style="background: linear-gradient(135deg, #1f2937, #111827); border-radius: 12px; padding: 24px; color: #ffffff; text-align: center; margin-bottom: 24px; box-shadow: 0 6px 20px rgba(0,0,0,0.15);">
+                                    <div style="font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; opacity: 0.8; margin-bottom: 6px;">Digital E-Gift Card</div>
+                                    <div style="font-size: 36px; font-weight: 800; color: #f472b6; margin-bottom: 12px;">$%.2f</div>
+                                    <div style="background: rgba(255,255,255,0.1); border: 1px dashed rgba(255,255,255,0.4); border-radius: 8px; padding: 12px; font-family: monospace; font-size: 22px; font-weight: 700; letter-spacing: 2px; color: #ffffff; margin-bottom: 12px;">
+                                        %s
+                                    </div>
+                                    <div style="font-size: 13px; opacity: 0.85;">Present this code in salon or enter it online when booking</div>
+                                </div>
+                                <div style="background-color: #f8fafc; border-left: 4px solid %s; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 24px;">
+                                    <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: #64748b; margin-bottom: 4px;">Personal Note from %s</div>
+                                    <div style="font-style: italic; color: #334155; line-height: 1.5;">"%s"</div>
+                                </div>
+                                <div style="text-align: center; margin-top: 24px;">
+                                    <a href="%s" style="background-color: %s; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 6px; font-weight: 700; font-size: 15px; display: inline-block;">
+                                        Book Your Appointment Now
+                                    </a>
+                                </div>
+                            </div>
+                            <div style="background-color: #edf2f7; padding: 16px; text-align: center; font-size: 12px; color: #718096;">
+                                %s | Questions or need help? Call %s
+                            </div>
+                        </div>
+                    </body>
+                    </html>
+                    """,
+                    primaryColor,
+                    salonName,
+                    themeHeading,
+                    recipientName,
+                    purchaserName,
+                    amount,
+                    code,
+                    primaryColor,
+                    purchaserName,
+                    noteText,
+                    bookingUrl,
+                    primaryColor,
+                    salonName,
+                    supportPhone
+            );
+
+            String smsBody = String.format("%s: %s sent you a $%.2f Gift Card! Code: %s. Redeem online or in salon: %s Questions? Call %s",
+                    salonName, purchaserName, amount, code, bookingUrl, supportPhone);
+
+            // Send to recipient
+            if (!recipientEmail.isBlank()) {
+                dispatchNotification(recipientEmail, "", subject, recipientHtml, smsBody, config);
+            }
+
+            // Send receipt to purchaser
+            if (!purchaserEmail.isBlank()) {
+                String receiptSubject = String.format("Receipt: Your $%.2f Gift Card for %s at %s", amount, recipientName, salonName);
+                String receiptHtml = String.format("""
+                        <!DOCTYPE html>
+                        <html>
+                        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f7fafc; margin: 0; padding: 20px; color: #2d3748;">
+                            <div style="max-width: 600px; margin: 20px auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0;">
+                                <div style="background-color: #1f2937; padding: 24px; text-align: center; color: #ffffff;">
+                                    <h2 style="margin: 0; font-size: 22px;">%s</h2>
+                                    <p style="margin: 4px 0 0 0; opacity: 0.85;">Gift Card Purchase Receipt</p>
+                                </div>
+                                <div style="padding: 24px;">
+                                    <p>Hi <strong>%s</strong>, thank you for your gift card purchase!</p>
+                                    <table style="width: 100%%; border-collapse: collapse; margin: 20px 0;">
+                                        <tr style="border-bottom: 1px solid #e2e8f0;"><td style="padding: 8px 0; color: #64748b;">Recipient:</td><td style="padding: 8px 0; text-align: right; font-weight: 600;">%s (%s)</td></tr>
+                                        <tr style="border-bottom: 1px solid #e2e8f0;"><td style="padding: 8px 0; color: #64748b;">Gift Card Code:</td><td style="padding: 8px 0; text-align: right; font-family: monospace; font-weight: 700;">%s</td></tr>
+                                        <tr style="border-bottom: 1px solid #e2e8f0;"><td style="padding: 8px 0; color: #64748b;">Amount:</td><td style="padding: 8px 0; text-align: right; font-weight: 700; color: #16a34a;">$%.2f</td></tr>
+                                        <tr><td style="padding: 8px 0; color: #64748b;">Status:</td><td style="padding: 8px 0; text-align: right; font-weight: 600; color: #2563eb;">ACTIVE</td></tr>
+                                    </table>
+                                    <p style="color: #64748b; font-size: 14px;">An email has been dispatched to %s with the digital gift voucher.</p>
+                                </div>
+                            </div>
+                        </body>
+                        </html>
+                        """,
+                        salonName,
+                        purchaserName,
+                        recipientName, recipientEmail,
+                        code,
+                        amount,
+                        recipientEmail
+                );
+                dispatchNotification(purchaserEmail, "", receiptSubject, receiptHtml, "", config);
+            }
+
+            return new NotificationResult(true, true, "sim-gc-" + code, "Gift card notifications sent to " + recipientEmail + " and " + purchaserEmail);
+        } catch (Exception e) {
+            return new NotificationResult(false, true, null, "Failed to send gift card notifications: " + e.getMessage());
+        }
+    }
+
     public record NotificationResult(
             boolean success,
             boolean simulated,

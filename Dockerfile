@@ -13,9 +13,9 @@ RUN chmod +x ./mvnw
 # Download dependencies (this layer gets cached if pom.xml doesn't change)
 RUN ./mvnw dependency:go-offline
 
-# Copy the rest of the source code and package the app
+# Copy the rest of the source code, run tests, and package the app
 COPY src ./src
-RUN ./mvnw clean package -DskipTests
+RUN ./mvnw clean package
 
 # Stage 2: Create lightweight runtime container with JRE 21
 FROM eclipse-temurin:21-jre-alpine

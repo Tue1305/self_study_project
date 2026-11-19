@@ -13,7 +13,7 @@ pipeline {
         stage('Test') {
             steps {
                 echo 'Running tests...'
-                // Example: sh 'npm test' or 'mvn test'
+                sh 'chmod +x ./mvnw && ./mvnw test'
             }
         }
 

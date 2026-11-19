@@ -22,7 +22,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.dao.DataIntegrityViolationException;
 
 import java.math.BigDecimal;
-import com.example.demo.entity.Customer;
 import com.example.demo.service.AppointmentAuditService;
 import com.example.demo.service.NotificationService;
 import org.springframework.beans.factory.annotation.Autowired;

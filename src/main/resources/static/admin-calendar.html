@@ -131,6 +131,40 @@
             background: #ffffff;
         }
 
+        .timeline-staff-col-header.clickable-staff-header {
+            cursor: pointer;
+            transition: background-color 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .timeline-staff-col-header.clickable-staff-header:hover {
+            background-color: #f8fafc;
+        }
+
+        .staff-column-day-off {
+            background-color: #fafbfc !important;
+            background-image: repeating-linear-gradient(45deg, rgba(241, 245, 249, 0.7), rgba(241, 245, 249, 0.7) 12px, rgba(226, 232, 240, 0.4) 12px, rgba(226, 232, 240, 0.4) 24px) !important;
+        }
+
+        .staff-day-off-watermark {
+            position: absolute;
+            top: 25%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            background: rgba(255, 255, 255, 0.94);
+            padding: 6px 14px;
+            border-radius: 20px;
+            border: 1px dashed #cbd5e1;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            white-space: nowrap;
+            z-index: 5;
+        }
+
         .staff-header-avatar {
             width: 36px;
             height: 36px;
@@ -810,6 +844,18 @@
         const [staffList, setStaffList] = useState([]);
         const [appointments, setAppointments] = useState([]);
         const [servicesCatalog, setServicesCatalog] = useState([]);
+        const [daysOffList, setDaysOffList] = useState([]);
+        const [dayOffModal, setDayOffModal] = useState({
+            isOpen: false,
+            staffId: null,
+            staffName: '',
+            isCurrentlyOff: false,
+            currentReason: '',
+            reason: 'Day Off',
+            existingCount: 0,
+            saving: false,
+            error: null
+        });
         const [loading, setLoading] = useState(true);
         const [selectedAppointment, setSelectedAppointment] = useState(null);
         const [statusReason, setStatusReason] = useState('');
@@ -1171,6 +1217,9 @@
         const totalStoreMinutes = totalStoreHours * 60;
         const totalGridHeightPx = totalStoreHours * HOUR_ROW_HEIGHT_PX;
 
+        const selectedDateKey = useMemo(() => toDateKey(selectedDate), [selectedDate]);
+        const isSelectedDateToday = useMemo(() => toDateKey(now) === selectedDateKey, [now, selectedDateKey]);
+
         const fetchScheduleData = useCallback(async (silent = false) => {
             if (!silent) setLoading(true);
             const headers = {
@@ -1179,24 +1228,27 @@
             };
 
             try {
-                const [staffRes, apptRes, srvRes] = await Promise.all([
+                const [staffRes, apptRes, srvRes, daysOffRes] = await Promise.all([
                     fetch('/api/nail-techs', { headers }),
                     fetch('/api/appointments', { headers }),
-                    fetch('/api/services', { headers })
+                    fetch('/api/services', { headers }),
+                    fetch(`/api/nail-techs/days-off?date=${selectedDateKey}`, { headers })
                 ]);
                 const staffData = staffRes.ok ? await staffRes.json() : [];
                 const apptData = apptRes.ok ? await apptRes.json() : [];
                 const srvData = srvRes.ok ? await srvRes.json() : [];
+                const daysOffData = daysOffRes.ok ? await daysOffRes.json() : [];
 
                 setStaffList(Array.isArray(staffData) ? staffData : []);
                 setAppointments(Array.isArray(apptData) ? apptData : []);
                 setServicesCatalog(Array.isArray(srvData) ? srvData : []);
+                setDaysOffList(Array.isArray(daysOffData) ? daysOffData : []);
             } catch (err) {
                 console.error('Error loading timeline data:', err);
             } finally {
                 if (!silent) setLoading(false);
             }
-        }, []);
+        }, [selectedDateKey]);
 
         useEffect(() => {
             fetchScheduleData();
@@ -1207,9 +1259,6 @@
             return () => clearInterval(pollId);
         }, [fetchScheduleData]);
 
-        const selectedDateKey = useMemo(() => toDateKey(selectedDate), [selectedDate]);
-        const isSelectedDateToday = useMemo(() => toDateKey(now) === selectedDateKey, [now, selectedDateKey]);
-
         const dayAppointments = useMemo(() => {
             return appointments.filter(apt => {
                 if (!apt.appointmentTime) return false;
@@ -1217,14 +1266,31 @@
             });
         }, [appointments, selectedDateKey]);
 
+        const daysOffMap = useMemo(() => {
+            const map = {};
+            if (Array.isArray(daysOffList)) {
+                daysOffList.forEach(item => {
+                    if (item.staffId) {
+                        map[item.staffId] = item;
+                    }
+                });
+            }
+            return map;
+        }, [daysOffList]);
+
         const staffColumns = useMemo(() => {
-            const cols = staffList.map(tech => ({
-                id: `tech-${tech.id}`,
-                techId: tech.id,
-                name: tech.name || tech.username,
-                pronouns: getStaffPronouns(tech),
-                isUnassigned: false
-            }));
+            const cols = staffList.map(tech => {
+                const dayOffRecord = daysOffMap[tech.id];
+                return {
+                    id: `tech-${tech.id}`,
+                    techId: tech.id,
+                    name: tech.name || tech.username,
+                    pronouns: getStaffPronouns(tech),
+                    isUnassigned: false,
+                    isOffToday: !!dayOffRecord,
+                    dayOffReason: dayOffRecord ? dayOffRecord.reason : null
+                };
+            });
 
             const hasUnassigned = dayAppointments.some(apt => !apt.nailTech || !apt.nailTech.id);
             if (hasUnassigned || cols.length === 0) {
@@ -1233,11 +1299,71 @@
                     techId: null,
                     name: 'Anyone Available',
                     pronouns: 'Open Queue',
-                    isUnassigned: true
+                    isUnassigned: true,
+                    isOffToday: false,
+                    dayOffReason: null
                 });
             }
             return cols;
-        }, [staffList, dayAppointments]);
+        }, [staffList, dayAppointments, daysOffMap]);
+
+        const handleStaffHeaderClick = (col) => {
+            if (col.isUnassigned) return;
+            const existingCount = dayAppointments.filter(apt =>
+                apt.nailTech && apt.nailTech.id === col.techId &&
+                String(apt.status || '').toUpperCase() !== 'CANCELLED'
+            ).length;
+
+            setDayOffModal({
+                isOpen: true,
+                staffId: col.techId,
+                staffName: col.name,
+                isCurrentlyOff: !!col.isOffToday,
+                currentReason: col.dayOffReason || 'Day Off',
+                reason: col.dayOffReason || 'Day Off',
+                existingCount,
+                saving: false,
+                error: null
+            });
+        };
+
+        const handleConfirmDayOffToggle = async () => {
+            if (!dayOffModal.staffId) return;
+            setDayOffModal(prev => ({ ...prev, saving: true, error: null }));
+            const headers = {
+                'Content-Type': 'application/json',
+                'X-Tenant-ID': activeTenant,
+                ...(token ? { 'Authorization': 'Bearer ' + token } : {})
+            };
+
+            try {
+                const res = await fetch(`/api/nail-techs/${dayOffModal.staffId}/toggle-day-off`, {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({
+                        date: selectedDateKey,
+                        reason: dayOffModal.reason
+                    })
+                });
+
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    throw new Error(data.message || 'Failed to update staff schedule.');
+                }
+
+                setDragToast({
+                    type: data.isOff ? 'warning' : 'success',
+                    message: data.message || `Schedule updated for ${dayOffModal.staffName}`
+                });
+
+                setDayOffModal(prev => ({ ...prev, isOpen: false, saving: false }));
+                await fetchScheduleData(true);
+            } catch (err) {
+                setDayOffModal(prev => ({ ...prev, saving: false, error: err.message || 'Error updating schedule.' }));
+            } finally {
+                setTimeout(() => setDragToast(null), 5000);
+            }
+        };
 
         const hourAxisTicks = useMemo(() => {
             const ticks = [];
@@ -2247,21 +2373,33 @@
 
                                 return h('div', {
                                     key: col.id,
-                                    className: `timeline-staff-col-header ${dragOverColumn && dragOverColumn.techId === col.techId && dragOverColumn.isHeader ? 'drag-target-active' : ''}`,
+                                    className: `timeline-staff-col-header ${!col.isUnassigned ? 'clickable-staff-header' : ''} ${dragOverColumn && dragOverColumn.techId === col.techId && dragOverColumn.isHeader ? 'drag-target-active' : ''}`,
+                                    onClick: () => handleStaffHeaderClick(col),
                                     onDragOver: (e) => handleHeaderDragOver(e, col),
                                     onDragLeave: (e) => handleColumnDragLeave(e, col),
                                     onDrop: (e) => handleDropOnStaff(e, col, true),
-                                    title: draggingApt ? `Drop here to assign to ${col.name} at current time` : col.name
+                                    title: draggingApt ? `Drop here to assign to ${col.name} at current time` : (!col.isUnassigned ? `Click to mark ${col.name} as Day Off / Available` : col.name)
                                 },
-                                    h('div', { className: 'd-flex align-items-center justify-content-center gap-2' },
-                                        h('div', { className: 'staff-header-avatar' }, col.name.charAt(0).toUpperCase()),
-                                        h('div', { className: 'text-start overflow-hidden' },
-                                            h('div', { className: 'fw-bold text-dark text-truncate staff-header-name' }, col.name),
-                                            h('div', { className: 'd-flex align-items-center gap-1' },
-                                                h('span', { className: 'text-muted extra-small' }, col.pronouns),
-                                                h('span', { className: 'badge rounded-pill bg-light text-secondary border extra-small' }, count)
+                                    h('div', { className: 'd-flex align-items-center justify-content-between gap-1' },
+                                        h('div', { className: 'd-flex align-items-center gap-2 overflow-hidden' },
+                                            h('div', {
+                                                className: `staff-header-avatar ${col.isOffToday ? 'bg-secondary-subtle text-secondary' : ''}`
+                                            }, col.isOffToday ? '💤' : col.name.charAt(0).toUpperCase()),
+                                            h('div', { className: 'text-start overflow-hidden' },
+                                                h('div', { className: 'fw-bold text-dark text-truncate staff-header-name d-flex align-items-center gap-1' },
+                                                    col.name,
+                                                    !col.isUnassigned && h('i', { className: 'bi bi-calendar-check text-muted extra-small opacity-50 ms-1' })
+                                                ),
+                                                h('div', { className: 'd-flex align-items-center gap-1 flex-wrap' },
+                                                    h('span', { className: 'text-muted extra-small' }, col.pronouns),
+                                                    h('span', { className: 'badge rounded-pill bg-light text-secondary border extra-small' }, count)
+                                                )
                                             )
-                                        )
+                                        ),
+                                        col.isOffToday && h('span', {
+                                            className: 'badge bg-warning text-dark border border-warning-subtle extra-small fw-bold px-2 py-1',
+                                            style: { fontSize: '0.68rem', letterSpacing: '0.02em' }
+                                        }, 'OFF TODAY')
                                     )
                                 );
                             })
@@ -2314,13 +2452,17 @@
 
                                     return h('div', {
                                         key: col.id,
-                                        className: `timeline-staff-column ${isHoveredCol ? 'drag-target-active' : ''}`,
+                                        className: `timeline-staff-column ${col.isOffToday ? 'staff-column-day-off' : ''} ${isHoveredCol ? 'drag-target-active' : ''}`,
                                         onClick: (e) => handleColumnClick(e, col),
                                         onDragOver: (e) => handleColumnDragOver(e, col),
                                         onDragLeave: (e) => handleColumnDragLeave(e, col),
                                         onDrop: (e) => handleDropOnStaff(e, col, false),
                                         title: draggingApt ? `Drop here to assign to ${col.name}` : `Click empty slot on ${col.name}'s column to book walk-in`
                                     },
+                                        /* Day-Off Watermark */
+                                        col.isOffToday && h('div', { className: 'staff-day-off-watermark' },
+                                            `💤 OFF TODAY (${col.dayOffReason || 'Day Off'})`
+                                        ),
                                         /* Drag preview ghost indicating the snap slot and technician */
                                         isHoveredCol && h('div', {
                                             className: 'timeline-drag-ghost',
@@ -2384,6 +2526,120 @@
                         )
                     )
                   ),
+
+            /* Staff Day Off Toggle Modal */
+            dayOffModal.isOpen && h('div', {
+                className: 'modal show d-block',
+                tabIndex: '-1',
+                style: { backgroundColor: 'rgba(15, 23, 42, 0.55)', zIndex: 1075 },
+                onClick: () => setDayOffModal(prev => ({ ...prev, isOpen: false }))
+            },
+                h('div', {
+                    className: 'modal-dialog modal-dialog-centered',
+                    onClick: (e) => e.stopPropagation()
+                },
+                    h('div', { className: 'modal-content border-0 shadow-lg rounded-4 overflow-hidden' },
+                        /* Modal Header */
+                        h('div', {
+                            className: `modal-header text-white px-4 py-3 border-0 ${dayOffModal.isCurrentlyOff ? 'bg-success' : 'bg-dark'}`
+                        },
+                            h('div', { className: 'd-flex align-items-center gap-2' },
+                                h('span', { className: 'fs-5' }, dayOffModal.isCurrentlyOff ? '✅' : '💤'),
+                                h('h5', { className: 'modal-title fw-bold mb-0 text-white' },
+                                    dayOffModal.isCurrentlyOff
+                                        ? `Mark ${dayOffModal.staffName} as Available`
+                                        : `Mark ${dayOffModal.staffName} as OFF Today`
+                                )
+                            ),
+                            h('button', {
+                                type: 'button',
+                                className: 'btn-close btn-close-white',
+                                onClick: () => setDayOffModal(prev => ({ ...prev, isOpen: false }))
+                            })
+                        ),
+
+                        /* Modal Body */
+                        h('div', { className: 'modal-body p-4' },
+                            dayOffModal.error && h('div', { className: 'alert alert-danger py-2 px-3 small rounded-3 mb-3' }, dayOffModal.error),
+
+                            dayOffModal.isCurrentlyOff ? (
+                                h('div', null,
+                                    h('p', { className: 'text-secondary mb-3' },
+                                        h('strong', { className: 'text-dark' }, dayOffModal.staffName),
+                                        ` is currently marked `,
+                                        h('span', { className: 'badge bg-warning-subtle text-dark border border-warning' }, `OFF: ${dayOffModal.currentReason}`),
+                                        ` for `,
+                                        h('strong', { className: 'text-dark' }, selectedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })),
+                                        `.`
+                                    ),
+                                    h('p', { className: 'text-muted small mb-0' },
+                                        'Removing the Day-Off status will make them immediately available for client bookings and appointments on this date.'
+                                    )
+                                )
+                            ) : (
+                                h('div', null,
+                                    h('p', { className: 'text-secondary mb-3' },
+                                        `Mark `,
+                                        h('strong', { className: 'text-dark' }, dayOffModal.staffName),
+                                        ` as `,
+                                        h('strong', { className: 'text-danger' }, 'OFF'),
+                                        ` for `,
+                                        h('strong', { className: 'text-dark' }, selectedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })),
+                                        `? In the client booking section, this staff member will be shown as unavailable/off for today.`
+                                    ),
+
+                                    h('div', { className: 'mb-3' },
+                                        h('label', { className: 'form-label fw-semibold text-dark small' }, 'Reason:'),
+                                        h('select', {
+                                            className: 'form-select rounded-3',
+                                            value: dayOffModal.reason,
+                                            onChange: (e) => setDayOffModal(prev => ({ ...prev, reason: e.target.value }))
+                                        },
+                                            h('option', { value: 'Day Off' }, 'Regular Day Off'),
+                                            h('option', { value: 'Vacation' }, 'Vacation / Travel'),
+                                            h('option', { value: 'Sick / Medical' }, 'Sick / Medical Leave'),
+                                            h('option', { value: 'Personal Leave' }, 'Personal Leave'),
+                                            h('option', { value: 'Emergency' }, 'Family / Personal Emergency')
+                                        )
+                                    ),
+
+                                    dayOffModal.existingCount > 0 && h('div', {
+                                        className: 'alert alert-warning border border-warning d-flex align-items-start gap-2 rounded-3 p-3 mb-0'
+                                    },
+                                        h('i', { className: 'bi bi-exclamation-triangle-fill fs-5 text-warning flex-shrink-0 mt-1' }),
+                                        h('div', { className: 'small' },
+                                            h('div', { className: 'fw-bold' }, `Notice: ${dayOffModal.existingCount} existing appointment(s) scheduled`),
+                                            h('div', { className: 'text-muted' },
+                                                `${dayOffModal.staffName} already has appointments booked on this day. You can still mark them off, but remember to reassign or notify the clients.`
+                                            )
+                                        )
+                                    )
+                                )
+                            )
+                        ),
+
+                        /* Modal Footer */
+                        h('div', { className: 'modal-footer bg-light px-4 py-3 border-0' },
+                            h('button', {
+                                type: 'button',
+                                className: 'btn btn-outline-secondary rounded-pill px-4',
+                                onClick: () => setDayOffModal(prev => ({ ...prev, isOpen: false })),
+                                disabled: dayOffModal.saving
+                            }, 'Cancel'),
+                            h('button', {
+                                type: 'button',
+                                className: `btn rounded-pill px-4 fw-semibold ${dayOffModal.isCurrentlyOff ? 'btn-success' : 'btn-dark'}`,
+                                onClick: handleConfirmDayOffToggle,
+                                disabled: dayOffModal.saving
+                            },
+                                dayOffModal.saving
+                                    ? h('span', { className: 'spinner-border spinner-border-sm me-2' })
+                                    : (dayOffModal.isCurrentlyOff ? '✅ Set as Available' : '💤 Confirm Day Off')
+                            )
+                        )
+                    )
+                )
+            ),
 
             /* 3. Quick Walk-In / Manual Booking Modal */
             walkInModal.isOpen && h('div', {

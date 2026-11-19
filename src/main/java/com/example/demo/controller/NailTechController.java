@@ -1,22 +1,25 @@
 package com.example.demo.controller;
 
+import com.example.demo.entity.Appointment;
 import com.example.demo.entity.ServiceEntity;
+import com.example.demo.entity.StaffDayOff;
 import com.example.demo.entity.UserEntity;
+import com.example.demo.repository.AppointmentRepository;
 import com.example.demo.repository.ServiceRepository;
+import com.example.demo.repository.StaffDayOffRepository;
 import com.example.demo.repository.UserRepository;
 import com.example.demo.service.TenantContextResolver;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.time.LocalDate;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @RestController
@@ -28,6 +31,8 @@ public class NailTechController {
     private final ServiceRepository serviceRepository;
     private final PasswordEncoder passwordEncoder;
     private final TenantContextResolver tenantContextResolver;
+    private StaffDayOffRepository staffDayOffRepository;
+    private AppointmentRepository appointmentRepository;
 
     public NailTechController(
             UserRepository userRepository,
@@ -39,6 +44,16 @@ public class NailTechController {
         this.serviceRepository = serviceRepository;
         this.passwordEncoder = passwordEncoder;
         this.tenantContextResolver = tenantContextResolver;
+    }
+
+    @Autowired(required = false)
+    public void setStaffDayOffRepository(StaffDayOffRepository staffDayOffRepository) {
+        this.staffDayOffRepository = staffDayOffRepository;
+    }
+
+    @Autowired(required = false)
+    public void setAppointmentRepository(AppointmentRepository appointmentRepository) {
+        this.appointmentRepository = appointmentRepository;
     }
 
     // Supports optional ?serviceId={id} or ?serviceIds={id1,id2} filtering scoped strictly to the active tenant
@@ -247,5 +262,103 @@ public class NailTechController {
         }
         userRepository.delete(existing.get());
         return ResponseEntity.ok(Map.of("message", "Nail technician deleted successfully"));
+    }
+
+    @GetMapping("/days-off")
+    public List<StaffDayOff> getDaysOff(
+            @RequestParam(required = false) String date,
+            HttpServletRequest request
+    ) {
+        String tenantId = tenantContextResolver.resolveTenantId(request);
+        if (staffDayOffRepository == null) {
+            return Collections.emptyList();
+        }
+        if (date != null && !date.isBlank()) {
+            try {
+                LocalDate parsedDate = LocalDate.parse(date.trim());
+                return staffDayOffRepository.findAllByTenantIdAndOffDate(tenantId, parsedDate);
+            } catch (Exception e) {
+                return Collections.emptyList();
+            }
+        }
+        return staffDayOffRepository.findAllByTenantId(tenantId);
+    }
+
+    @Transactional
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ADMIN')")
+    @PostMapping("/{staffId}/toggle-day-off")
+    public ResponseEntity<?> toggleDayOff(
+            @PathVariable Long staffId,
+            @RequestBody(required = false) Map<String, Object> body,
+            HttpServletRequest request,
+            java.security.Principal principal
+    ) {
+        String tenantId = tenantContextResolver.resolveTenantId(request);
+        Optional<UserEntity> techOpt = userRepository.findByTenantIdAndId(tenantId, staffId);
+        if (techOpt.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("message", "Staff technician not found."));
+        }
+        UserEntity tech = techOpt.get();
+
+        LocalDate targetDate = LocalDate.now();
+        String reason = "Day Off";
+        if (body != null) {
+            if (body.get("date") != null && !String.valueOf(body.get("date")).isBlank()) {
+                try {
+                    targetDate = LocalDate.parse(String.valueOf(body.get("date")).trim());
+                } catch (Exception ignored) {}
+            }
+            if (body.get("reason") != null && !String.valueOf(body.get("reason")).isBlank()) {
+                reason = String.valueOf(body.get("reason")).trim();
+            }
+        }
+
+        if (staffDayOffRepository == null) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("message", "Staff day-off repository not initialized."));
+        }
+
+        Optional<StaffDayOff> existingOpt = staffDayOffRepository.findByTenantIdAndStaffIdAndOffDate(tenantId, staffId, targetDate);
+        Map<String, Object> response = new LinkedHashMap<>();
+        String staffDisplayName = (tech.getName() != null && !tech.getName().isBlank()) ? tech.getName() : tech.getUsername();
+
+        if (existingOpt.isPresent()) {
+            staffDayOffRepository.delete(existingOpt.get());
+            response.put("isOff", false);
+            response.put("staffId", staffId);
+            response.put("staffName", staffDisplayName);
+            response.put("date", targetDate.toString());
+            response.put("message", staffDisplayName + " is now marked Available for " + targetDate + ".");
+            return ResponseEntity.ok(response);
+        } else {
+            String createdBy = (principal != null && principal.getName() != null) ? principal.getName() : "Admin";
+            StaffDayOff dayOff = new StaffDayOff(tenantId, staffId, staffDisplayName, targetDate, reason, createdBy);
+            staffDayOffRepository.save(dayOff);
+
+            long existingAppointmentsCount = 0;
+            if (appointmentRepository != null) {
+                List<Appointment> dayAppts = appointmentRepository.findByTenantIdAndAppointmentTimeBetween(
+                        tenantId,
+                        targetDate.atStartOfDay(),
+                        targetDate.plusDays(1).atStartOfDay()
+                );
+                if (dayAppts != null) {
+                    existingAppointmentsCount = dayAppts.stream()
+                            .filter(a -> a.getStatus() != Appointment.AppointmentStatus.CANCELLED)
+                            .filter(a -> a.getNailTech() != null && staffId.equals(a.getNailTech().getId()))
+                            .count();
+                }
+            }
+
+            response.put("isOff", true);
+            response.put("staffId", staffId);
+            response.put("staffName", staffDisplayName);
+            response.put("date", targetDate.toString());
+            response.put("reason", reason);
+            response.put("existingAppointmentsCount", existingAppointmentsCount);
+            response.put("message", staffDisplayName + " is now marked OFF for " + targetDate + ".");
+            return ResponseEntity.ok(response);
+        }
     }
 }

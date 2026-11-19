@@ -244,6 +244,17 @@
             background-color: var(--bs-soft-pink);
             box-shadow: 0 6px 20px rgba(233, 30, 99, 0.12);
         }
+        .staff-card.disabled-off {
+            opacity: 0.65;
+            cursor: not-allowed !important;
+            background: #fbfbfb !important;
+            border-style: dashed;
+        }
+        .staff-card.disabled-off:hover {
+            border-color: #cbd5e1 !important;
+            transform: none !important;
+            box-shadow: none !important;
+        }
         .staff-avatar {
             width: 50px;
             height: 50px;
@@ -1033,6 +1044,7 @@
         selectedStation: null, // string name e.g. 'Private Zen Suite A'
         servicesList: [],
         staffList: [],
+        staffDaysOffInfo: {},
         serviceTimeSlots: {}, // { [serviceId]: '15:00:00' }
         slotSelectionMode: 'per-service' // 'per-service' or 'combined'
     };
@@ -1444,6 +1456,19 @@
 
         try {
             const techId = currentPortalAppointment && currentPortalAppointment.nailTech ? currentPortalAppointment.nailTech.id : '';
+            if (techId) {
+                const daysOffResp = await fetch(`/api/nail-techs/days-off?date=${dateStr}`, { headers: getActiveTenantHeaders() }).catch(() => null);
+                if (daysOffResp && daysOffResp.ok) {
+                    const daysOffData = await daysOffResp.json().catch(() => []);
+                    const isTechOff = Array.isArray(daysOffData) && daysOffData.some(d => d.staffId == techId);
+                    if (isTechOff) {
+                        const techName = currentPortalAppointment && currentPortalAppointment.nailTech ? (currentPortalAppointment.nailTech.name || currentPortalAppointment.nailTech.username) : 'The assigned specialist';
+                        slotsGrid.innerHTML = `<div class="alert alert-warning small py-3 text-center w-100" style="grid-column: 1 / -1;"><i class="bi bi-moon-stars me-1"></i>${techName} is off on ${dateStr}. Please select another date.</div>`;
+                        return;
+                    }
+                }
+            }
+
             const duration = currentPortalAppointment && currentPortalAppointment.service ? (currentPortalAppointment.service.durationMinutes || 45) : 45;
             const params = new URLSearchParams({
                 date: dateStr,
@@ -2878,6 +2903,48 @@
             grid.innerHTML = '<div class="text-muted small py-3 text-center" style="grid-column: 1 / -1;"><span class="spinner-border spinner-border-sm text-pink me-2"></span>Synchronizing technician schedule &amp; available time windows...</div>';
         }
 
+        // Fetch staff days-off for the selected date
+        try {
+            const daysOffResp = await fetch(`/api/nail-techs/days-off?date=${selectedDate}`, {
+                headers: getActiveTenantHeaders()
+            });
+            if (daysOffResp.ok) {
+                const daysOffData = await daysOffResp.json();
+                bookingState.staffDaysOffInfo = {};
+                if (Array.isArray(daysOffData)) {
+                    daysOffData.forEach(item => {
+                        if (item.staffId) {
+                            bookingState.staffDaysOffInfo[item.staffId] = item.reason || 'Day Off';
+                        }
+                    });
+                }
+            }
+        } catch (ignored) {}
+
+        // Check if any currently chosen technician is marked OFF on this date
+        const offSpecialistsNotice = [];
+        if (bookingState.selectedStaff && !bookingState.selectedStaff.isAnyoneAvailable && bookingState.selectedStaff.id) {
+            if (bookingState.staffDaysOffInfo && bookingState.staffDaysOffInfo[bookingState.selectedStaff.id]) {
+                offSpecialistsNotice.push(`${bookingState.selectedStaff.name || 'Specialist'}`);
+            }
+        }
+        bookingState.guests.forEach((g) => {
+            if (g && g.serviceStaffAssignments) {
+                Object.entries(g.serviceStaffAssignments).forEach(([sId, tId]) => {
+                    if (tId && bookingState.staffDaysOffInfo && bookingState.staffDaysOffInfo[tId]) {
+                        const tObj = (bookingState.staffList || []).find(t => t.id === tId);
+                        const tName = tObj ? (tObj.name || tObj.username) : `Specialist #${tId}`;
+                        if (!offSpecialistsNotice.includes(tName)) {
+                            offSpecialistsNotice.push(tName);
+                        }
+                    }
+                });
+            }
+        });
+        if (offSpecialistsNotice.length > 0) {
+            showAlert(`Notice: ${offSpecialistsNotice.join(', ')} is off on ${selectedDate}. Please select another specialist or choose Anyone Available.`);
+        }
+
         const totalDuration = getTotalBookingDurationMinutes();
 
         // Build query parameters including per-service sequential durations and assigned technician IDs
@@ -3643,13 +3710,14 @@
             const techs = response.ok ? await response.json() : [];
             bookingState.staffList = techs;
 
-            // Pre-fetch today's schedule conflicts if not cached
-            if (!bookingState.staffBookedInfo) {
+            // Pre-fetch today's schedule conflicts and staff day-off status if not cached
+            if (!bookingState.staffBookedInfo || !bookingState.staffDaysOffInfo) {
                 try {
                     const todayStr = getLocalTodayDateStr();
-                    const preResp = await fetch(`/api/appointments/available-slots?date=${todayStr}&durationMinutes=45`, {
-                        headers: getActiveTenantHeaders()
-                    });
+                    const [preResp, daysOffResp] = await Promise.all([
+                        fetch(`/api/appointments/available-slots?date=${todayStr}&durationMinutes=45`, { headers: getActiveTenantHeaders() }),
+                        fetch(`/api/nail-techs/days-off?date=${todayStr}`, { headers: getActiveTenantHeaders() })
+                    ]);
                     if (preResp.ok) {
                         const preData = await preResp.json();
                         bookingState.staffBookedInfo = {};
@@ -3660,6 +3728,17 @@
                                 }
                             });
                         });
+                    }
+                    if (daysOffResp.ok) {
+                        const daysOffData = await daysOffResp.json();
+                        bookingState.staffDaysOffInfo = {};
+                        if (Array.isArray(daysOffData)) {
+                            daysOffData.forEach(item => {
+                                if (item.staffId) {
+                                    bookingState.staffDaysOffInfo[item.staffId] = item.reason || 'Day Off';
+                                }
+                            });
+                        }
                     }
                 } catch (ignored) {}
             }
@@ -3733,21 +3812,32 @@
             // 2. Qualified staff cards
             qualifiedTechs.forEach(tech => {
                 const isSel = (assignedTechId === tech.id);
+                const isOff = bookingState.staffDaysOffInfo && bookingState.staffDaysOffInfo[tech.id];
                 const isBooked = bookingState.staffBookedInfo && bookingState.staffBookedInfo[tech.id];
-                const bookedBadge = isBooked
-                    ? `<span class="badge bg-warning-subtle text-dark border border-warning-subtle ms-2 small"><i class="bi bi-clock-history me-1"></i>Staff booked</span>`
-                    : '';
+
+                let statusBadge = '';
+                if (isOff) {
+                    statusBadge = `<span class="badge bg-secondary-subtle text-secondary border ms-2 small"><i class="bi bi-moon-stars me-1"></i>Off Today</span>`;
+                } else if (isBooked) {
+                    statusBadge = `<span class="badge bg-warning-subtle text-dark border border-warning-subtle ms-2 small"><i class="bi bi-clock-history me-1"></i>Staff booked</span>`;
+                }
+
+                const safeName = (tech.name || tech.username).replace(/'/g, "\\'");
+                const clickHandler = isOff
+                    ? `showAlert('${safeName} is off today. Please select another specialist or Anyone Available.')`
+                    : `selectSingleStaff(${tech.id})`;
+
                 const col = document.createElement('div');
                 col.className = 'col-md-6';
                 col.innerHTML = `
-                    <div class="staff-card d-flex align-items-center justify-content-between ${isSel ? 'selected' : ''}"
+                    <div class="staff-card d-flex align-items-center justify-content-between ${isSel ? 'selected' : ''} ${isOff ? 'disabled-off' : ''}"
                          id="singleCard-${tech.id}"
-                         onclick="selectSingleStaff(${tech.id})">
+                         onclick="${clickHandler}">
                         <div class="d-flex align-items-center gap-3">
-                            <div class="staff-avatar"><i class="bi bi-person-fill"></i></div>
+                            <div class="staff-avatar ${isOff ? 'bg-secondary-subtle text-secondary' : ''}"><i class="bi bi-${isOff ? 'moon-stars' : 'person-fill'}"></i></div>
                             <div>
-                                <h5 class="fw-bold text-dark mb-0 d-flex align-items-center flex-wrap">${tech.name || tech.username} ${bookedBadge}</h5>
-                                <small class="text-muted">${getStaffPronouns(tech)}</small>
+                                <h5 class="fw-bold text-dark mb-0 d-flex align-items-center flex-wrap">${tech.name || tech.username} ${statusBadge}</h5>
+                                <small class="text-muted">${isOff ? `Off today (${bookingState.staffDaysOffInfo[tech.id]})` : getStaffPronouns(tech)}</small>
                             </div>
                         </div>
                         <span class="check-indicator"><i class="bi bi-check-lg"></i></span>
@@ -3815,20 +3905,31 @@
                 // 2. Qualified staff cards for this specific service
                 qualifiedTechs.forEach(tech => {
                     const isTechAssigned = (assignedVal === tech.id);
+                    const isOff = bookingState.staffDaysOffInfo && bookingState.staffDaysOffInfo[tech.id];
                     const isBooked = bookingState.staffBookedInfo && bookingState.staffBookedInfo[tech.id];
-                    const bookedBadge = isBooked
-                        ? `<span class="badge bg-warning-subtle text-dark border border-warning-subtle ms-2 small"><i class="bi bi-clock-history me-1"></i>Staff booked</span>`
-                        : '';
+
+                    let statusBadge = '';
+                    if (isOff) {
+                        statusBadge = `<span class="badge bg-secondary-subtle text-secondary border ms-2 small"><i class="bi bi-moon-stars me-1"></i>Off Today</span>`;
+                    } else if (isBooked) {
+                        statusBadge = `<span class="badge bg-warning-subtle text-dark border border-warning-subtle ms-2 small"><i class="bi bi-clock-history me-1"></i>Staff booked</span>`;
+                    }
+
+                    const safeName = (tech.name || tech.username).replace(/'/g, "\\'");
+                    const clickHandler = isOff
+                        ? `showAlert('${safeName} is off today. Please select another specialist or Anyone Available.')`
+                        : `selectServiceStaff(${srv.id}, ${tech.id})`;
+
                     staffCardsHtml += `
                         <div class="col-md-6">
-                            <div class="staff-card d-flex align-items-center justify-content-between ${isTechAssigned ? 'selected' : ''}"
+                            <div class="staff-card d-flex align-items-center justify-content-between ${isTechAssigned ? 'selected' : ''} ${isOff ? 'disabled-off' : ''}"
                                  id="srvCard-${srv.id}-${tech.id}"
-                                 onclick="selectServiceStaff(${srv.id}, ${tech.id})">
+                                 onclick="${clickHandler}">
                                 <div class="d-flex align-items-center gap-3">
-                                    <div class="staff-avatar"><i class="bi bi-person-fill"></i></div>
+                                    <div class="staff-avatar ${isOff ? 'bg-secondary-subtle text-secondary' : ''}"><i class="bi bi-${isOff ? 'moon-stars' : 'person-fill'}"></i></div>
                                     <div>
-                                        <h5 class="fw-bold text-dark mb-0 d-flex align-items-center flex-wrap">${tech.name || tech.username} ${bookedBadge}</h5>
-                                        <small class="text-muted">${getStaffPronouns(tech)}</small>
+                                        <h5 class="fw-bold text-dark mb-0 d-flex align-items-center flex-wrap">${tech.name || tech.username} ${statusBadge}</h5>
+                                        <small class="text-muted">${isOff ? `Off today (${bookingState.staffDaysOffInfo[tech.id]})` : getStaffPronouns(tech)}</small>
                                     </div>
                                 </div>
                                 <span class="check-indicator"><i class="bi bi-check-lg"></i></span>

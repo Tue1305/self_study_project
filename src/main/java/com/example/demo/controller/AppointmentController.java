@@ -4,11 +4,13 @@ import com.example.demo.dto.BookingRequestDto;
 import com.example.demo.entity.Appointment;
 import com.example.demo.entity.Customer;
 import com.example.demo.entity.ServiceEntity;
+import com.example.demo.entity.StaffDayOff;
 import com.example.demo.entity.TenantConfig;
 import com.example.demo.entity.UserEntity;
 import com.example.demo.repository.AppointmentRepository;
 import com.example.demo.repository.CustomerRepository;
 import com.example.demo.repository.ServiceRepository;
+import com.example.demo.repository.StaffDayOffRepository;
 import com.example.demo.repository.UserRepository;
 import com.example.demo.service.TenantContextResolver;
 import jakarta.servlet.http.HttpServletRequest;
@@ -25,6 +27,7 @@ import com.example.demo.service.AppointmentAuditService;
 import com.example.demo.service.NotificationService;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
@@ -33,7 +36,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping({"/api/appointments", "/api/bookings"})
@@ -49,10 +54,16 @@ public class AppointmentController {
     private final NotificationService notificationService;
     private final com.example.demo.repository.AppointmentTransactionRepository transactionRepository;
     private com.example.demo.service.AppointmentReminderService reminderService;
+    private StaffDayOffRepository staffDayOffRepository;
 
     @Autowired(required = false)
     public void setReminderService(com.example.demo.service.AppointmentReminderService reminderService) {
         this.reminderService = reminderService;
+    }
+
+    @Autowired(required = false)
+    public void setStaffDayOffRepository(StaffDayOffRepository staffDayOffRepository) {
+        this.staffDayOffRepository = staffDayOffRepository;
     }
 
     private static final java.util.regex.Pattern STRICT_EMAIL_PATTERN =
@@ -266,8 +277,20 @@ public class AppointmentController {
          .filter(a -> a.getStatus() != Appointment.AppointmentStatus.CANCELLED)
          .toList();
 
-        // Get active tenant technicians
+        // Query technicians who have a marked day-off on this date
+        Set<Long> offStaffIds = Collections.emptySet();
+        if (staffDayOffRepository != null) {
+            offStaffIds = staffDayOffRepository.findAllByTenantIdAndOffDate(tenantId, targetDate).stream()
+                    .map(StaffDayOff::getStaffId)
+                    .collect(Collectors.toSet());
+        }
+        final Set<Long> finalOffStaffIds = offStaffIds;
+
+        // Get active tenant technicians and non-off working technicians
         List<UserEntity> tenantTechs = userRepository.findAllByTenantIdAndRole(tenantId, "ROLE_NAIL_TECH");
+        List<UserEntity> workingTenantTechs = tenantTechs.stream()
+                .filter(t -> t.getId() != null && !finalOffStaffIds.contains(t.getId()))
+                .collect(Collectors.toList());
 
         // Determine which technicians are being checked
         List<UserEntity> targetTechs = new ArrayList<>();
@@ -279,9 +302,9 @@ public class AppointmentController {
             }
         }
 
-        // If no specific tech requested, "Anyone Available" mode evaluates against all qualified techs
-        if (targetTechs.isEmpty()) {
-            targetTechs.addAll(tenantTechs);
+        // If no specific tech requested, "Anyone Available" mode evaluates against all qualified techs who are not OFF
+        if (targetTechs.isEmpty() && techId == null && (techIds == null || techIds.isEmpty())) {
+            targetTechs.addAll(workingTenantTechs);
         }
 
         // Flatten any comma-separated values passed in query params
@@ -456,7 +479,18 @@ public class AppointmentController {
 
                     if (seg.techId != null && seg.techId > 0) {
                         final long targetTid = seg.techId;
-                        Optional<Appointment> conflictOpt = dayAppointments.stream()
+                        if (finalOffStaffIds.contains(targetTid)) {
+                            segAvailable = false;
+                            isAvailable = false;
+                            segBusyWindow = "Off on this date";
+                            segNextAvailable = "N/A";
+                            segMessage = seg.serviceName + " — " + seg.techName + " is OFF on this date";
+                            conflictMessages.add(segMessage);
+                            if (staffBookedDesc == null) {
+                                staffBookedDesc = seg.techName + " is OFF on this date";
+                            }
+                        } else {
+                            Optional<Appointment> conflictOpt = dayAppointments.stream()
                                 .filter(a -> a.getNailTech() != null &&
                                         a.getNailTech().getId() != null &&
                                         a.getNailTech().getId().equals(targetTid) &&
@@ -510,21 +544,22 @@ public class AppointmentController {
                         } else {
                             segMessage = seg.serviceName + " — " + seg.techName + ": Available at " + formatTime12Hour(segStart);
                         }
-                    } else {
-                        // "Anyone Available": check if at least one qualified technician is free
-                        boolean atLeastOneFree = tenantTechs.isEmpty() || tenantTechs.stream().anyMatch(t ->
-                                dayAppointments.stream().noneMatch(a ->
-                                        a.getNailTech() != null &&
-                                        a.getNailTech().getId() != null &&
-                                        a.getNailTech().getId().equals(t.getId()) &&
-                                        hasOverlapWithBuffer(a, segStart, segEnd, effectiveBuffer)
-                                )
-                        );
-                        if (!atLeastOneFree) {
-                            segAvailable = false;
-                            isAvailable = false;
-                            segMessage = seg.serviceName + " — Anyone Available: All specialists booked at " + formatTime12Hour(segStart);
-                            conflictMessages.add(segMessage);
+                    }
+                } else {
+                    // "Anyone Available": check if at least one qualified non-off technician is free
+                    boolean atLeastOneFree = !workingTenantTechs.isEmpty() && workingTenantTechs.stream().anyMatch(t ->
+                            dayAppointments.stream().noneMatch(a ->
+                                    a.getNailTech() != null &&
+                                    a.getNailTech().getId() != null &&
+                                    a.getNailTech().getId().equals(t.getId()) &&
+                                    hasOverlapWithBuffer(a, segStart, segEnd, effectiveBuffer)
+                            )
+                    );
+                    if (!atLeastOneFree) {
+                        segAvailable = false;
+                        isAvailable = false;
+                        segMessage = seg.serviceName + " — Anyone Available: All specialists " + (workingTenantTechs.isEmpty() ? "off" : "booked") + " at " + formatTime12Hour(segStart);
+                        conflictMessages.add(segMessage);
                             if (staffBookedDesc == null) {
                                 staffBookedDesc = "All staff booked";
                             }
@@ -640,8 +675,8 @@ public class AppointmentController {
                     String nextAvail = null;
                     List<String> freeSpecialists = new ArrayList<>();
 
-                    // Check which specialists are free at this exact slot
-                    for (UserEntity tech : tenantTechs) {
+                    // Check which specialists are free at this exact slot (excluding off specialists)
+                    for (UserEntity tech : workingTenantTechs) {
                         boolean techFree = dayAppointments.stream().noneMatch(a ->
                                 a.getNailTech() != null &&
                                 a.getNailTech().getId() != null &&
@@ -653,67 +688,78 @@ public class AppointmentController {
                             freeSpecialists.add(tName);
                         }
                     }
-                    boolean anyoneAvailableAtSlot = tenantTechs.isEmpty() || !freeSpecialists.isEmpty();
+                    boolean anyoneAvailableAtSlot = !freeSpecialists.isEmpty();
                     String statusMessage;
 
                     if (seg.techId != null && seg.techId > 0) {
                         final long targetTid = seg.techId;
-                        Optional<Appointment> conflictOpt = dayAppointments.stream()
-                                .filter(a -> a.getNailTech() != null &&
-                                        a.getNailTech().getId() != null &&
-                                        a.getNailTech().getId().equals(targetTid) &&
-                                        hasOverlapWithBuffer(a, segStart, segEnd, effectiveBuffer))
-                                .findFirst();
-
-                        if (conflictOpt.isPresent()) {
+                        if (finalOffStaffIds.contains(targetTid)) {
                             segAvailable = false;
-                            Appointment ca = conflictOpt.get();
-                            LocalDateTime caStart = ca.getAppointmentTime();
-                            int caDur = (ca.getService() != null && ca.getService().getDurationMinutes() != null)
-                                    ? ca.getService().getDurationMinutes() : 45;
-                            LocalDateTime caBusyEnd = caStart.plusMinutes(caDur + effectiveBuffer);
-
-                            LocalDateTime nextOpen = caBusyEnd;
-                            boolean chained = true;
-                            while (chained) {
-                                final LocalDateTime checkTime = nextOpen;
-                                Optional<Appointment> nextConflict = dayAppointments.stream()
-                                        .filter(a -> a.getNailTech() != null &&
-                                                a.getNailTech().getId() != null &&
-                                                a.getNailTech().getId().equals(targetTid))
-                                        .filter(a -> a.getAppointmentTime() != null &&
-                                                !a.getAppointmentTime().isAfter(checkTime) &&
-                                                a.getAppointmentTime().plusMinutes(
-                                                        (a.getService() != null && a.getService().getDurationMinutes() != null
-                                                                ? a.getService().getDurationMinutes() : 45) + effectiveBuffer
-                                                ).isAfter(checkTime))
-                                        .findFirst();
-                                if (nextConflict.isPresent()) {
-                                    Appointment nc = nextConflict.get();
-                                    int ncDur = (nc.getService() != null && nc.getService().getDurationMinutes() != null)
-                                            ? nc.getService().getDurationMinutes() : 45;
-                                    nextOpen = nc.getAppointmentTime().plusMinutes(ncDur + effectiveBuffer);
-                                } else {
-                                    chained = false;
-                                }
-                            }
-
-                            busyWindow = formatTime12Hour(caStart) + " – " + formatTime12Hour(caBusyEnd);
-                            nextAvail = formatTime12Hour(nextOpen);
-
+                            busyWindow = "Off on this date";
+                            nextAvail = "N/A";
                             if (anyoneAvailableAtSlot) {
-                                statusMessage = seg.techName + " is booked at this time. The next available is " + nextAvail + ", or choose Anyone Available at " + lbl12;
+                                statusMessage = seg.techName + " is OFF on this date. Choose Anyone Available at " + lbl12 + " or pick another date.";
                             } else {
-                                statusMessage = seg.techName + " is booked at this time. The next available is " + nextAvail + " (all specialists booked at " + lbl12 + ")";
+                                statusMessage = seg.techName + " is OFF on this date.";
                             }
                         } else {
-                            statusMessage = seg.serviceName + " — " + seg.techName + ": Available at " + lbl12;
+                            Optional<Appointment> conflictOpt = dayAppointments.stream()
+                                    .filter(a -> a.getNailTech() != null &&
+                                            a.getNailTech().getId() != null &&
+                                            a.getNailTech().getId().equals(targetTid) &&
+                                            hasOverlapWithBuffer(a, segStart, segEnd, effectiveBuffer))
+                                    .findFirst();
+
+                            if (conflictOpt.isPresent()) {
+                                segAvailable = false;
+                                Appointment ca = conflictOpt.get();
+                                LocalDateTime caStart = ca.getAppointmentTime();
+                                int caDur = (ca.getService() != null && ca.getService().getDurationMinutes() != null)
+                                        ? ca.getService().getDurationMinutes() : 45;
+                                LocalDateTime caBusyEnd = caStart.plusMinutes(caDur + effectiveBuffer);
+
+                                LocalDateTime nextOpen = caBusyEnd;
+                                boolean chained = true;
+                                while (chained) {
+                                    final LocalDateTime checkTime = nextOpen;
+                                    Optional<Appointment> nextConflict = dayAppointments.stream()
+                                            .filter(a -> a.getNailTech() != null &&
+                                                    a.getNailTech().getId() != null &&
+                                                    a.getNailTech().getId().equals(targetTid))
+                                            .filter(a -> a.getAppointmentTime() != null &&
+                                                    !a.getAppointmentTime().isAfter(checkTime) &&
+                                                    a.getAppointmentTime().plusMinutes(
+                                                            (a.getService() != null && a.getService().getDurationMinutes() != null
+                                                                    ? a.getService().getDurationMinutes() : 45) + effectiveBuffer
+                                                    ).isAfter(checkTime))
+                                            .findFirst();
+                                    if (nextConflict.isPresent()) {
+                                        Appointment nc = nextConflict.get();
+                                        int ncDur = (nc.getService() != null && nc.getService().getDurationMinutes() != null)
+                                                ? nc.getService().getDurationMinutes() : 45;
+                                        nextOpen = nc.getAppointmentTime().plusMinutes(ncDur + effectiveBuffer);
+                                    } else {
+                                        chained = false;
+                                    }
+                                }
+
+                                busyWindow = formatTime12Hour(caStart) + " – " + formatTime12Hour(caBusyEnd);
+                                nextAvail = formatTime12Hour(nextOpen);
+
+                                if (anyoneAvailableAtSlot) {
+                                    statusMessage = seg.techName + " is booked at this time. The next available is " + nextAvail + ", or choose Anyone Available at " + lbl12;
+                                } else {
+                                    statusMessage = seg.techName + " is booked at this time. The next available is " + nextAvail + " (all specialists booked at " + lbl12 + ")";
+                                }
+                            } else {
+                                statusMessage = seg.serviceName + " — " + seg.techName + ": Available at " + lbl12;
+                            }
                         }
                     } else {
                         // "Anyone Available" mode
                         if (!anyoneAvailableAtSlot) {
                             segAvailable = false;
-                            statusMessage = "All specialists booked at " + lbl12;
+                            statusMessage = workingTenantTechs.isEmpty() ? "All specialists are off on this date" : ("All specialists booked at " + lbl12);
                         } else {
                             statusMessage = seg.serviceName + ": Specialist available at " + lbl12;
                         }
@@ -874,6 +920,14 @@ public class AppointmentController {
                 return ResponseEntity.badRequest().body(Map.of("message", "Selected technician does not belong to this salon."));
             }
             resolvedTech = tenantTech.get();
+
+            if (!Boolean.TRUE.equals(bookingRequest.getManualOverride()) && staffDayOffRepository != null) {
+                LocalDate aptDate = bookingRequest.getAppointmentTime().toLocalDate();
+                if (staffDayOffRepository.existsByTenantIdAndStaffIdAndOffDate(tenantId, techId, aptDate)) {
+                    String sName = (resolvedTech.getName() != null && !resolvedTech.getName().isBlank()) ? resolvedTech.getName() : "Selected specialist";
+                    return ResponseEntity.badRequest().body(Map.of("message", sName + " is off on this date. Please choose another specialist or Anyone Available."));
+                }
+            }
 
             boolean hasConflict = false;
             // Only perform top-level conflict check for single-guest single-service bookings.
@@ -1052,6 +1106,10 @@ public class AppointmentController {
                     if (!Boolean.TRUE.equals(bookingRequest.getManualOverride())) {
                         if (serviceSpecificTech != null && serviceSpecificTech.getId() != null) {
                             Long checkTechId = serviceSpecificTech.getId();
+                            if (staffDayOffRepository != null && staffDayOffRepository.existsByTenantIdAndStaffIdAndOffDate(tenantId, checkTechId, serviceApptTime.toLocalDate())) {
+                                String tName = (serviceSpecificTech.getName() != null && !serviceSpecificTech.getName().isBlank()) ? serviceSpecificTech.getName() : "Selected specialist";
+                                return ResponseEntity.badRequest().body(Map.of("message", tName + " is off on this date. Please choose another specialist or Anyone Available."));
+                            }
                             boolean hasConf = isTechBusyAtWindow(checkTechId, serviceApptTime, serviceSlotEnd, 15, dayAppts, savedAppointments);
                             if (hasConf) {
                                 String tName = serviceSpecificTech.getName() != null ? serviceSpecificTech.getName() : "Selected specialist";
@@ -1059,10 +1117,13 @@ public class AppointmentController {
                                         .body(Map.of("message", tName + " is already booked at " + formatTime12Hour(serviceApptTime) + ". Please choose another time or specialist."));
                             }
                         } else if (!tenantTechs.isEmpty()) {
-                            // Anyone Available mode: find a free specialist who is not booked at this window
+                            // Anyone Available mode: find a free specialist who is not booked at this window and NOT off
                             UserEntity freeTech = null;
                             for (UserEntity tech : tenantTechs) {
                                 if (tech.getId() == null) continue;
+                                if (staffDayOffRepository != null && staffDayOffRepository.existsByTenantIdAndStaffIdAndOffDate(tenantId, tech.getId(), serviceApptTime.toLocalDate())) {
+                                    continue;
+                                }
                                 boolean busy = isTechBusyAtWindow(tech.getId(), serviceApptTime, serviceSlotEnd, 15, dayAppts, savedAppointments);
                                 if (!busy) {
                                     freeTech = tech;
@@ -1214,6 +1275,9 @@ public class AppointmentController {
                 UserEntity freeTech = null;
                 for (UserEntity tech : tenantTechs) {
                     if (tech.getId() == null) continue;
+                    if (staffDayOffRepository != null && staffDayOffRepository.existsByTenantIdAndStaffIdAndOffDate(tenantId, tech.getId(), singleApptTime.toLocalDate())) {
+                        continue;
+                    }
                     boolean busy = isTechBusyAtWindow(tech.getId(), singleApptTime, singleSlotEnd, 15, dayAppts, null);
                     if (!busy) {
                         freeTech = tech;

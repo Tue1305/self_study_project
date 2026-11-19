@@ -151,6 +151,10 @@
             border-color: #f8bbd0;
             box-shadow: 0 6px 18px rgba(233, 30, 99, 0.08) !important;
         }
+        .category-card.has-selection {
+            border-color: #f48fb1;
+            box-shadow: 0 4px 14px rgba(233, 30, 99, 0.08) !important;
+        }
         .category-card.is-open {
             border-color: var(--bs-primary-pink);
             box-shadow: 0 8px 24px rgba(233, 30, 99, 0.12) !important;
@@ -616,7 +620,7 @@
                         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
                             <div>
                                 <h5 class="fw-bold mb-0"><i class="bi bi-stars text-pink me-2"></i><span id="step1HeaderTitle">Step 1: Choose Services for Guest 1</span></h5>
-                                <small class="text-muted">Select one or more services from the full menu below</small>
+                                <small class="text-muted">Select services from the menu below (1 option per service section, e.g., 1 Manicure, 1 Pedicure)</small>
                             </div>
                             <div class="d-flex align-items-center gap-2 d-none" id="guestSwitcherControls">
                                 <button type="button" class="btn btn-sm rounded-pill px-3 btn-pink fw-bold" id="switchGuest1Btn" onclick="switchActiveGuest(0)">
@@ -1027,6 +1031,7 @@
     };
 
     const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
+    const serviceIdToCategoryMap = {};
 
     // Service categories list matching services.html with standalone Combo and Kids cards
     const serviceCategoryConfigs = [
@@ -3024,6 +3029,10 @@
                 const catServices = categorized[cat.id] || [];
                 if (catServices.length === 0) return;
 
+                catServices.forEach(s => {
+                    serviceIdToCategoryMap[s.id] = cat.id;
+                });
+
                 const hasPreselected = Boolean(matchedServiceToSelect && catServices.some(s => s.id === matchedServiceToSelect.id));
                 const collapseId = `bookingCollapse_${cat.id}`;
                 const cardId = `bookingCatCard_${cat.id}`;
@@ -3062,18 +3071,29 @@
                                     <i class="bi ${cat.icon || 'bi-stars'}"></i>
                                 </div>
                                 <div>
-                                    <h5 class="fw-bold text-dark mb-1 d-flex align-items-center gap-2">
-                                        ${cat.title}
+                                    <h5 class="fw-bold text-dark mb-1 d-flex align-items-center gap-2 flex-wrap">
+                                        <span>${cat.title}</span>
                                         <span class="badge bg-danger-subtle text-pink border border-danger-subtle rounded-pill fs-6 px-2 py-0">
                                             ${catServices.length} items
                                         </span>
+                                        <span id="catSelectedBadge_${cat.id}" class="badge bg-success-subtle text-success border border-success-subtle rounded-pill fs-6 px-2 py-0 d-none">
+                                            <i class="bi bi-check-circle-fill me-1"></i><span class="cat-selected-label">1 selected</span>
+                                        </span>
                                     </h5>
+                                    <div class="text-muted" style="font-size: 0.78rem;">
+                                        <span class="badge bg-light text-secondary border me-1"><i class="bi bi-check2-circle me-1 text-pink"></i>1 Option</span>
+                                        <span id="catSelectedSubtitle_${cat.id}" class="text-muted">Choose 1 service from this section</span>
+                                    </div>
                                 </div>
                             </div>
                             <i class="bi bi-chevron-down chevron-icon ms-2"></i>
                         </div>
                         <div class="collapse ${hasPreselected ? 'show' : ''}" id="${collapseId}">
                             <div class="border-top">
+                                <div class="px-3 py-2 bg-light border-bottom text-muted small d-flex align-items-center justify-content-between">
+                                    <span class="extra-small text-secondary"><i class="bi bi-info-circle me-1 text-pink"></i>Select <strong>1 option</strong> in ${cat.title}. Selecting another will switch to it.</span>
+                                    <span class="text-pink fw-semibold extra-small" id="catActiveSelectionText_${cat.id}"></span>
+                                </div>
                                 ${rowsHtml}
                             </div>
                         </div>
@@ -3124,8 +3144,11 @@
     }
 
     function getCategoryForService(srv) {
-        if (!srv || !srv.name) return 'manicures';
-        const nameLower = srv.name.toLowerCase();
+        if (!srv) return 'manicures';
+        if (srv.id && serviceIdToCategoryMap[srv.id]) {
+            return serviceIdToCategoryMap[srv.id];
+        }
+        const nameLower = (srv.name || '').toLowerCase();
         if (nameLower.includes('combo')) return 'combos';
         if (nameLower.includes('kid') || nameLower.includes('kids')) return 'kids';
         for (const cat of serviceCategoryConfigs) {
@@ -3137,21 +3160,55 @@
         return 'manicures';
     }
 
+    function cleanUpServiceAssignments(guest, serviceId) {
+        if (!guest || !serviceId) return;
+        const sIdStr = String(serviceId);
+        const sIdNum = Number(serviceId);
+        if (guest.serviceStaffAssignments) {
+            delete guest.serviceStaffAssignments[sIdStr];
+            delete guest.serviceStaffAssignments[sIdNum];
+        }
+        if (guest.serviceTimeSlots) {
+            delete guest.serviceTimeSlots[sIdStr];
+            delete guest.serviceTimeSlots[sIdNum];
+        }
+        if (bookingState.serviceTimeSlots) {
+            delete bookingState.serviceTimeSlots[sIdStr];
+            delete bookingState.serviceTimeSlots[sIdNum];
+        }
+    }
+
     function toggleService(serviceId, catId) {
         hideAlert();
         const found = bookingState.servicesList.find(s => s.id === serviceId);
         if (!found) return;
 
         const effectiveCatId = catId || getCategoryForService(found);
+        if (found && !serviceIdToCategoryMap[found.id]) {
+            serviceIdToCategoryMap[found.id] = effectiveCatId;
+        }
+
         const activeGuest = bookingState.guests[bookingState.activeGuestIndex] || bookingState.guests[0];
 
-        // Multi-service selection: clicking toggles service on or off for the active guest
+        // Single-option selection per service section (e.g., Manicures section can be selected once):
         const existingIdx = activeGuest.services.findIndex(s => s.id === found.id);
         if (existingIdx >= 0) {
             // Clicking the already selected service toggles it off
-            activeGuest.services.splice(existingIdx, 1);
+            const removed = activeGuest.services.splice(existingIdx, 1)[0];
+            cleanUpServiceAssignments(activeGuest, removed.id);
         } else {
-            activeGuest.services.push(found);
+            // If another service in the same category section was already selected, replace it with the newly chosen service
+            const sameCategoryIdx = activeGuest.services.findIndex(s => {
+                const sCat = getCategoryForService(s);
+                return sCat === effectiveCatId;
+            });
+            if (sameCategoryIdx >= 0) {
+                const replaced = activeGuest.services[sameCategoryIdx];
+                cleanUpServiceAssignments(activeGuest, replaced.id);
+                activeGuest.services[sameCategoryIdx] = found;
+            } else {
+                activeGuest.services.push(found);
+            }
         }
 
         // If card is collapsed, expand it
@@ -3181,6 +3238,46 @@
         document.querySelectorAll('.service-select-row').forEach(row => {
             const idNum = Number(row.id.replace('serviceRow-', ''));
             row.classList.toggle('selected', activeIds.has(idNum));
+        });
+
+        // Update category headers, selected badges, and status text
+        serviceCategoryConfigs.forEach(cat => {
+            const badge = document.getElementById(`catSelectedBadge_${cat.id}`);
+            const subtitle = document.getElementById(`catSelectedSubtitle_${cat.id}`);
+            const activeText = document.getElementById(`catActiveSelectionText_${cat.id}`);
+            const card = document.getElementById(`bookingCatCard_${cat.id}`);
+
+            const selectedInCat = activeGuest.services.find(s => getCategoryForService(s) === cat.id);
+
+            if (selectedInCat) {
+                if (badge) {
+                    badge.classList.remove('d-none');
+                    const labelSpan = badge.querySelector('.cat-selected-label');
+                    if (labelSpan) labelSpan.textContent = selectedInCat.name;
+                }
+                if (subtitle) {
+                    subtitle.className = 'text-pink fw-semibold';
+                    subtitle.textContent = `Selected: ${selectedInCat.name} ($${Number(selectedInCat.price || 0).toFixed(2)})`;
+                }
+                if (activeText) {
+                    activeText.textContent = `✓ Selected: ${selectedInCat.name}`;
+                }
+                if (card) {
+                    card.classList.add('has-selection');
+                }
+            } else {
+                if (badge) badge.classList.add('d-none');
+                if (subtitle) {
+                    subtitle.className = 'text-muted';
+                    subtitle.textContent = `Choose 1 service from this section`;
+                }
+                if (activeText) {
+                    activeText.textContent = '';
+                }
+                if (card) {
+                    card.classList.remove('has-selection');
+                }
+            }
         });
 
         const headerTitle = document.getElementById('step1HeaderTitle');

@@ -104,10 +104,6 @@ public class SecurityConfig {
                                 "/giftcards",
                                 "/dashboard",
                                 "/dashboard.html",
-                                "/api/appointments",
-                                "/api/appointments/**",
-                                "/api/bookings",
-                                "/api/bookings/**",
                                 "/favicon.ico",
                                 "/*.css",
                                 "/*.js",
@@ -121,6 +117,15 @@ public class SecurityConfig {
                                 "/*.jpeg",
                                 "/api/public/**"
                         ).permitAll()
+                        // Appointments & Bookings: public booking creation, availability lookup, and token-gated self-service portal
+                        .requestMatchers(HttpMethod.POST, "/api/appointments", "/api/bookings").permitAll()
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/appointments/availability", "/api/appointments/available-slots",
+                                "/api/bookings/availability", "/api/bookings/available-slots").permitAll()
+                        .requestMatchers("/api/appointments/by-token/**", "/api/bookings/by-token/**").permitAll()
+                        // All other appointment management endpoints require Admin or Staff authentication
+                        .requestMatchers("/api/appointments", "/api/appointments/**", "/api/bookings", "/api/bookings/**")
+                                .hasAnyAuthority("ROLE_ADMIN", "ADMIN", "ROLE_STAFF", "STAFF", "ROLE_NAIL_TECH")
                         // Services rules (public GET, admin-only POST/PUT/DELETE)
                         .requestMatchers(HttpMethod.GET, "/api/services", "/api/services/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/services", "/api/services/**").hasAnyAuthority("ROLE_ADMIN", "ADMIN")

@@ -115,6 +115,7 @@ public class AppointmentController {
         this(appointmentRepository, customerRepository, serviceRepository, userRepository, tenantContextResolver, null, null, null);
     }
 
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ADMIN', 'ROLE_STAFF', 'STAFF', 'ROLE_NAIL_TECH')")
     @GetMapping
     public List<Appointment> getAllAppointments(HttpServletRequest request) {
         String tenantId = tenantContextResolver.resolveTenantId(request);
@@ -193,6 +194,7 @@ public class AppointmentController {
         return autoMarked;
     }
 
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ADMIN', 'ROLE_STAFF', 'STAFF', 'ROLE_NAIL_TECH')")
     @PostMapping("/auto-no-show")
     public ResponseEntity<?> runAutoNoShowScan(HttpServletRequest request) {
         String tenantId = tenantContextResolver.resolveTenantId(request);
@@ -204,6 +206,7 @@ public class AppointmentController {
         ));
     }
 
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ADMIN', 'ROLE_STAFF', 'STAFF', 'ROLE_NAIL_TECH')")
     @GetMapping("/customer-history")
     public ResponseEntity<?> getCustomerAppointmentHistory(
             @RequestParam String email,
@@ -1388,6 +1391,7 @@ public class AppointmentController {
         }
     }
 
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ADMIN', 'ROLE_STAFF', 'STAFF', 'ROLE_NAIL_TECH')")
     @Transactional
     @PatchMapping("/{id}/status")
     public ResponseEntity<?> updateAppointmentStatus(
@@ -1588,6 +1592,7 @@ public class AppointmentController {
     /**
      * Admin freely updates the appointment notes without changing status.
      */
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ADMIN', 'ROLE_STAFF', 'STAFF', 'ROLE_NAIL_TECH')")
     @Transactional
     @PatchMapping("/{id}/notes")
     public ResponseEntity<?> updateAppointmentNotes(
@@ -1641,6 +1646,7 @@ public class AppointmentController {
     /**
      * Sends a reminder notification to a specific appointment customer.
      */
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ADMIN', 'ROLE_STAFF', 'STAFF', 'ROLE_NAIL_TECH')")
     @PostMapping("/{id}/remind")
     public ResponseEntity<?> sendSingleReminder(
             @PathVariable Long id,
@@ -1902,6 +1908,7 @@ public class AppointmentController {
         ));
     }
 
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ADMIN', 'ROLE_STAFF', 'STAFF', 'ROLE_NAIL_TECH')")
     @Transactional
     @PatchMapping("/{id}/reschedule")
     public ResponseEntity<?> adminRescheduleAppointment(
@@ -2035,6 +2042,7 @@ public class AppointmentController {
      * Reassigns an appointment to a specific staff member (or unassigns to 'Anyone Available')
      * with conflict checking against the target technician's active schedule.
      */
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ADMIN', 'ROLE_STAFF', 'STAFF', 'ROLE_NAIL_TECH')")
     @Transactional
     @PatchMapping("/{id}/assign-tech")
     public ResponseEntity<?> assignTechnician(

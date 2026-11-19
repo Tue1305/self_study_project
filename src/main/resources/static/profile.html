@@ -162,6 +162,96 @@
         </form>
     </div>
 
+    <!-- Digital Client Card: Nail Style & Custom Preferences -->
+    <div class="card border-0 shadow-sm rounded-4 p-4 mb-4 profile-card">
+        <div class="d-flex justify-content-between align-items-center mb-1">
+            <h2 class="h5 fw-bold text-dark mb-0">
+                <i class="bi bi-palette-fill text-pink me-2"></i>My Nail Style &amp; Custom Preferences
+            </h2>
+            <span class="badge bg-danger-subtle text-pink border border-danger-subtle rounded-pill px-3 py-1 fw-bold small">
+                Digital Client Card
+            </span>
+        </div>
+        <p class="text-muted small mb-4">
+            Saved to your studio card so your nail artist knows your exact preferences, shapes, and formulas before your session starts.
+        </p>
+
+        <form id="nailProfileForm" onsubmit="handleUpdateNailPreferences(event)">
+            <div class="row g-3 mb-3">
+                <div class="col-12 col-md-4">
+                    <label for="prefNailShape" class="form-label fw-semibold text-muted small">Preferred Shape</label>
+                    <select class="form-select rounded-3" id="prefNailShape">
+                        <option value="">Select Shape...</option>
+                        <option value="Almond">Almond</option>
+                        <option value="Coffin">Coffin / Ballerina</option>
+                        <option value="Square">Square</option>
+                        <option value="Squoval">Squoval</option>
+                        <option value="Stiletto">Stiletto</option>
+                        <option value="Oval">Oval</option>
+                        <option value="Round">Round</option>
+                        <option value="Natural">Natural Shape</option>
+                    </select>
+                </div>
+                <div class="col-12 col-md-4">
+                    <label for="prefNailLength" class="form-label fw-semibold text-muted small">Preferred Length</label>
+                    <select class="form-select rounded-3" id="prefNailLength">
+                        <option value="">Select Length...</option>
+                        <option value="Short">Short (Active)</option>
+                        <option value="Medium">Medium</option>
+                        <option value="Long">Long</option>
+                        <option value="Extra Long">Extra Long (XL)</option>
+                    </select>
+                </div>
+                <div class="col-12 col-md-4">
+                    <label for="prefNailSystem" class="form-label fw-semibold text-muted small">Favorite Material / System</label>
+                    <select class="form-select rounded-3" id="prefNailSystem">
+                        <option value="">Select System...</option>
+                        <option value="Gel-X">Gel-X Extensions</option>
+                        <option value="Bio Gel">Bio Gel Sculpting</option>
+                        <option value="Acrylic">Acrylic Sculpting</option>
+                        <option value="Dip Powder">Dip Powder</option>
+                        <option value="Builder Gel">BIAB / Builder Gel</option>
+                        <option value="Shellac">Shellac / Gel Polish</option>
+                        <option value="Natural">Natural Nails</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label for="prefFavoriteColors" class="form-label fw-semibold text-muted small">
+                    <i class="bi bi-heart-fill text-pink me-1"></i>Favorite Polish Shades &amp; Nail Art Ideas
+                </label>
+                <input type="text" class="form-control rounded-3" id="prefFavoriteColors"
+                       placeholder="e.g. OPI Bubble Bath #T80, French Chrome Glaze, DND #452 Cherry Mocha">
+                <div class="form-text extra-small text-muted">Mention shade names, numbers, or specific finishes (matte, high-shine, chrome).</div>
+            </div>
+
+            <div class="mb-3">
+                <label for="prefCuticleNotes" class="form-label fw-semibold text-muted small">
+                    <i class="bi bi-shield-check text-success me-1"></i>Cuticle &amp; Sensitivity Instructions
+                </label>
+                <input type="text" class="form-control rounded-3" id="prefCuticleNotes"
+                       placeholder="e.g. Sensitive cuticles, please use glass buffer, gentle pusher only">
+            </div>
+
+            <div class="mt-4 text-end">
+                <button type="submit" id="btnSaveNailPrefs" class="btn btn-pink rounded-pill px-4 fw-semibold">
+                    <i class="bi bi-check2 me-1"></i>Save Nail Preferences
+                </button>
+            </div>
+        </form>
+
+        <!-- Past Sets Photo Gallery -->
+        <div id="pastSetsSection" class="mt-4 pt-3 border-top d-none">
+            <h6 class="fw-bold text-dark mb-3 d-flex align-items-center gap-1">
+                <i class="bi bi-images text-pink"></i>My Studio Nail Photo History
+            </h6>
+            <div class="row g-3" id="pastSetsGrid">
+                <!-- Injected dynamically -->
+            </div>
+        </div>
+    </div>
+
     <!-- Security & Password Adjustment Form -->
     <div class="card border-0 shadow-sm rounded-4 p-4 mb-4 profile-card">
         <h2 class="h5 fw-bold text-dark mb-3"><i class="bi bi-shield-lock text-pink me-2"></i>Security &amp; Password</h2>
@@ -337,6 +427,107 @@
         }
     }
 
+    async function loadClientNailProfile() {
+        try {
+            const resp = await fetch('/api/users/me/nail-profile', {
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+            if (resp.ok) {
+                const data = await resp.json();
+                if (data.nailShape) document.getElementById('prefNailShape').value = data.nailShape;
+                if (data.nailLength) document.getElementById('prefNailLength').value = data.nailLength;
+                if (data.nailSystem) document.getElementById('prefNailSystem').value = data.nailSystem;
+                if (data.favoriteColors || data.colorFormula) {
+                    document.getElementById('prefFavoriteColors').value = data.favoriteColors || data.colorFormula || '';
+                }
+                if (data.cuticleCareNotes) {
+                    document.getElementById('prefCuticleNotes').value = data.cuticleCareNotes;
+                }
+
+                // Render Past Sets Gallery if available
+                const notes = data.nailNotes || [];
+                const sec = document.getElementById('pastSetsSection');
+                const grid = document.getElementById('pastSetsGrid');
+                if (notes.length > 0) {
+                    sec.classList.remove('d-none');
+                    grid.innerHTML = notes.map(n => {
+                        const dateStr = n.serviceDate || 'Recent';
+                        const hasImg = n.photoUrl && n.photoUrl.trim();
+                        return `
+                            <div class="col-6 col-md-4">
+                                <div class="card h-100 border rounded-3 overflow-hidden shadow-xs">
+                                    ${hasImg ? `
+                                        <div style="height: 120px; overflow: hidden; background: #212529;">
+                                            <img src="${n.photoUrl}" alt="Nail Set" class="w-100 h-100" style="object-fit: cover;">
+                                        </div>
+                                    ` : `
+                                        <div class="d-flex align-items-center justify-content-center bg-light" style="height: 70px;">
+                                            <i class="bi bi-palette text-pink fs-3 opacity-50"></i>
+                                        </div>
+                                    `}
+                                    <div class="p-2">
+                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                            <span class="badge bg-light text-dark border extra-small">${dateStr}</span>
+                                            ${n.technicianName ? `<span class="extra-small text-muted">${n.technicianName}</span>` : ''}
+                                        </div>
+                                        <div class="fw-semibold text-dark extra-small text-truncate" title="${n.colorDetails || 'Session'}">
+                                            ${n.colorDetails || 'Nail Session'}
+                                        </div>
+                                        ${(n.nailShape || n.nailSystem) ? `
+                                            <div class="extra-small text-muted mt-1">
+                                                ${n.nailShape || ''} ${n.nailLength ? '• ' + n.nailLength : ''} ${n.nailSystem ? '• ' + n.nailSystem : ''}
+                                            </div>
+                                        ` : ''}
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                }
+            }
+        } catch (e) {
+            console.warn('Could not load nail profile:', e);
+        }
+    }
+
+    async function handleUpdateNailPreferences(event) {
+        event.preventDefault();
+        const nailShape = document.getElementById('prefNailShape').value.trim();
+        const nailLength = document.getElementById('prefNailLength').value.trim();
+        const nailSystem = document.getElementById('prefNailSystem').value.trim();
+        const favoriteColors = document.getElementById('prefFavoriteColors').value.trim();
+        const cuticleCareNotes = document.getElementById('prefCuticleNotes').value.trim();
+
+        const btn = document.getElementById('btnSaveNailPrefs');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
+
+        try {
+            const resp = await fetch('/api/users/me/nail-profile', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + token
+                },
+                body: JSON.stringify({
+                    nailShape, nailLength, nailSystem, favoriteColors, cuticleCareNotes
+                })
+            });
+
+            if (resp.ok) {
+                showAlert('Your nail style preferences have been saved to your digital client card!');
+            } else {
+                const text = await resp.text();
+                showAlert('Failed to save preferences: ' + text, 'danger');
+            }
+        } catch (e) {
+            showAlert('Error saving preferences: ' + e.message, 'danger');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-check2 me-1"></i>Save Nail Preferences';
+        }
+    }
+
     function handleLogout() {
         localStorage.removeItem('accessToken');
         localStorage.removeItem('token');
@@ -346,6 +537,7 @@
     }
 
     loadUserProfile();
+    loadClientNailProfile();
 </script>
 </body>
 </html>

@@ -44,6 +44,21 @@ public class Customer {
     @Column(name = "opt_out_marketing", nullable = false)
     private Boolean optOutMarketing = false;
 
+    @Column(name = "nail_shape", length = 64)
+    private String nailShape;
+
+    @Column(name = "nail_length", length = 64)
+    private String nailLength;
+
+    @Column(name = "nail_system", length = 64)
+    private String nailSystem;
+
+    @Column(name = "favorite_colors", length = 1000)
+    private String favoriteColors;
+
+    @Column(name = "cuticle_care_notes", length = 1000)
+    private String cuticleCareNotes;
+
     public Customer() {}
 
     public Customer(String name, String email, String phone) {
@@ -95,4 +110,19 @@ public class Customer {
 
     public Boolean getOptOutMarketing() { return optOutMarketing != null ? optOutMarketing : false; }
     public void setOptOutMarketing(Boolean optOutMarketing) { this.optOutMarketing = optOutMarketing != null ? optOutMarketing : false; }
+
+    public String getNailShape() { return nailShape; }
+    public void setNailShape(String nailShape) { this.nailShape = nailShape; }
+
+    public String getNailLength() { return nailLength; }
+    public void setNailLength(String nailLength) { this.nailLength = nailLength; }
+
+    public String getNailSystem() { return nailSystem; }
+    public void setNailSystem(String nailSystem) { this.nailSystem = nailSystem; }
+
+    public String getFavoriteColors() { return favoriteColors; }
+    public void setFavoriteColors(String favoriteColors) { this.favoriteColors = favoriteColors; }
+
+    public String getCuticleCareNotes() { return cuticleCareNotes; }
+    public void setCuticleCareNotes(String cuticleCareNotes) { this.cuticleCareNotes = cuticleCareNotes; }
 }

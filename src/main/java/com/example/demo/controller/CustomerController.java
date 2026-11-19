@@ -138,6 +138,21 @@ public class CustomerController {
         if (updatedCustomer.getOptOutMarketing() != null) {
             existing.setOptOutMarketing(updatedCustomer.getOptOutMarketing());
         }
+        if (updatedCustomer.getNailShape() != null) {
+            existing.setNailShape(updatedCustomer.getNailShape().trim());
+        }
+        if (updatedCustomer.getNailLength() != null) {
+            existing.setNailLength(updatedCustomer.getNailLength().trim());
+        }
+        if (updatedCustomer.getNailSystem() != null) {
+            existing.setNailSystem(updatedCustomer.getNailSystem().trim());
+        }
+        if (updatedCustomer.getFavoriteColors() != null) {
+            existing.setFavoriteColors(updatedCustomer.getFavoriteColors().trim());
+        }
+        if (updatedCustomer.getCuticleCareNotes() != null) {
+            existing.setCuticleCareNotes(updatedCustomer.getCuticleCareNotes().trim());
+        }
 
         customerService.saveCustomer(existing);
         return ResponseEntity.ok(existing);

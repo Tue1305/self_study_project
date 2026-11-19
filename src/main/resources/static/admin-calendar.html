@@ -3936,13 +3936,45 @@
                                         customerHistoryModal.data.customer.medicalFlags
                                     )
                                 ),
-                                customerHistoryModal.data.customer?.colorFormula && h('div', {
-                                    className: 'alert alert-info d-flex align-items-center gap-2 py-2 px-3 mb-3 rounded-3 shadow-sm border border-info-subtle bg-info-subtle'
+                                (customerHistoryModal.data.customer?.nailShape || customerHistoryModal.data.customer?.nailSystem || customerHistoryModal.data.customer?.favoriteColors || customerHistoryModal.data.customer?.colorFormula) && h('div', {
+                                    className: 'card border-0 bg-light rounded-3 p-3 mb-3 border'
                                 },
-                                    h('i', { className: 'bi bi-palette-fill fs-5 text-primary flex-shrink-0' }),
-                                    h('div', null,
-                                        h('strong', { className: 'text-primary' }, '💅 Preferred / Prior Color Formula: '),
-                                        customerHistoryModal.data.customer.colorFormula
+                                    h('div', { className: 'd-flex justify-content-between align-items-center mb-1' },
+                                        h('span', { className: 'small fw-bold text-dark d-flex align-items-center gap-1' },
+                                            h('i', { className: 'bi bi-person-vcard-fill text-pink' }),
+                                            'Digital Client Card & Style Profile'
+                                        ),
+                                        h('span', { className: 'badge bg-white text-dark border extra-small' }, 'Nail Profile')
+                                    ),
+                                    h('div', { className: 'd-flex flex-wrap gap-2 my-1' },
+                                        customerHistoryModal.data.customer.nailShape && h('span', { className: 'badge bg-pink text-white rounded-pill px-2 py-1' }, `Shape: ${customerHistoryModal.data.customer.nailShape}`),
+                                        customerHistoryModal.data.customer.nailLength && h('span', { className: 'badge bg-secondary rounded-pill px-2 py-1' }, `Length: ${customerHistoryModal.data.customer.nailLength}`),
+                                        customerHistoryModal.data.customer.nailSystem && h('span', { className: 'badge bg-info-subtle text-info-emphasis border rounded-pill px-2 py-1' }, `System: ${customerHistoryModal.data.customer.nailSystem}`)
+                                    ),
+                                    (customerHistoryModal.data.customer.favoriteColors || customerHistoryModal.data.customer.colorFormula) && h('div', { className: 'extra-small text-dark mt-1' },
+                                        h('strong', null, '💖 Favorite Colors: '),
+                                        customerHistoryModal.data.customer.favoriteColors || customerHistoryModal.data.customer.colorFormula
+                                    ),
+                                    customerHistoryModal.data.customer.cuticleCareNotes && h('div', { className: 'extra-small text-secondary mt-1' },
+                                        h('strong', { className: 'text-success' }, '🛡️ Cuticle Care: '),
+                                        customerHistoryModal.data.customer.cuticleCareNotes
+                                    )
+                                ),
+                                (customerHistoryModal.data.nailNotes && customerHistoryModal.data.nailNotes.length > 0) && h('div', { className: 'mb-3' },
+                                    h('div', { className: 'small fw-bold text-dark mb-1 d-flex align-items-center gap-1' },
+                                        h('i', { className: 'bi bi-camera-fill text-pink' }),
+                                        `Past Set Photos (${customerHistoryModal.data.nailNotes.length})`
+                                    ),
+                                    h('div', { className: 'd-flex gap-2 overflow-x-auto pb-2' },
+                                        customerHistoryModal.data.nailNotes.map(n =>
+                                            h('div', { key: n.id, className: 'border rounded-2 p-1 bg-white shadow-xs text-center flex-shrink-0', style: { width: '105px' } },
+                                                n.photoUrl
+                                                    ? h('img', { src: n.photoUrl, alt: 'Nail Set', className: 'rounded w-100', style: { height: '65px', objectFit: 'cover' } })
+                                                    : h('div', { className: 'bg-light rounded d-flex align-items-center justify-content-center text-muted', style: { height: '65px' } }, h('i', { className: 'bi bi-palette text-pink' })),
+                                                h('div', { className: 'extra-small text-truncate mt-1 fw-bold', title: n.colorDetails }, n.colorDetails || 'Set'),
+                                                h('div', { className: 'text-muted', style: { fontSize: '0.65rem' } }, n.serviceDate || '')
+                                            )
+                                        )
                                     )
                                 ),
                                 h('div', { className: 'row g-2 mb-4 text-center' },

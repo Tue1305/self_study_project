@@ -166,6 +166,7 @@
                     <th>Full Name</th>
                     <th>Email</th>
                     <th>Phone</th>
+                    <th>Nail Style</th>
                     <th>Birthday</th>
                     <th>Loyalty Points</th>
                     <th>Safety / Allergy Flags</th>
@@ -225,6 +226,63 @@
                         </div>
                     </div>
                 </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-md-4">
+                        <label for="customerNailShape" class="form-label fw-semibold text-secondary small mb-1">
+                            💅 Nail Shape:
+                        </label>
+                        <select class="form-select rounded-3" id="customerNailShape">
+                            <option value="">Select Shape...</option>
+                            <option value="Almond">Almond</option>
+                            <option value="Coffin">Coffin / Ballerina</option>
+                            <option value="Square">Square</option>
+                            <option value="Squoval">Squoval</option>
+                            <option value="Stiletto">Stiletto</option>
+                            <option value="Oval">Oval</option>
+                            <option value="Round">Round</option>
+                            <option value="Natural">Natural</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="customerNailLength" class="form-label fw-semibold text-secondary small mb-1">
+                            📏 Nail Length:
+                        </label>
+                        <select class="form-select rounded-3" id="customerNailLength">
+                            <option value="">Select Length...</option>
+                            <option value="Short">Short (Active)</option>
+                            <option value="Medium">Medium</option>
+                            <option value="Long">Long</option>
+                            <option value="Extra Long">Extra Long (XL)</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="customerNailSystem" class="form-label fw-semibold text-secondary small mb-1">
+                            💎 System / Material:
+                        </label>
+                        <select class="form-select rounded-3" id="customerNailSystem">
+                            <option value="">Select System...</option>
+                            <option value="Gel-X">Gel-X Extensions</option>
+                            <option value="Bio Gel">Bio Gel Sculpting</option>
+                            <option value="Acrylic">Acrylic Sculpting</option>
+                            <option value="Dip Powder">Dip Powder</option>
+                            <option value="Builder Gel">Builder in a Bottle (BIAB)</option>
+                            <option value="Shellac">Shellac / Gel Polish</option>
+                            <option value="Natural">Natural Nails</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label for="customerFavoriteColors" class="form-label fw-semibold text-secondary small mb-1">
+                        <i class="bi bi-heart-fill text-pink me-1"></i>Favorite Colors / Polish Shades:
+                    </label>
+                    <input type="text" class="form-control rounded-3" id="customerFavoriteColors" placeholder="e.g. OPI Bubble Bath #T80, DND 452 Cherry Mocha, French Ombre">
+                </div>
+                <div class="mb-3">
+                    <label for="customerCuticleCareNotes" class="form-label fw-semibold text-secondary small mb-1">
+                        <i class="bi bi-shield-check text-success me-1"></i>Cuticle & Nail Bed Care Instructions:
+                    </label>
+                    <input type="text" class="form-control rounded-3" id="customerCuticleCareNotes" placeholder="e.g. Sensitive eponychium, dry cuticles, glass buffer only, soft apex">
+                </div>
                 <div class="mb-3">
                     <label for="customerMedicalFlags" class="form-label fw-semibold text-secondary small d-flex justify-content-between align-items-center mb-1">
                         <span><i class="bi bi-exclamation-triangle-fill text-danger me-1"></i>Safety & Allergy Flags:</span>
@@ -254,7 +312,7 @@
 </div>
 
 <!-- Customer History & Audit Log Offcanvas Drawer -->
-<div class="offcanvas offcanvas-end" tabindex="-1" id="customerHistoryDrawer" style="width: 600px;" aria-labelledby="drawerCustomerName">
+<div class="offcanvas offcanvas-end" tabindex="-1" id="customerHistoryDrawer" style="width: 650px;" aria-labelledby="drawerCustomerName">
     <div class="offcanvas-header bg-light border-bottom py-3 px-4">
         <div>
             <h5 class="offcanvas-title fw-bold text-dark d-flex align-items-center gap-2 mb-1" id="drawerCustomerName">
@@ -267,6 +325,132 @@
     </div>
     <div class="offcanvas-body p-4" id="drawerBody">
         <!-- Dynamically rendered via JavaScript -->
+    </div>
+</div>
+
+<!-- Log Nail Session & Photo Modal -->
+<div class="modal fade" id="nailSessionModal" tabindex="-1" aria-labelledby="nailSessionModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header bg-light border-bottom py-3 px-4">
+                <h5 class="modal-title fw-bold text-dark d-flex align-items-center gap-2 mb-0" id="nailSessionModalLabel">
+                    <i class="bi bi-camera-fill text-pink"></i>
+                    <span>Log Nail Session &amp; Photo</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <input type="hidden" id="sessionCustomerId">
+                <div class="row g-2 mb-3">
+                    <div class="col-sm-6">
+                        <label for="sessionDate" class="form-label fw-semibold small text-secondary">Service Date *</label>
+                        <input type="date" class="form-control rounded-3" id="sessionDate" required>
+                    </div>
+                    <div class="col-sm-6">
+                        <label for="sessionTechName" class="form-label fw-semibold small text-secondary">Technician Name</label>
+                        <input type="text" class="form-control rounded-3" id="sessionTechName" placeholder="e.g. Chloe Vance">
+                    </div>
+                </div>
+
+                <div class="row g-2 mb-3">
+                    <div class="col-4">
+                        <label for="sessionNailShape" class="form-label fw-semibold small text-secondary">Shape</label>
+                        <select class="form-select rounded-3" id="sessionNailShape">
+                            <option value="">Default...</option>
+                            <option value="Almond">Almond</option>
+                            <option value="Coffin">Coffin</option>
+                            <option value="Square">Square</option>
+                            <option value="Squoval">Squoval</option>
+                            <option value="Stiletto">Stiletto</option>
+                            <option value="Oval">Oval</option>
+                            <option value="Round">Round</option>
+                            <option value="Natural">Natural</option>
+                        </select>
+                    </div>
+                    <div class="col-4">
+                        <label for="sessionNailLength" class="form-label fw-semibold small text-secondary">Length</label>
+                        <select class="form-select rounded-3" id="sessionNailLength">
+                            <option value="">Default...</option>
+                            <option value="Short">Short</option>
+                            <option value="Medium">Medium</option>
+                            <option value="Long">Long</option>
+                            <option value="Extra Long">XL</option>
+                        </select>
+                    </div>
+                    <div class="col-4">
+                        <label for="sessionNailSystem" class="form-label fw-semibold small text-secondary">System</label>
+                        <select class="form-select rounded-3" id="sessionNailSystem">
+                            <option value="">Default...</option>
+                            <option value="Gel-X">Gel-X</option>
+                            <option value="Bio Gel">Bio Gel</option>
+                            <option value="Acrylic">Acrylic</option>
+                            <option value="Dip Powder">Dip</option>
+                            <option value="Builder Gel">BIAB</option>
+                            <option value="Shellac">Shellac</option>
+                            <option value="Natural">Natural</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="sessionColorDetails" class="form-label fw-semibold small text-secondary">
+                        <i class="bi bi-palette-fill text-pink me-1"></i>Color Formula &amp; Polish Shades Used *
+                    </label>
+                    <input type="text" class="form-control rounded-3" id="sessionColorDetails"
+                           placeholder="e.g. OPI Bubble Bath #T80 (2 coats) + White Chrome Glaze #2" required>
+                </div>
+
+                <div class="mb-3">
+                    <label for="sessionNotes" class="form-label fw-semibold small text-secondary">Technician Session Notes</label>
+                    <textarea class="form-control rounded-3" id="sessionNotes" rows="2"
+                              placeholder="e.g. Built soft apex for strength; client prefers gentle cuticle pusher; loved the chrome finish."></textarea>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-semibold small text-secondary">
+                        <i class="bi bi-image-fill text-pink me-1"></i>Nail Set Photo Attachment
+                    </label>
+                    <div class="input-group mb-2">
+                        <input type="file" class="form-control rounded-start-3" id="sessionPhotoFile" accept="image/*" onchange="handleSessionPhotoFile(this)">
+                    </div>
+                    <div class="text-center text-muted small my-1">OR enter image URL</div>
+                    <input type="url" class="form-control rounded-3" id="sessionPhotoUrl" placeholder="https://example.com/nails.jpg" oninput="handleSessionPhotoUrl(this.value)">
+
+                    <div id="sessionPhotoPreviewWrapper" class="mt-2 text-center d-none">
+                        <img id="sessionPhotoPreview" src="" alt="Nail Photo Preview" class="img-thumbnail rounded-3 shadow-xs" style="max-height: 180px; object-fit: cover;">
+                        <div class="mt-1">
+                            <button type="button" class="btn btn-outline-danger btn-sm py-0 px-2" onclick="clearSessionPhoto()"><i class="bi bi-x-circle me-1"></i>Remove Photo</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-0 pt-0">
+                <button type="button" class="btn btn-light rounded-pill px-4 fw-semibold" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" id="btnSaveNailSession" class="btn btn-pink rounded-pill px-4 fw-semibold" onclick="saveNailSessionNote()">
+                    <i class="bi bi-check2-circle me-1"></i>Save Session Note
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Photo Lightbox Modal -->
+<div class="modal fade" id="photoLightboxModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 bg-dark text-white rounded-4 overflow-hidden">
+            <div class="modal-header border-0 pb-0">
+                <h6 class="modal-title text-white fw-bold" id="lightboxTitle">Client Nail Set Photo</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-3 text-center">
+                <img id="lightboxImage" src="" alt="Enlarged Nail Set" class="img-fluid rounded-3 shadow-lg" style="max-height: 75vh; object-fit: contain;">
+                <div class="mt-3 text-start bg-secondary bg-opacity-25 p-3 rounded-3">
+                    <div class="fw-bold text-white mb-1" id="lightboxColorDetails"></div>
+                    <div class="small text-light opacity-75 mb-1" id="lightboxNotes"></div>
+                    <div class="extra-small text-light opacity-50" id="lightboxMeta"></div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -567,12 +751,26 @@
         }
     }
 
+    let customersCache = [];
+    let nailSessionModalInstance = null;
+    let lightboxModalInstance = null;
+    let activeDrawerCustomerId = null;
+
     document.addEventListener('DOMContentLoaded', () => {
         customerModalInstance = new bootstrap.Modal(document.getElementById('customerModal'));
         const drawerEl = document.getElementById('customerHistoryDrawer');
         if (drawerEl && window.bootstrap) {
             customerHistoryDrawerInstance = new bootstrap.Offcanvas(drawerEl);
         }
+        const sessionModalEl = document.getElementById('nailSessionModal');
+        if (sessionModalEl && window.bootstrap) {
+            nailSessionModalInstance = new bootstrap.Modal(sessionModalEl);
+        }
+        const lightboxModalEl = document.getElementById('photoLightboxModal');
+        if (lightboxModalEl && window.bootstrap) {
+            lightboxModalInstance = new bootstrap.Modal(lightboxModalEl);
+        }
+
         loadBranding();
         loadCustomers();
     });
@@ -588,11 +786,12 @@
             if (!response.ok) throw new Error('Failed to fetch customers');
 
             const customers = await response.json();
+            customersCache = customers;
             const tbody = document.getElementById('customerTableBody');
             tbody.innerHTML = '';
 
             if (customers.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="9" class="text-center text-muted py-4">No customers found in the database.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="10" class="text-center text-muted py-4">No customers found in the database.</td></tr>`;
                 return;
             }
 
@@ -600,12 +799,21 @@
                 const safeName = (customer.name || '').replace(/'/g, "\\'");
                 const safeEmail = (customer.email || '').replace(/'/g, "\\'");
                 const safePhone = (customer.phone || '').replace(/'/g, "\\'");
-                const safeMedicalFlags = (customer.medicalFlags || '').replace(/'/g, "\\'");
-                const safeColorFormula = (customer.colorFormula || '').replace(/'/g, "\\'");
-                const safeBirthDate = customer.birthDate || '';
                 const optOut = customer.optOutMarketing === true;
                 const points = customer.loyaltyPoints || 0;
                 const pointsVal = (points * 0.10).toFixed(2);
+
+                let nailStyleBadge = '<span class="text-muted small fst-italic">Not specified</span>';
+                if (customer.nailShape || customer.nailSystem || customer.nailLength) {
+                    nailStyleBadge = `
+                        <div class="d-flex flex-column gap-1">
+                            <span class="badge bg-pink text-white rounded-pill px-2 py-1" style="font-size: 0.72rem; width: fit-content;">
+                                💅 ${customer.nailShape || 'Shape'} ${customer.nailLength ? '(' + customer.nailLength + ')' : ''}
+                            </span>
+                            ${customer.nailSystem ? `<span class="badge bg-light text-dark border px-2 py-1" style="font-size: 0.7rem; width: fit-content;">${customer.nailSystem}</span>` : ''}
+                        </div>
+                    `;
+                }
 
                 let flagsBadge = '<span class="text-muted small fst-italic">None</span>';
                 if (customer.medicalFlags && customer.medicalFlags.trim()) {
@@ -641,6 +849,7 @@
                         </td>
                         <td><a href="mailto:${customer.email || ''}" class="text-decoration-none">${customer.email || 'N/A'}</a></td>
                         <td><a href="tel:${customer.phone || ''}" class="text-decoration-none">${customer.phone || 'N/A'}</a></td>
+                        <td>${nailStyleBadge}</td>
                         <td>${birthdayBadge}</td>
                         <td>
                             <span class="badge bg-warning-subtle text-dark border border-warning-subtle fw-bold">
@@ -653,7 +862,7 @@
                             <button class="btn btn-outline-info btn-sm me-1 fw-semibold" onclick="openCustomerHistory(${customer.id}, '${safeName}', '${safeEmail}', '${safePhone}')" title="View Appointment History & Audit Log">
                                 <i class="bi bi-clock-history me-1"></i> History
                             </button>
-                            <button class="btn btn-outline-secondary btn-sm me-1" onclick="openEditModal(${customer.id}, '${safeName}', '${safeEmail}', '${safePhone}', '${safeMedicalFlags}', '${safeColorFormula}', ${points}, '${safeBirthDate}', ${optOut})" title="Edit Customer">
+                            <button class="btn btn-outline-secondary btn-sm me-1" onclick="openEditModal(${customer.id})" title="Edit Customer">
                                 <i class="bi bi-pencil"></i>
                             </button>
                             <button class="btn btn-outline-danger btn-sm" onclick="deleteCustomer(${customer.id})" title="Delete Customer">
@@ -665,7 +874,7 @@
             });
         } catch (error) {
             console.error('Error loading customers:', error);
-            document.getElementById('customerTableBody').innerHTML = `<tr><td colspan="9" class="text-center text-danger py-4">Error loading customer data from server.</td></tr>`;
+            document.getElementById('customerTableBody').innerHTML = `<tr><td colspan="10" class="text-center text-danger py-4">Error loading customer data from server.</td></tr>`;
         }
     }
 
@@ -684,6 +893,11 @@
         document.getElementById('customerName').value = '';
         document.getElementById('customerEmail').value = '';
         document.getElementById('customerPhone').value = '';
+        document.getElementById('customerNailShape').value = '';
+        document.getElementById('customerNailLength').value = '';
+        document.getElementById('customerNailSystem').value = '';
+        document.getElementById('customerFavoriteColors').value = '';
+        document.getElementById('customerCuticleCareNotes').value = '';
         document.getElementById('customerLoyaltyPoints').value = '0';
         document.getElementById('customerBirthDate').value = '';
         document.getElementById('customerOptOutMarketing').checked = false;
@@ -693,16 +907,24 @@
         customerModalInstance.show();
     }
 
-    function openEditModal(id, name, email, phone, medicalFlags, colorFormula, loyaltyPoints, birthDate, optOutMarketing) {
-        document.getElementById('customerId').value = id;
-        document.getElementById('customerName').value = name;
-        document.getElementById('customerEmail').value = email;
-        document.getElementById('customerPhone').value = phone === 'undefined' ? '' : phone;
-        document.getElementById('customerLoyaltyPoints').value = (loyaltyPoints !== undefined && loyaltyPoints !== null) ? loyaltyPoints : 0;
-        document.getElementById('customerBirthDate').value = (birthDate && birthDate !== 'undefined') ? birthDate : '';
-        document.getElementById('customerOptOutMarketing').checked = (optOutMarketing === true || optOutMarketing === 'true');
-        document.getElementById('customerMedicalFlags').value = (medicalFlags === 'undefined' || !medicalFlags) ? '' : medicalFlags;
-        document.getElementById('customerColorFormula').value = (colorFormula === 'undefined' || !colorFormula) ? '' : colorFormula;
+    function openEditModal(id) {
+        const c = customersCache.find(x => x.id === id);
+        if (!c) return;
+
+        document.getElementById('customerId').value = c.id;
+        document.getElementById('customerName').value = c.name || '';
+        document.getElementById('customerEmail').value = c.email || '';
+        document.getElementById('customerPhone').value = c.phone || '';
+        document.getElementById('customerNailShape').value = c.nailShape || '';
+        document.getElementById('customerNailLength').value = c.nailLength || '';
+        document.getElementById('customerNailSystem').value = c.nailSystem || '';
+        document.getElementById('customerFavoriteColors').value = c.favoriteColors || '';
+        document.getElementById('customerCuticleCareNotes').value = c.cuticleCareNotes || '';
+        document.getElementById('customerLoyaltyPoints').value = c.loyaltyPoints || 0;
+        document.getElementById('customerBirthDate').value = c.birthDate || '';
+        document.getElementById('customerOptOutMarketing').checked = (c.optOutMarketing === true);
+        document.getElementById('customerMedicalFlags').value = c.medicalFlags || '';
+        document.getElementById('customerColorFormula').value = c.colorFormula || '';
         document.getElementById('modalTitle').innerText = 'Edit Customer';
         customerModalInstance.show();
     }
@@ -712,6 +934,11 @@
         const name = document.getElementById('customerName').value.trim();
         const email = document.getElementById('customerEmail').value.trim();
         const phone = document.getElementById('customerPhone').value.trim();
+        const nailShape = document.getElementById('customerNailShape').value.trim();
+        const nailLength = document.getElementById('customerNailLength').value.trim();
+        const nailSystem = document.getElementById('customerNailSystem').value.trim();
+        const favoriteColors = document.getElementById('customerFavoriteColors').value.trim();
+        const cuticleCareNotes = document.getElementById('customerCuticleCareNotes').value.trim();
         const loyaltyPoints = parseInt(document.getElementById('customerLoyaltyPoints').value) || 0;
         const birthDate = document.getElementById('customerBirthDate').value || null;
         const optOutMarketing = document.getElementById('customerOptOutMarketing').checked;
@@ -734,7 +961,11 @@
                     'Authorization': 'Bearer ' + token,
                     'X-Tenant-ID': activeTenant
                 },
-                body: JSON.stringify({ name, email, phone, medicalFlags, colorFormula, loyaltyPoints, birthDate, optOutMarketing })
+                body: JSON.stringify({
+                    name, email, phone, nailShape, nailLength, nailSystem,
+                    favoriteColors, cuticleCareNotes, medicalFlags, colorFormula,
+                    loyaltyPoints, birthDate, optOutMarketing
+                })
             });
 
             if (response.ok) {
@@ -1073,7 +1304,9 @@
         const totalCancelled = rel.totalCancelled || 0;
         const totalNoShows = rel.totalNoShows || 0;
         const hasRisk = rel.hasHighNoShowRisk || totalNoShows >= 2;
+        const nailNotes = data.nailNotes || [];
 
+        // 1. Safety & Allergy Alert
         let medicalBannerHtml = '';
         if (customer.medicalFlags && customer.medicalFlags.trim()) {
             medicalBannerHtml = `
@@ -1083,6 +1316,152 @@
                         <div class="fw-bold text-danger text-uppercase" style="letter-spacing: 0.05em; font-size: 0.82rem;">⚠️ Safety & Allergy Alert</div>
                         <div class="fw-bold text-dark fs-6 mt-1">${customer.medicalFlags}</div>
                         <div class="extra-small text-muted mt-1">Technicians: Always verify customer sensitivity & consult care guidelines before service.</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // 2. Digital Client Card & Nail Style Profile
+        const shape = customer.nailShape || 'Not set';
+        const length = customer.nailLength || 'Not set';
+        const system = customer.nailSystem || 'Not set';
+        const favoriteColors = customer.favoriteColors || customer.colorFormula || 'No favorite shades recorded yet';
+
+        const digitalCardHtml = `
+            <div class="card border-0 bg-white shadow-sm rounded-4 p-3 mb-3 border">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="small fw-bold text-dark d-flex align-items-center gap-1">
+                        <i class="bi bi-person-vcard-fill text-pink fs-5"></i>
+                        <span class="fs-6">Digital Client Card &amp; Style Profile</span>
+                    </span>
+                    <button class="btn btn-sm btn-pink rounded-pill px-3 py-1 fw-bold shadow-xs d-flex align-items-center gap-1"
+                            onclick="openLogNailSessionModal(${customer.id})">
+                        <i class="bi bi-camera-fill"></i> + Log Session &amp; Photo
+                    </button>
+                </div>
+
+                <div class="row g-2 mb-2">
+                    <div class="col-4">
+                        <div class="p-2 bg-light rounded-3 text-center border">
+                            <div class="extra-small text-muted text-uppercase fw-semibold">Shape</div>
+                            <div class="fw-bold text-dark mt-1 text-truncate">${shape}</div>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="p-2 bg-light rounded-3 text-center border">
+                            <div class="extra-small text-muted text-uppercase fw-semibold">Length</div>
+                            <div class="fw-bold text-dark mt-1 text-truncate">${length}</div>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="p-2 bg-light rounded-3 text-center border">
+                            <div class="extra-small text-muted text-uppercase fw-semibold">System</div>
+                            <div class="fw-bold text-pink mt-1 text-truncate">${system}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-2 bg-light rounded-3 border mb-2">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <span class="extra-small text-muted text-uppercase fw-semibold">
+                            <i class="bi bi-heart-fill text-pink me-1"></i>Favorite Colors / Polish Codes
+                        </span>
+                    </div>
+                    <div class="fw-semibold text-dark small mt-1">${favoriteColors}</div>
+                </div>
+
+                ${customer.cuticleCareNotes ? `
+                    <div class="p-2 bg-light rounded-3 border">
+                        <span class="extra-small text-muted text-uppercase fw-semibold">
+                            <i class="bi bi-shield-check text-success me-1"></i>Cuticle &amp; Bed Instructions
+                        </span>
+                        <div class="small text-secondary mt-1">${customer.cuticleCareNotes}</div>
+                    </div>
+                ` : ''}
+            </div>
+        `;
+
+        // 3. Past Sets & Photo Gallery (nailNotes)
+        let galleryHtml = '';
+        if (nailNotes.length === 0) {
+            galleryHtml = `
+                <div class="card border-0 bg-light rounded-4 p-4 text-center mb-3 border">
+                    <i class="bi bi-camera text-muted fs-2 d-block mb-1"></i>
+                    <div class="fw-semibold text-dark small">No Nail Photos or Consultation Notes Yet</div>
+                    <p class="extra-small text-muted mb-2">Attach photos of their completed sets and log color formulas for quick recall.</p>
+                    <div>
+                        <button class="btn btn-outline-pink btn-sm rounded-pill px-3 py-1 fw-bold" onclick="openLogNailSessionModal(${customer.id})">
+                            <i class="bi bi-plus-lg me-1"></i>Log First Set &amp; Photo
+                        </button>
+                    </div>
+                </div>
+            `;
+        } else {
+            galleryHtml = `
+                <div class="card border-0 bg-white shadow-sm rounded-4 p-3 mb-3 border">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <span class="small fw-bold text-dark d-flex align-items-center gap-1">
+                            <i class="bi bi-images text-pink"></i> Past Sets &amp; Photo History (${nailNotes.length})
+                        </span>
+                        <button class="btn btn-sm btn-outline-pink rounded-pill px-2 py-0 extra-small fw-bold" onclick="openLogNailSessionModal(${customer.id})">
+                            + Add Note
+                        </button>
+                    </div>
+                    <div class="row g-2">
+                        ${nailNotes.map(n => {
+                            const dateStr = n.serviceDate || 'Recent';
+                            const hasPhoto = n.photoUrl && n.photoUrl.trim();
+                            const safePhoto = hasPhoto ? n.photoUrl.replace(/'/g, "\\'") : '';
+                            const safeColors = (n.colorDetails || '').replace(/'/g, "\\'");
+                            const safeNotes = (n.notes || '').replace(/'/g, "\\'");
+                            const safeTech = (n.technicianName || '').replace(/'/g, "\\'");
+                            return `
+                                <div class="col-6">
+                                    <div class="card h-100 border rounded-3 overflow-hidden shadow-xs">
+                                        ${hasPhoto ? `
+                                            <div style="height: 120px; overflow: hidden; background: #212529; cursor: pointer; position: relative;"
+                                                 onclick="openPhotoLightbox('${safePhoto}', '${safeColors}', '${safeNotes}', '${safeTech}', '${dateStr}')">
+                                                <img src="${n.photoUrl}" alt="Nail Set" class="w-100 h-100" style="object-fit: cover; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+                                                <span class="badge bg-dark bg-opacity-75 text-white position-absolute bottom-0 start-0 m-1 extra-small">
+                                                    <i class="bi bi-zoom-in"></i> View
+                                                </span>
+                                            </div>
+                                        ` : `
+                                            <div class="d-flex align-items-center justify-content-center bg-light text-muted" style="height: 70px;">
+                                                <i class="bi bi-palette fs-3 text-pink opacity-50"></i>
+                                            </div>
+                                        `}
+                                        <div class="p-2">
+                                            <div class="d-flex justify-content-between align-items-start mb-1">
+                                                <span class="badge bg-light text-dark border extra-small">${dateStr}</span>
+                                                <button class="btn btn-link text-danger p-0 extra-small" title="Delete note"
+                                                        onclick="deleteNailSessionNote(${customer.id}, ${n.id})">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </div>
+                                            <div class="fw-bold text-dark extra-small text-truncate" title="${n.colorDetails || 'Nail Consultation'}">
+                                                ${n.colorDetails || 'Nail Consultation'}
+                                            </div>
+                                            ${(n.nailShape || n.nailSystem) ? `
+                                                <div class="text-muted extra-small mt-1">
+                                                    ${n.nailShape || ''} ${n.nailLength ? '• ' + n.nailLength : ''} ${n.nailSystem ? '• ' + n.nailSystem : ''}
+                                                </div>
+                                            ` : ''}
+                                            ${n.technicianName ? `
+                                                <div class="text-secondary extra-small mt-1">
+                                                    <i class="bi bi-person me-1"></i>Tech: ${n.technicianName}
+                                                </div>
+                                            ` : ''}
+                                            ${n.notes ? `
+                                                <div class="p-1 bg-light rounded text-muted extra-small mt-1 text-truncate" title="${n.notes}">
+                                                    ${n.notes}
+                                                </div>
+                                            ` : ''}
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
                     </div>
                 </div>
             `;
@@ -1264,6 +1643,8 @@
 
         body.innerHTML = `
             ${medicalBannerHtml}
+            ${digitalCardHtml}
+            ${galleryHtml}
             ${formulaCardHtml}
             ${loyaltyCardHtml}
             ${birthdayCardHtml}
@@ -1277,6 +1658,180 @@
             </div>
             ${timelineHtml}
         `;
+    }
+
+    // --- NAIL SESSION LOG & PHOTO HANDLERS ---
+    let currentPhotoBase64 = '';
+
+    function openLogNailSessionModal(customerId) {
+        activeDrawerCustomerId = customerId;
+        document.getElementById('sessionCustomerId').value = customerId;
+
+        // Default to today
+        const now = new Date();
+        const y = now.getFullYear();
+        const m = String(now.getMonth() + 1).padStart(2, '0');
+        const d = String(now.getDate()).padStart(2, '0');
+        document.getElementById('sessionDate').value = `${y}-${m}-${d}`;
+
+        document.getElementById('sessionTechName').value = '';
+        document.getElementById('sessionNailShape').value = '';
+        document.getElementById('sessionNailLength').value = '';
+        document.getElementById('sessionNailSystem').value = '';
+        document.getElementById('sessionColorDetails').value = '';
+        document.getElementById('sessionNotes').value = '';
+        document.getElementById('sessionPhotoUrl').value = '';
+        document.getElementById('sessionPhotoFile').value = '';
+        clearSessionPhoto();
+
+        // Pre-fill default shape/length/system from customer if available
+        const cust = customersCache.find(c => c.id === customerId);
+        if (cust) {
+            if (cust.nailShape) document.getElementById('sessionNailShape').value = cust.nailShape;
+            if (cust.nailLength) document.getElementById('sessionNailLength').value = cust.nailLength;
+            if (cust.nailSystem) document.getElementById('sessionNailSystem').value = cust.nailSystem;
+            if (cust.colorFormula) document.getElementById('sessionColorDetails').value = cust.colorFormula;
+        }
+
+        if (nailSessionModalInstance) {
+            nailSessionModalInstance.show();
+        }
+    }
+
+    function handleSessionPhotoFile(input) {
+        if (!input.files || !input.files[0]) return;
+        const file = input.files[0];
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            currentPhotoBase64 = e.target.result;
+            showPhotoPreview(currentPhotoBase64);
+            document.getElementById('sessionPhotoUrl').value = '';
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function handleSessionPhotoUrl(url) {
+        if (url && url.trim()) {
+            currentPhotoBase64 = url.trim();
+            showPhotoPreview(currentPhotoBase64);
+            document.getElementById('sessionPhotoFile').value = '';
+        } else {
+            clearSessionPhoto();
+        }
+    }
+
+    function showPhotoPreview(src) {
+        const wrapper = document.getElementById('sessionPhotoPreviewWrapper');
+        const img = document.getElementById('sessionPhotoPreview');
+        img.src = src;
+        wrapper.classList.remove('d-none');
+    }
+
+    function clearSessionPhoto() {
+        currentPhotoBase64 = '';
+        const wrapper = document.getElementById('sessionPhotoPreviewWrapper');
+        if (wrapper) wrapper.classList.add('d-none');
+        const fileIn = document.getElementById('sessionPhotoFile');
+        if (fileIn) fileIn.value = '';
+        const urlIn = document.getElementById('sessionPhotoUrl');
+        if (urlIn) urlIn.value = '';
+    }
+
+    async function saveNailSessionNote() {
+        const customerId = activeDrawerCustomerId || document.getElementById('sessionCustomerId').value;
+        const serviceDate = document.getElementById('sessionDate').value;
+        const colorDetails = document.getElementById('sessionColorDetails').value.trim();
+
+        if (!customerId) {
+            alert('No customer selected.');
+            return;
+        }
+        if (!serviceDate || !colorDetails) {
+            alert('Please provide the Service Date and Color Formula / Shades Used.');
+            return;
+        }
+
+        const payload = {
+            serviceDate: serviceDate,
+            technicianName: document.getElementById('sessionTechName').value.trim() || null,
+            nailShape: document.getElementById('sessionNailShape').value.trim() || null,
+            nailLength: document.getElementById('sessionNailLength').value.trim() || null,
+            nailSystem: document.getElementById('sessionNailSystem').value.trim() || null,
+            colorDetails: colorDetails,
+            notes: document.getElementById('sessionNotes').value.trim() || null,
+            photoUrl: currentPhotoBase64 || null
+        };
+
+        const btn = document.getElementById('btnSaveNailSession');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
+
+        try {
+            const resp = await fetch(`/api/admin/customers/${customerId}/nail-notes`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + token,
+                    'X-Tenant-ID': activeTenant
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (!resp.ok) {
+                const errData = await resp.json().catch(() => ({}));
+                throw new Error(errData.message || 'Failed to save session note');
+            }
+
+            if (nailSessionModalInstance) {
+                nailSessionModalInstance.hide();
+            }
+
+            // Refresh customer table and customer history drawer
+            loadCustomers();
+            const cust = customersCache.find(c => c.id === Number(customerId));
+            openCustomerHistory(customerId, cust ? cust.name : '', cust ? cust.email : '', cust ? cust.phone : '');
+
+        } catch (err) {
+            alert('Error: ' + err.message);
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-check2-circle me-1"></i>Save Session Note';
+        }
+    }
+
+    async function deleteNailSessionNote(customerId, noteId) {
+        if (!confirm('Are you sure you want to delete this nail consultation session note and photo?')) return;
+
+        try {
+            const resp = await fetch(`/api/admin/customers/${customerId}/nail-notes/${noteId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': 'Bearer ' + token,
+                    'X-Tenant-ID': activeTenant
+                }
+            });
+
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({}));
+                throw new Error(err.message || 'Failed to delete note');
+            }
+
+            const cust = customersCache.find(c => c.id === Number(customerId));
+            openCustomerHistory(customerId, cust ? cust.name : '', cust ? cust.email : '', cust ? cust.phone : '');
+        } catch (e) {
+            alert('Error deleting note: ' + e.message);
+        }
+    }
+
+    function openPhotoLightbox(photoUrl, colorDetails, notes, techName, date) {
+        document.getElementById('lightboxImage').src = photoUrl;
+        document.getElementById('lightboxColorDetails').textContent = colorDetails || 'Nail Consultation';
+        document.getElementById('lightboxNotes').textContent = notes ? `Notes: "${notes}"` : 'No consultation notes attached.';
+        document.getElementById('lightboxMeta').textContent = `Logged: ${date} ${techName ? '• Specialist: ' + techName : ''}`;
+
+        if (lightboxModalInstance) {
+            lightboxModalInstance.show();
+        }
     }
 
     function handleLogout() {

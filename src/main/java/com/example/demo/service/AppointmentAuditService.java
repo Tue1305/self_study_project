@@ -3,9 +3,12 @@ package com.example.demo.service;
 import com.example.demo.entity.Appointment;
 import com.example.demo.entity.AppointmentActivityLog;
 import com.example.demo.entity.Customer;
+import com.example.demo.entity.CustomerNailNote;
 import com.example.demo.repository.AppointmentActivityLogRepository;
 import com.example.demo.repository.AppointmentRepository;
+import com.example.demo.repository.CustomerNailNoteRepository;
 import com.example.demo.repository.CustomerRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -18,15 +21,27 @@ public class AppointmentAuditService {
     private final AppointmentActivityLogRepository activityLogRepository;
     private final AppointmentRepository appointmentRepository;
     private final CustomerRepository customerRepository;
+    private final CustomerNailNoteRepository nailNoteRepository;
 
     public AppointmentAuditService(
             AppointmentActivityLogRepository activityLogRepository,
             AppointmentRepository appointmentRepository,
             CustomerRepository customerRepository
     ) {
+        this(activityLogRepository, appointmentRepository, customerRepository, null);
+    }
+
+    @Autowired
+    public AppointmentAuditService(
+            AppointmentActivityLogRepository activityLogRepository,
+            AppointmentRepository appointmentRepository,
+            CustomerRepository customerRepository,
+            CustomerNailNoteRepository nailNoteRepository
+    ) {
         this.activityLogRepository = activityLogRepository;
         this.appointmentRepository = appointmentRepository;
         this.customerRepository = customerRepository;
+        this.nailNoteRepository = nailNoteRepository;
     }
 
     /**
@@ -188,11 +203,16 @@ public class AppointmentAuditService {
             return m;
         }).toList();
 
+        List<CustomerNailNote> nailNotes = (nailNoteRepository != null && customerId != null)
+                ? nailNoteRepository.findAllByTenantIdAndCustomerIdOrderByServiceDateDescCreatedAtDesc(tenantId, customerId)
+                : Collections.emptyList();
+
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("customer", customer);
         response.put("reliability", reliability);
         response.put("appointments", formattedAppointments);
         response.put("activityLogs", formattedLogs);
+        response.put("nailNotes", nailNotes);
 
         return response;
     }

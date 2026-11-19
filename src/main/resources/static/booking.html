@@ -510,6 +510,13 @@
                         <span id="wizardAlertText"></span>
                     </div>
 
+                    <!-- Global Notice Box for Auto-reconciled selections or info -->
+                    <div id="wizardNotice" class="alert alert-info border-info-subtle bg-info-subtle text-dark d-none align-items-center py-2 px-3 rounded-3 shadow-sm mb-3" role="alert">
+                        <i class="bi bi-info-circle-fill text-info me-2 fs-5"></i>
+                        <span id="wizardNoticeText" class="small fw-semibold"></span>
+                        <button type="button" class="btn-close ms-auto small" onclick="hideWizardNotice()" aria-label="Close"></button>
+                    </div>
+
                     <!-- ==================== SELF-SERVICE MANAGE RESERVATION PORTAL ==================== -->
                     <div id="selfServicePortalContainer" class="d-none">
                         <!-- Alert Banner for cancellations or reschedules -->
@@ -1049,7 +1056,7 @@
         },
         {
             id: 'combos',
-            title: 'Combo',
+            title: 'Pedicure & Manicure Combos',
             icon: 'bi-intersect',
             keywords: ['combo']
         },
@@ -1126,6 +1133,31 @@
         const alertEl = document.getElementById('wizardAlert');
         alertEl.classList.add('d-none');
         alertEl.classList.remove('d-flex');
+    }
+
+    let wizardNoticeTimeout = null;
+    function showWizardNotice(message) {
+        const noticeEl = document.getElementById('wizardNotice');
+        const noticeText = document.getElementById('wizardNoticeText');
+        if (!noticeEl || !noticeText) return;
+        noticeText.textContent = message;
+        noticeEl.classList.remove('d-none');
+        noticeEl.classList.add('d-flex');
+        if (wizardNoticeTimeout) clearTimeout(wizardNoticeTimeout);
+        wizardNoticeTimeout = setTimeout(() => {
+            hideWizardNotice();
+        }, 6000);
+    }
+
+    function hideWizardNotice() {
+        const noticeEl = document.getElementById('wizardNotice');
+        if (!noticeEl) return;
+        noticeEl.classList.add('d-none');
+        noticeEl.classList.remove('d-flex');
+        if (wizardNoticeTimeout) {
+            clearTimeout(wizardNoticeTimeout);
+            wizardNoticeTimeout = null;
+        }
     }
 
     // ==================== INITIALIZATION & TENANT CONFIG ====================
@@ -3160,6 +3192,23 @@
         return 'manicures';
     }
 
+    function getComboCoverage(service) {
+        if (!service) return { isCombo: false, includesManicure: false, includesPedicure: false };
+        const sCat = getCategoryForService(service);
+        const nameLower = (service.name || '').toLowerCase();
+        const descLower = (service.description || '').toLowerCase();
+        const fullText = nameLower + ' ' + descLower;
+
+        // Is it a combo? (either in combos category, or name/desc contains combo or duo)
+        const isCombo = (sCat === 'combos') || fullText.includes('combo') || fullText.includes('duo');
+
+        // Check if combo includes manicure / pedicure components
+        const includesManicure = isCombo && (fullText.includes('manicure') || fullText.includes('mani'));
+        const includesPedicure = isCombo && (fullText.includes('pedicure') || fullText.includes('pedi'));
+
+        return { isCombo, includesManicure, includesPedicure };
+    }
+
     function cleanUpServiceAssignments(guest, serviceId) {
         if (!guest || !serviceId) return;
         const sIdStr = String(serviceId);
@@ -3208,6 +3257,56 @@
                 activeGuest.services[sameCategoryIdx] = found;
             } else {
                 activeGuest.services.push(found);
+            }
+
+            // COMBO & SINGLE MANICURE / PEDICURE RECONCILIATION:
+            // When choosing a Pedicure & Manicure combo, unselect individual Manicure and/or Pedicure services
+            const coverage = getComboCoverage(found);
+            const unselectedSingleNames = [];
+
+            if (coverage.isCombo) {
+                if (coverage.includesManicure) {
+                    for (let i = activeGuest.services.length - 1; i >= 0; i--) {
+                        const s = activeGuest.services[i];
+                        if (s.id !== found.id && getCategoryForService(s) === 'manicures') {
+                            const removedMani = activeGuest.services.splice(i, 1)[0];
+                            cleanUpServiceAssignments(activeGuest, removedMani.id);
+                            unselectedSingleNames.push(removedMani.name);
+                        }
+                    }
+                }
+                if (coverage.includesPedicure) {
+                    for (let i = activeGuest.services.length - 1; i >= 0; i--) {
+                        const s = activeGuest.services[i];
+                        if (s.id !== found.id && getCategoryForService(s) === 'pedicures') {
+                            const removedPedi = activeGuest.services.splice(i, 1)[0];
+                            cleanUpServiceAssignments(activeGuest, removedPedi.id);
+                            unselectedSingleNames.push(removedPedi.name);
+                        }
+                    }
+                }
+
+                if (unselectedSingleNames.length > 0) {
+                    showWizardNotice(`Unselected single service (${unselectedSingleNames.join(' & ')}) since you selected ${found.name}.`);
+                }
+            } else {
+                // If user selected an individual Manicure or Pedicure, remove any existing combo that covers it
+                const isSingleMani = (effectiveCatId === 'manicures');
+                const isSinglePedi = (effectiveCatId === 'pedicures');
+
+                if (isSingleMani || isSinglePedi) {
+                    for (let i = activeGuest.services.length - 1; i >= 0; i--) {
+                        const s = activeGuest.services[i];
+                        if (s.id === found.id) continue;
+                        const c = getComboCoverage(s);
+                        if (!c.isCombo) continue;
+                        if ((isSingleMani && c.includesManicure) || (isSinglePedi && c.includesPedicure)) {
+                            const removedCombo = activeGuest.services.splice(i, 1)[0];
+                            cleanUpServiceAssignments(activeGuest, removedCombo.id);
+                            showWizardNotice(`Unselected ${removedCombo.name} since you selected individual ${found.name}.`);
+                        }
+                    }
+                }
             }
         }
 

@@ -842,7 +842,10 @@
                                 </div>
                                 <div class="col-md-6">
                                     <label for="customerPhone" class="form-label fw-semibold"><span id="guestPhoneLabel">Guest 1 Phone Number</span> <span class="text-danger">*</span></label>
-                                    <input type="tel" class="form-control" id="customerPhone" required placeholder="">
+                                    <input type="tel" class="form-control" id="customerPhone" required maxlength="18" inputmode="numeric" placeholder="(000)-(000)-(0000)" oninput="handlePhoneInput(this)" onkeydown="handlePhoneKeydown(event, this)" onblur="validatePhoneField(this)">
+                                    <div id="phoneValidationError" class="text-danger small mt-1 d-none">
+                                        <i class="bi bi-exclamation-circle me-1"></i>Please enter a valid 10-digit phone number: (000)-(000)-(0000).
+                                    </div>
                                 </div>
                             </div>
 
@@ -1786,9 +1789,10 @@
                     if (bookingState.guests[0]) bookingState.guests[0].customerName = profile.name.trim();
                 }
                 if (profile.phoneNumber && profile.phoneNumber.trim()) {
+                    const formattedPhone = formatPhoneNumber(profile.phoneNumber.trim());
                     const phoneEl = document.getElementById('customerPhone');
-                    if (phoneEl) phoneEl.value = profile.phoneNumber.trim();
-                    if (bookingState.guests[0]) bookingState.guests[0].customerPhone = profile.phoneNumber.trim();
+                    if (phoneEl) phoneEl.value = formattedPhone;
+                    if (bookingState.guests[0]) bookingState.guests[0].customerPhone = formattedPhone;
                 }
             })
             .catch(() => {});
@@ -4363,9 +4367,13 @@
         document.getElementById('guestNotesLabel').textContent = `Guest ${guestNum} Notes / Special Requests`;
 
         document.getElementById('customerName').value = guest.customerName || '';
-        document.getElementById('customerPhone').value = guest.customerPhone || '';
+        document.getElementById('customerPhone').value = formatPhoneNumber(guest.customerPhone || '');
         document.getElementById('customerEmail').value = guest.customerEmail || '';
         document.getElementById('appointmentNotes').value = guest.notes || '';
+        const phoneInputEl = document.getElementById('customerPhone');
+        if (phoneInputEl) phoneInputEl.classList.remove('is-invalid');
+        const phoneErrEl = document.getElementById('phoneValidationError');
+        if (phoneErrEl) phoneErrEl.classList.add('d-none');
 
         const backLabel = document.getElementById('step3BackBtnLabel');
         if (backLabel) {
@@ -4395,6 +4403,49 @@
     }
 
     const STRICT_EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/;
+
+    const STRICT_PHONE_REGEX = /^\(\d{3}\)-\(\d{3}\)-\(\d{4}\)$/;
+
+    function formatPhoneNumber(raw) {
+        const digits = String(raw || '').replace(/\D/g, '').slice(0, 10);
+        if (digits.length === 0) return '';
+        if (digits.length <= 3) return `(${digits}`;
+        if (digits.length <= 6) return `(${digits.slice(0, 3)})-(${digits.slice(3)}`;
+        if (digits.length < 10) return `(${digits.slice(0, 3)})-(${digits.slice(3, 6)})-(${digits.slice(6)}`;
+        return `(${digits.slice(0, 3)})-(${digits.slice(3, 6)})-(${digits.slice(6, 10)})`;
+    }
+
+    function handlePhoneKeydown(e, input) {
+        if (e.key === 'Backspace' && input.selectionStart === input.selectionEnd && input.selectionStart === input.value.length && input.value.endsWith(')')) {
+            e.preventDefault();
+            const digits = input.value.replace(/\D/g, '').slice(0, -1);
+            input.value = formatPhoneNumber(digits);
+            validatePhoneField(input, true);
+        }
+    }
+
+    function handlePhoneInput(input) {
+        input.value = formatPhoneNumber(input.value);
+        validatePhoneField(input, true);
+    }
+
+    function validatePhoneField(input, silentWhenIncomplete = false) {
+        const el = input || document.getElementById('customerPhone');
+        const val = (el ? el.value : '').trim();
+        const errEl = document.getElementById('phoneValidationError');
+        if (!el) return true;
+        const isValid = STRICT_PHONE_REGEX.test(val);
+        if (isValid || (silentWhenIncomplete && val.length === 0)) {
+            el.classList.remove('is-invalid');
+            if (errEl) errEl.classList.add('d-none');
+            return isValid;
+        }
+        if (!silentWhenIncomplete) {
+            el.classList.add('is-invalid');
+            if (errEl) errEl.classList.remove('d-none');
+        }
+        return false;
+    }
 
     function validateEmailField(input) {
         const val = (input ? input.value : document.getElementById('customerEmail').value).trim();
@@ -4428,6 +4479,15 @@
 
         if (!currentGuest.customerName || !currentGuest.customerPhone) {
             showAlert(`Please fill in Full Name and Phone Number for Guest ${activeIdx + 1}.`);
+            return;
+        }
+
+        currentGuest.customerPhone = formatPhoneNumber(currentGuest.customerPhone);
+        document.getElementById('customerPhone').value = currentGuest.customerPhone;
+        if (!STRICT_PHONE_REGEX.test(currentGuest.customerPhone)) {
+            showAlert(`Please enter a valid 10-digit phone number for Guest ${activeIdx + 1} in the format (000)-(000)-(0000).`);
+            validatePhoneField(document.getElementById('customerPhone'), false);
+            document.getElementById('customerPhone').focus();
             return;
         }
 

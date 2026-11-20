@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title id="pageTitle">Staff Portal — My Schedule & Earnings</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico?=v2">
+
+    <script src="/js/tenant-theme.js"></script>
+    <style id="tenant-theme-vars">
+        :root {
+            --primary-color: #e91e63;
+            --secondary-color: #343a40;
+            --bs-primary-pink: #e91e63;
+            --bs-soft-pink: #fce4ec;
+        }
+    </style>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <style>
+        body {
+            background-color: #f8fafc;
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+            padding-bottom: 40px;
+        }
+        .text-pink { color: var(--bs-primary-pink) !important; }
+        .btn-pink { background-color: var(--bs-primary-pink); border-color: var(--bs-primary-pink); color: #fff; }
+        .btn-pink:hover { filter: brightness(0.92); color: #fff; }
+        .portal-hero {
+            background: linear-gradient(135deg, var(--bs-primary-pink), #ad1457);
+            color: #ffffff;
+            border-radius: 0 0 24px 24px;
+            padding: 20px 16px 26px;
+            box-shadow: 0 10px 28px rgba(233, 30, 99, 0.22);
+        }
+        .earnings-card {
+            background: #ffffff;
+            border-radius: 18px;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+            margin-top: -18px;
+        }
+        .appt-card {
+            background: #ffffff;
+            border-radius: 16px;
+            border: 1.5px solid #e2e8f0;
+            border-left: 5px solid var(--bs-primary-pink);
+            box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
+            transition: transform 0.15s ease;
+        }
+        .appt-card.status-completed { border-left-color: #198754; opacity: 0.92; }
+        .appt-card.status-pending { border-left-color: #f59e0b; }
+        .allergy-banner {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #991b1b;
+            border-radius: 10px;
+            padding: 8px 12px;
+            font-size: 0.84rem;
+        }
+        .formula-box {
+            background: #f8fafc;
+            border: 1px dashed #cbd5e1;
+            border-radius: 10px;
+            padding: 10px 12px;
+            font-size: 0.84rem;
+        }
+        .portal-container {
+            max-width: 720px;
+            margin: 0 auto;
+        }
+    </style>
+</head>
+<body>
+
+<!-- Mobile-Friendly Top Hero -->
+<header class="portal-hero">
+    <div class="portal-container">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div class="d-flex align-items-center gap-2">
+                <span class="badge bg-white text-dark rounded-pill px-3 py-1 fw-bold" id="salonBadge">Staff Portal</span>
+                <a id="adminBackBtn" href="/admin/dashboard" class="btn btn-sm btn-outline-light rounded-pill px-2 py-0 d-none" style="font-size: 0.75rem;">
+                    <i class="bi bi-arrow-left me-1"></i>Admin Hub
+                </a>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-light rounded-pill px-3 fw-semibold" onclick="handleLogout()">
+                <i class="bi bi-box-arrow-right me-1"></i>Log Out
+            </button>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-end flex-wrap gap-2">
+            <div>
+                <div class="small opacity-75">Welcome back,</div>
+                <h1 class="h3 fw-bold mb-1" id="staffGreetingName">Technician</h1>
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    <span class="badge bg-white bg-opacity-25 text-white rounded-pill" id="staffCommBadge">60% Commission + 100% Tips</span>
+                    <span class="small opacity-90" id="staffSpecialtyText"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+
+<main class="portal-container px-3">
+    <!-- Personal Earnings & Tips Tracker Card -->
+    <section class="earnings-card p-3 p-md-4 mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div class="fw-bold text-dark d-flex align-items-center gap-2">
+                <i class="bi bi-wallet2 text-pink fs-5"></i>
+                <span>My Earnings &amp; Tips</span>
+            </div>
+            <div class="btn-group btn-group-sm" role="group">
+                <button type="button" id="btnEarnToday" class="btn btn-pink fw-semibold" onclick="switchEarningsTab('day')">Selected Day</button>
+                <button type="button" id="btnEarnWeek" class="btn btn-outline-secondary fw-semibold" onclick="switchEarningsTab('week')">Last 7 Days</button>
+            </div>
+        </div>
+
+        <div class="row g-2 text-center">
+            <div class="col-6 col-md-3">
+                <div class="p-2 rounded-3 bg-light border h-100">
+                    <div class="text-muted" style="font-size: 0.72rem;">Total Take-Home</div>
+                    <div class="fs-5 fw-bold text-success mt-1" id="earnTakeHome">$0.00</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="p-2 rounded-3 bg-light border h-100">
+                    <div class="text-muted" style="font-size: 0.72rem;">My Commission</div>
+                    <div class="fs-5 fw-bold text-dark mt-1" id="earnCommission">$0.00</div>
+                    <div class="text-muted" style="font-size: 0.68rem;" id="earnServiceSales">Sales: $0.00</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="p-2 rounded-3 bg-light border h-100">
+                    <div class="text-muted" style="font-size: 0.72rem;">Total Tips (100%)</div>
+                    <div class="fs-5 fw-bold text-pink mt-1" id="earnTips">$0.00</div>
+                    <div class="text-muted" style="font-size: 0.68rem;" id="earnTipsSplit">Card $0 • Cash $0</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="p-2 rounded-3 bg-light border h-100">
+                    <div class="text-muted" style="font-size: 0.72rem;">Checkouts</div>
+                    <div class="fs-5 fw-bold text-primary mt-1" id="earnCheckouts">0</div>
+                    <div class="text-muted" style="font-size: 0.68rem;">Completed</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Date Selector Bar -->
+    <section class="d-flex justify-content-between align-items-center gap-2 mb-3 flex-wrap">
+        <div class="btn-group btn-group-sm shadow-sm">
+            <button type="button" class="btn btn-white bg-white border fw-semibold" onclick="shiftDate(-1)">
+                <i class="bi bi-chevron-left"></i>
+            </button>
+            <button type="button" class="btn btn-white bg-white border fw-semibold px-3" onclick="goToday()">Today</button>
+            <button type="button" class="btn btn-white bg-white border fw-semibold" onclick="shiftDate(1)">
+                <i class="bi bi-chevron-right"></i>
+            </button>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <input type="date" id="portalDatePicker" class="form-control form-control-sm shadow-sm" style="width: 155px;" onchange="onDatePickerChange(this.value)">
+            <button type="button" class="btn btn-light btn-sm border shadow-sm" title="Refresh" onclick="loadStaffPortal(true)">
+                <i class="bi bi-arrow-clockwise"></i>
+            </button>
+        </div>
+    </section>
+
+    <!-- Day Off Banner (shown if marked OFF on selected date) -->
+    <div id="dayOffBanner" class="alert alert-warning border border-warning rounded-4 d-none align-items-center gap-2 mb-3">
+        <span class="fs-4">💤</span>
+        <div>
+            <div class="fw-bold">You are marked OFF on this date</div>
+            <div class="small text-muted" id="dayOffReasonText">Day Off</div>
+        </div>
+    </div>
+
+    <!-- Schedule Header -->
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <h2 class="h6 fw-bold text-dark mb-0 d-flex align-items-center gap-2">
+            <i class="bi bi-calendar2-week text-pink"></i>
+            <span id="scheduleHeading">My Appointments</span>
+        </h2>
+        <span class="badge bg-secondary-subtle text-dark border rounded-pill" id="apptCountBadge">0 visits</span>
+    </div>
+
+    <!-- Appointments List -->
+    <div id="appointmentsList" class="d-flex flex-column gap-3">
+        <div class="text-center py-5 text-muted">
+            <div class="spinner-border spinner-border-sm text-pink me-2"></div>Loading your schedule...
+        </div>
+    </div>
+</main>
+
+<!-- Quick Edit Client Formula & Notes Modal -->
+<div class="modal fade" id="noteModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header border-bottom">
+                <h5 class="modal-title fw-bold text-dark">
+                    <i class="bi bi-palette-fill text-pink me-2"></i><span id="noteModalClientName">Client Notes</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="noteAptId">
+                <div class="mb-3">
+                    <label for="noteColorFormula" class="form-label small fw-bold text-dark">Color / Polish Formula Used</label>
+                    <input type="text" class="form-control rounded-3" id="noteColorFormula" placeholder="e.g. OPI Bubble Bath 2 coats + Chrome Top">
+                </div>
+                <div class="mb-3">
+                    <label for="noteMedicalFlags" class="form-label small fw-bold text-danger">Allergy / Medical Safety Flags</label>
+                    <input type="text" class="form-control rounded-3" id="noteMedicalFlags" placeholder="e.g. Sensitive cuticles, acetone allergy">
+                </div>
+                <div class="mb-2">
+                    <label for="noteSessionNotes" class="form-label small fw-bold text-dark">Appointment Notes</label>
+                    <textarea class="form-control rounded-3" id="noteSessionNotes" rows="3" placeholder="Any preferences or reminders for next visit..."></textarea>
+                </div>
+                <div id="noteModalError" class="alert alert-danger py-2 px-3 small d-none mt-2 mb-0"></div>
+            </div>
+            <div class="modal-footer border-0 bg-light rounded-bottom-4">
+                <button type="button" class="btn btn-outline-secondary rounded-pill px-3" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" id="saveNoteBtn" class="btn btn-pink rounded-pill px-4 fw-semibold" onclick="saveAppointmentNote()">Save Notes</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
+    let selectedDateStr = getTodayDateStr();
+    let currentEarningsMode = 'day';
+    let latestPortalData = null;
+    let noteModalInstance = null;
+
+    function getTodayDateStr() {
+        const d = new Date();
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+
+    function parseJwtRole(jwtToken) {
+        try {
+            const base64Url = jwtToken.split('.')[1];
+            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+            const payload = JSON.parse(decodeURIComponent(atob(base64).split('').map(c =>
+                '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
+            ).join('')));
+            return payload.role || payload.authorities || (payload.roles ? payload.roles[0] : null) || 'ROLE_USER';
+        } catch (_) {
+            return 'ROLE_USER';
+        }
+    }
+
+    // Route guard: require authenticated Staff / Nail Tech / Admin
+    const currentRole = token ? parseJwtRole(token) : null;
+    (function guardRoute() {
+        if (!token) {
+            window.location.href = '/login';
+            return;
+        }
+        const allowed = ['ROLE_NAIL_TECH', 'NAIL_TECH', 'ROLE_STAFF', 'STAFF', 'ROLE_ADMIN', 'ADMIN'];
+        if (!allowed.includes(currentRole)) {
+            alert('Staff login is required to access the Technician Portal.');
+            window.location.href = '/';
+        }
+    })();
+
+    function getActiveTenant() {
+        if (window.TenantTheme && TenantTheme.resolveTenantId) {
+            return TenantTheme.resolveTenantId();
+        }
+        return (localStorage.getItem('active_tenant') || localStorage.getItem('tenant') || 'default').toLowerCase();
+    }
+
+    function fmtMoney(val) {
+        return '$' + Number(val || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function fmtTime12(isoStr, durationMins) {
+        if (!isoStr) return '';
+        const dt = new Date(isoStr);
+        const end = new Date(dt.getTime() + (Number(durationMins) || 45) * 60000);
+        const f = (d) => d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+        return `${f(dt)} – ${f(end)}`;
+    }
+
+    function esc(str) {
+        return String(str || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    async function loadBranding() {
+        const tenant = getActiveTenant();
+        try {
+            const resp = await fetch(`/api/public/tenant-config?tenant=${encodeURIComponent(tenant)}`);
+            if (resp.ok) {
+                const cfg = await resp.json();
+                const salonName = cfg.salonName || "Jenny's Nail Studio";
+                const primaryColor = cfg.primaryColor || '#e91e63';
+                document.documentElement.style.setProperty('--bs-primary-pink', primaryColor);
+                document.getElementById('salonBadge').textContent = salonName;
+                document.getElementById('pageTitle').textContent = `Staff Portal — ${salonName}`;
+            }
+        } catch (_) {}
+    }
+
+    async function loadStaffPortal(silent = false) {
+        const listEl = document.getElementById('appointmentsList');
+        if (!silent && listEl) {
+            listEl.innerHTML = `<div class="text-center py-5 text-muted"><div class="spinner-border spinner-border-sm text-pink me-2"></div>Loading your schedule...</div>`;
+        }
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const previewStaffId = urlParams.get('staffId');
+        const qs = new URLSearchParams({ date: selectedDateStr });
+        if (previewStaffId) qs.set('staffId', previewStaffId);
+
+        try {
+            const res = await fetch(`/api/staff-portal/me?${qs.toString()}`, {
+                headers: {
+                    'Authorization': 'Bearer ' + token,
+                    'X-Tenant-ID': getActiveTenant()
+                }
+            });
+            if (res.status === 401 || res.status === 403) {
+                window.location.href = '/login';
+                return;
+            }
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Unable to load portal data.');
+            latestPortalData = data;
+            renderPortal(data);
+        } catch (err) {
+            console.error('Staff portal load error:', err);
+            if (listEl) {
+                listEl.innerHTML = `<div class="alert alert-danger rounded-4">${esc(err.message || 'Error loading your schedule.')}</div>`;
+            }
+        }
+    }
+
+    function renderPortal(data) {
+        const staff = data.staff || {};
+        const appts = Array.isArray(data.appointments) ? data.appointments : [];
+
+        document.getElementById('staffGreetingName').textContent = staff.name || 'Technician';
+        const commRate = staff.commissionRate != null ? Number(staff.commissionRate) : 60;
+        document.getElementById('staffCommBadge').textContent = `${commRate}% Commission + 100% Tips`;
+        document.getElementById('staffSpecialtyText').textContent = staff.specialty ? `• ${staff.specialty}` : '';
+
+        const offBanner = document.getElementById('dayOffBanner');
+        if (staff.isOffToday) {
+            offBanner.classList.remove('d-none');
+            offBanner.classList.add('d-flex');
+            document.getElementById('dayOffReasonText').textContent = staff.dayOffReason || 'Day Off';
+        } else {
+            offBanner.classList.add('d-none');
+            offBanner.classList.remove('d-flex');
+        }
+
+        const dtObj = new Date(selectedDateStr + 'T12:00:00');
+        const niceDate = dtObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+        document.getElementById('scheduleHeading').textContent = `My Schedule — ${niceDate}`;
+        document.getElementById('apptCountBadge').textContent = `${appts.length} visit${appts.length === 1 ? '' : 's'}`;
+
+        renderEarnings(currentEarningsMode);
+        renderAppointments(appts);
+    }
+
+    function switchEarningsTab(mode) {
+        currentEarningsMode = mode;
+        const btnDay = document.getElementById('btnEarnToday');
+        const btnWeek = document.getElementById('btnEarnWeek');
+        btnDay.className = mode === 'day' ? 'btn btn-pink fw-semibold' : 'btn btn-outline-secondary fw-semibold';
+        btnWeek.className = mode === 'week' ? 'btn btn-pink fw-semibold' : 'btn btn-outline-secondary fw-semibold';
+        renderEarnings(mode);
+    }
+
+    function renderEarnings(mode) {
+        if (!latestPortalData) return;
+        const e = mode === 'week' ? (latestPortalData.weekEarnings || {}) : (latestPortalData.dayEarnings || {});
+        document.getElementById('earnTakeHome').textContent = fmtMoney(e.totalTakeHome);
+        document.getElementById('earnCommission').textContent = fmtMoney(e.commissionEarned);
+        document.getElementById('earnServiceSales').textContent = `Sales: ${fmtMoney(e.serviceSales)}`;
+        document.getElementById('earnTips').textContent = fmtMoney(e.totalTips);
+        document.getElementById('earnTipsSplit').textContent = `Card ${fmtMoney(e.cardTips)} • Cash ${fmtMoney(e.cashTips)}`;
+        document.getElementById('earnCheckouts').textContent = e.completedCount || 0;
+    }
+
+    function renderAppointments(appts) {
+        const listEl = document.getElementById('appointmentsList');
+        if (!appts.length) {
+            listEl.innerHTML = `
+                <div class="card border-0 shadow-sm rounded-4 p-5 text-center bg-white">
+                    <i class="bi bi-calendar2-heart fs-1 text-muted opacity-50 mb-2"></i>
+                    <h5 class="fw-bold text-dark mb-1">No Appointments Scheduled</h5>
+                    <p class="text-muted small mb-0">You have no bookings assigned for this date yet.</p>
+                </div>
+            `;
+            return;
+        }
+
+        listEl.innerHTML = appts.map(apt => {
+            const st = String(apt.status || 'PENDING').toUpperCase();
+            const statusClass = st === 'COMPLETED' ? 'bg-success-subtle text-success'
+                : (st === 'CONFIRMED' ? 'bg-primary-subtle text-primary' : 'bg-warning-subtle text-dark');
+            const cardModifier = st === 'COMPLETED' ? 'status-completed' : (st === 'PENDING' ? 'status-pending' : '');
+
+            const nailTags = [apt.nailShape, apt.nailLength, apt.nailSystem].filter(Boolean);
+            const hasFormulaInfo = apt.colorFormula || nailTags.length > 0 || apt.favoriteColors || apt.cuticleCareNotes;
+
+            return `
+                <div class="appt-card p-3 ${cardModifier}">
+                    <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                        <div>
+                            <div class="fw-bold text-pink small">${esc(fmtTime12(apt.appointmentTime, apt.durationMinutes))}</div>
+                            <h5 class="fw-bold text-dark mb-0 mt-1">${esc(apt.customerName || 'Walk-In Guest')}</h5>
+                            <div class="small text-secondary">${esc(apt.serviceName)} &bull; ${apt.durationMinutes || 45}m &bull; ${fmtMoney(apt.servicePrice)}</div>
+                        </div>
+                        <span class="badge rounded-pill ${statusClass} border px-2 py-1">${esc(st)}</span>
+                    </div>
+
+                    ${apt.medicalFlags ? `
+                        <div class="allergy-banner mb-2 d-flex align-items-start gap-2">
+                            <i class="bi bi-exclamation-triangle-fill flex-shrink-0 mt-1"></i>
+                            <div><strong>Allergy / Safety Alert:</strong> ${esc(apt.medicalFlags)}</div>
+                        </div>
+                    ` : ''}
+
+                    ${hasFormulaInfo ? `
+                        <div class="formula-box mb-2">
+                            ${apt.colorFormula ? `<div><i class="bi bi-palette-fill text-pink me-1"></i><strong>Color Formula:</strong> ${esc(apt.colorFormula)}</div>` : ''}
+                            ${nailTags.length ? `<div class="mt-1"><i class="bi bi-stars text-secondary me-1"></i><strong>Nail Profile:</strong> ${esc(nailTags.join(' • '))}</div>` : ''}
+                            ${apt.favoriteColors ? `<div class="mt-1 text-muted"><strong>Favorite Shades:</strong> ${esc(apt.favoriteColors)}</div>` : ''}
+                            ${apt.cuticleCareNotes ? `<div class="mt-1 text-muted"><strong>Cuticle Care:</strong> ${esc(apt.cuticleCareNotes)}</div>` : ''}
+                        </div>
+                    ` : ''}
+
+                    ${apt.notes ? `
+                        <div class="small text-muted mb-2"><i class="bi bi-chat-left-text me-1"></i>${esc(apt.notes)}</div>
+                    ` : ''}
+
+                    <div class="d-flex justify-content-end pt-2 border-top">
+                        <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3 fw-semibold"
+                                onclick="openNoteModal(${apt.id})">
+                            <i class="bi bi-pencil-square me-1"></i>Color Formula / Notes
+                        </button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function openNoteModal(aptId) {
+        if (!latestPortalData || !Array.isArray(latestPortalData.appointments)) return;
+        const apt = latestPortalData.appointments.find(a => a.id === aptId);
+        if (!apt) return;
+
+        document.getElementById('noteAptId').value = apt.id;
+        document.getElementById('noteModalClientName').textContent = `${apt.customerName || 'Client'} — Formula & Notes`;
+        document.getElementById('noteColorFormula').value = apt.colorFormula || '';
+        document.getElementById('noteMedicalFlags').value = apt.medicalFlags || '';
+        document.getElementById('noteSessionNotes').value = apt.notes || '';
+        document.getElementById('noteModalError').classList.add('d-none');
+
+        noteModalInstance.show();
+    }
+
+    async function saveAppointmentNote() {
+        const aptId = document.getElementById('noteAptId').value;
+        const btn = document.getElementById('saveNoteBtn');
+        const errEl = document.getElementById('noteModalError');
+        errEl.classList.add('d-none');
+
+        btn.disabled = true;
+        btn.textContent = 'Saving...';
+
+        try {
+            const res = await fetch(`/api/staff-portal/appointments/${aptId}/note`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + token,
+                    'X-Tenant-ID': getActiveTenant()
+                },
+                body: JSON.stringify({
+                    colorFormula: document.getElementById('noteColorFormula').value.trim(),
+                    medicalFlags: document.getElementById('noteMedicalFlags').value.trim(),
+                    notes: document.getElementById('noteSessionNotes').value.trim()
+                })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.message || 'Unable to save notes.');
+
+            noteModalInstance.hide();
+            await loadStaffPortal(true);
+        } catch (err) {
+            errEl.textContent = err.message || 'Failed to save notes.';
+            errEl.classList.remove('d-none');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Save Notes';
+        }
+    }
+
+    function shiftDate(deltaDays) {
+        const dt = new Date(selectedDateStr + 'T12:00:00');
+        dt.setDate(dt.getDate() + deltaDays);
+        selectedDateStr = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+        document.getElementById('portalDatePicker').value = selectedDateStr;
+        loadStaffPortal();
+    }
+
+    function goToday() {
+        selectedDateStr = getTodayDateStr();
+        document.getElementById('portalDatePicker').value = selectedDateStr;
+        loadStaffPortal();
+    }
+
+    function onDatePickerChange(val) {
+        if (!val) return;
+        selectedDateStr = val;
+        loadStaffPortal();
+    }
+
+    function handleLogout() {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('token');
+        localStorage.removeItem('userRole');
+        window.location.href = '/login';
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        noteModalInstance = new bootstrap.Modal(document.getElementById('noteModal'));
+        document.getElementById('portalDatePicker').value = selectedDateStr;
+        if (currentRole === 'ROLE_ADMIN' || currentRole === 'ADMIN') {
+            document.getElementById('adminBackBtn').classList.remove('d-none');
+        }
+        loadBranding();
+        loadStaffPortal();
+        setInterval(() => loadStaffPortal(true), 30000);
+    });
+</script>
+</body>
+</html>

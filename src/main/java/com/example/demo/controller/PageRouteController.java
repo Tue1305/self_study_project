@@ -55,6 +55,12 @@ public class PageRouteController {
         return "forward:/nail-techs.html";
     }
 
+    // Clean Technician / Staff Self-Service Portal Routes
+    @GetMapping({"/staff", "/staff/portal", "/tech-portal"})
+    public String staffPortalPage() {
+        return "forward:/staff-portal.html";
+    }
+
     // Clean General Routes
     @GetMapping("/services")
     public String servicesPage() {

@@ -83,6 +83,10 @@ public class SecurityConfig {
                                 "/admin/customers",
                                 "/admin/nail-techs",
                                 "/admin",
+                                "/staff",
+                                "/staff/portal",
+                                "/tech-portal",
+                                "/staff-portal.html",
                                 "/admin-calendar.html",
                                 "/admin-dashboard.html",
                                 "/admin-customers.html",
@@ -144,6 +148,7 @@ public class SecurityConfig {
                         // Customers admin API rules
                         .requestMatchers("/api/customers", "/api/customers/**").hasAnyAuthority("ROLE_ADMIN", "ADMIN")
                         .requestMatchers("/api/pos", "/api/pos/**").hasAnyAuthority("ROLE_ADMIN", "ADMIN", "ROLE_STAFF", "STAFF", "ROLE_NAIL_TECH")
+                        .requestMatchers("/api/staff-portal", "/api/staff-portal/**").hasAnyAuthority("ROLE_NAIL_TECH", "NAIL_TECH", "ROLE_STAFF", "STAFF", "ROLE_ADMIN", "ADMIN")
                         .requestMatchers("/api/gift-cards/verify", "/api/gift-cards/purchase").permitAll()
                         .requestMatchers("/api/gift-cards", "/api/gift-cards/**").hasAnyAuthority("ROLE_ADMIN", "ADMIN", "ROLE_STAFF", "STAFF", "ROLE_NAIL_TECH")
                         .requestMatchers("/api/admin/**").hasAnyAuthority("ROLE_ADMIN", "ADMIN")

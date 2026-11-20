@@ -164,6 +164,8 @@
                 // Clean extensionless routing based on role and tenant
                 if (role === 'ROLE_ADMIN' || role === 'ADMIN') {
                     window.location.assign('/admin/dashboard');
+                } else if (role === 'ROLE_NAIL_TECH' || role === 'NAIL_TECH' || role === 'ROLE_STAFF' || role === 'STAFF') {
+                    window.location.assign('/staff/portal');
                 } else if (tenantId === 'luxe') {
                     window.location.assign('/book/luxe');
                 } else {

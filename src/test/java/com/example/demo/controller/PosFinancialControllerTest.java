@@ -581,4 +581,70 @@ class PosFinancialControllerTest {
 
         verify(eodRegisterCloseRepository).save(any(EodRegisterClose.class));
     }
+
+    @Test
+    void testSalonAnalyticsEndpointComputesMetrics() throws Exception {
+        LocalDate today = LocalDate.now();
+
+        ServiceEntity gelMani = new ServiceEntity("default", "Gel Manicure", "Gel", new BigDecimal("45.00"), 45);
+        gelMani.setId(1L);
+        ServiceEntity deluxePedi = new ServiceEntity("default", "Deluxe Pedicure", "Pedi", new BigDecimal("65.00"), 60);
+        deluxePedi.setId(2L);
+
+        // Repeat client (Alice: 2 visits) + New client (Bob: 1 visit)
+        Appointment a1 = new Appointment();
+        a1.setId(101L);
+        a1.setTenantId("default");
+        a1.setCustomerName("Alice");
+        a1.setCustomerEmail("alice@example.com");
+        a1.setService(gelMani);
+        a1.setAppointmentTime(today.minusDays(2).atTime(14, 0));
+        a1.setStatus(Appointment.AppointmentStatus.COMPLETED);
+
+        Appointment a2 = new Appointment();
+        a2.setId(102L);
+        a2.setTenantId("default");
+        a2.setCustomerName("Alice");
+        a2.setCustomerEmail("alice@example.com");
+        a2.setService(gelMani);
+        a2.setAppointmentTime(today.atTime(14, 30));
+        a2.setStatus(Appointment.AppointmentStatus.CONFIRMED);
+
+        Appointment a3 = new Appointment();
+        a3.setId(103L);
+        a3.setTenantId("default");
+        a3.setCustomerName("Bob");
+        a3.setCustomerEmail("bob@example.com");
+        a3.setService(deluxePedi);
+        a3.setAppointmentTime(today.atTime(11, 0));
+        a3.setStatus(Appointment.AppointmentStatus.COMPLETED);
+
+        AppointmentTransaction tx = new AppointmentTransaction();
+        tx.setId(501L);
+        tx.setTenantId("default");
+        tx.setTotalAmount(new BigDecimal("120.00"));
+        tx.setTipAmount(new BigDecimal("20.00"));
+        tx.setCreatedAt(today.atTime(15, 0));
+
+        when(transactionRepository.findAllByTenantIdAndCreatedAtBetweenOrderByCreatedAtDesc(
+                eq("default"), any(LocalDateTime.class), any(LocalDateTime.class)
+        )).thenReturn(List.of(tx));
+        when(appointmentRepository.findAllByTenantId("default")).thenReturn(List.of(a1, a2, a3));
+
+        mockMvc.perform(get("/api/pos/analytics")
+                        .header("X-Tenant-ID", "default")
+                        .param("days", "7"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.granularity").value("DAILY"))
+                .andExpect(jsonPath("$.revenueTrend.length()").value(7))
+                .andExpect(jsonPath("$.summary.totalPosRevenue").value(120.00))
+                .andExpect(jsonPath("$.summary.totalTips").value(20.00))
+                .andExpect(jsonPath("$.summary.totalAppointments").value(3))
+                .andExpect(jsonPath("$.summary.repeatClients").value(1))
+                .andExpect(jsonPath("$.summary.newClients").value(1))
+                .andExpect(jsonPath("$.summary.repeatClientRate").value(50.0))
+                .andExpect(jsonPath("$.summary.peakHourLabel").value("2 PM"))
+                .andExpect(jsonPath("$.topServices[0].serviceName").value("Gel Manicure"))
+                .andExpect(jsonPath("$.topServices[0].count").value(2));
+    }
 }

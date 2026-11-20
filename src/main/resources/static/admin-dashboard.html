@@ -31,6 +31,8 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Bootstrap Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <!-- Chart.js 4 -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <style id="themeStyles">
         .text-pink { color: var(--bs-primary-pink) !important; }
         .btn-outline-pink { color: var(--bs-primary-pink); border-color: var(--bs-primary-pink); }
@@ -249,6 +251,135 @@
             </div>
         </div>
     </div>
+
+    <!-- ==================== REVENUE & ANALYTICS DASHBOARD ==================== -->
+    <section class="mt-5" id="analyticsDashboardSection">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+            <div>
+                <h2 class="h4 fw-bold text-dark mb-1 d-flex align-items-center gap-2">
+                    <i class="bi bi-graph-up-arrow text-pink"></i>
+                    <span>Revenue &amp; Salon Analytics</span>
+                </h2>
+                <p id="analyticsDateRangeLabel" class="text-muted small mb-0">Loading performance metrics...</p>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <div class="btn-group btn-group-sm shadow-sm" role="group" aria-label="Analytics timeframe">
+                    <button type="button" class="btn btn-outline-secondary fw-semibold analytics-range-btn" data-days="7" onclick="loadSalonAnalytics(7)">7 Days</button>
+                    <button type="button" class="btn btn-pink fw-semibold analytics-range-btn" data-days="30" onclick="loadSalonAnalytics(30)">30 Days</button>
+                    <button type="button" class="btn btn-outline-secondary fw-semibold analytics-range-btn" data-days="90" onclick="loadSalonAnalytics(90)">90 Days</button>
+                </div>
+                <button type="button" class="btn btn-light btn-sm border shadow-sm" title="Refresh Analytics" onclick="loadSalonAnalytics(currentAnalyticsDays)">
+                    <i class="bi bi-arrow-clockwise"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- KPI Summary Row -->
+        <div class="row g-3 mb-4">
+            <div class="col-6 col-lg-3">
+                <div class="card border-0 shadow-sm rounded-4 p-3 h-100 bg-white">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <span class="text-muted small fw-semibold">Gross Revenue</span>
+                        <span class="badge bg-success-subtle text-success rounded-pill"><i class="bi bi-currency-dollar"></i></span>
+                    </div>
+                    <div id="kpiHeadlineRevenue" class="fs-3 fw-bold text-dark mt-2">$0.00</div>
+                    <div id="kpiRevenueSub" class="text-muted" style="font-size: 0.76rem;">POS &amp; booked services</div>
+                </div>
+            </div>
+            <div class="col-6 col-lg-3">
+                <div class="card border-0 shadow-sm rounded-4 p-3 h-100 bg-white">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <span class="text-muted small fw-semibold">Total Bookings</span>
+                        <span class="badge bg-primary-subtle text-primary rounded-pill"><i class="bi bi-calendar2-check"></i></span>
+                    </div>
+                    <div id="kpiTotalBookings" class="fs-3 fw-bold text-dark mt-2">0</div>
+                    <div id="kpiBookingsSub" class="text-muted" style="font-size: 0.76rem;">0 completed</div>
+                </div>
+            </div>
+            <div class="col-6 col-lg-3">
+                <div class="card border-0 shadow-sm rounded-4 p-3 h-100 bg-white">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <span class="text-muted small fw-semibold">Avg Ticket &amp; Tips</span>
+                        <span class="badge bg-warning-subtle text-dark rounded-pill"><i class="bi bi-receipt"></i></span>
+                    </div>
+                    <div id="kpiAvgTicket" class="fs-3 fw-bold text-dark mt-2">$0.00</div>
+                    <div id="kpiTipsSub" class="text-muted" style="font-size: 0.76rem;">Tips collected: $0.00</div>
+                </div>
+            </div>
+            <div class="col-6 col-lg-3">
+                <div class="card border-0 shadow-sm rounded-4 p-3 h-100 bg-white">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <span class="text-muted small fw-semibold">Repeat Client Rate</span>
+                        <span class="badge bg-danger-subtle text-pink rounded-pill"><i class="bi bi-arrow-repeat"></i></span>
+                    </div>
+                    <div id="kpiRepeatRate" class="fs-3 fw-bold text-dark mt-2">0%</div>
+                    <div id="kpiPeakHourSub" class="text-muted" style="font-size: 0.76rem;">Peak hour: —</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Grid -->
+        <div class="row g-4">
+            <!-- Chart 1: Revenue Trend -->
+            <div class="col-lg-8">
+                <div class="card border-0 shadow-sm rounded-4 p-4 h-100 bg-white">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <h5 class="fw-bold text-dark mb-0">Revenue &amp; Booking Trend</h5>
+                            <small id="trendSubtitle" class="text-muted">Daily POS revenue, booked service value, and appointment volume</small>
+                        </div>
+                        <span id="trendGranularityBadge" class="badge bg-light text-secondary border">DAILY</span>
+                    </div>
+                    <div style="position: relative; height: 290px;">
+                        <canvas id="revenueTrendChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chart 2: Repeat vs. New Clients -->
+            <div class="col-lg-4">
+                <div class="card border-0 shadow-sm rounded-4 p-4 h-100 bg-white d-flex flex-column">
+                    <div class="mb-3">
+                        <h5 class="fw-bold text-dark mb-0">Repeat vs. New Clients</h5>
+                        <small class="text-muted">Client retention in selected window</small>
+                    </div>
+                    <div class="flex-grow-1 d-flex align-items-center justify-content-center" style="position: relative; min-height: 220px;">
+                        <canvas id="clientRetentionChart"></canvas>
+                    </div>
+                    <div id="clientRetentionSummary" class="d-flex justify-content-around pt-3 mt-2 border-top small text-center">
+                        <div><div class="fw-bold text-dark" id="retRepeatCount">0</div><div class="text-muted">Repeat</div></div>
+                        <div><div class="fw-bold text-dark" id="retNewCount">0</div><div class="text-muted">New</div></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chart 3: Top-Booked Services -->
+            <div class="col-lg-6">
+                <div class="card border-0 shadow-sm rounded-4 p-4 h-100 bg-white">
+                    <div class="mb-3">
+                        <h5 class="fw-bold text-dark mb-0">Top-Booked Services</h5>
+                        <small class="text-muted">Most popular treatments by booking count &amp; revenue</small>
+                    </div>
+                    <div style="position: relative; height: 280px;">
+                        <canvas id="topServicesChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chart 4: Peak Booking Hours -->
+            <div class="col-lg-6">
+                <div class="card border-0 shadow-sm rounded-4 p-4 h-100 bg-white">
+                    <div class="mb-3">
+                        <h5 class="fw-bold text-dark mb-0">Peak Booking Hours</h5>
+                        <small class="text-muted">Appointment volume across store hours (10 AM – 7 PM)</small>
+                    </div>
+                    <div style="position: relative; height: 280px;">
+                        <canvas id="peakHoursChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
 </main>
 
 <!-- Customer Quick Lookup Modal -->
@@ -706,7 +837,275 @@
         `;
     }
 
-    document.addEventListener('DOMContentLoaded', initializeTenantContext);
+    // ==================== REVENUE & ANALYTICS CHARTS (Chart.js) ====================
+    let currentAnalyticsDays = 30;
+    const analyticsCharts = {
+        revenueTrend: null,
+        clientRetention: null,
+        topServices: null,
+        peakHours: null
+    };
+
+    function getThemePrimaryHex() {
+        const val = getComputedStyle(document.documentElement).getPropertyValue('--bs-primary-pink').trim();
+        return val || '#e91e63';
+    }
+
+    function formatCurrency(val) {
+        const num = Number(val || 0);
+        return '$' + num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    async function loadSalonAnalytics(days = 30) {
+        currentAnalyticsDays = days;
+
+        // Update active range pill buttons
+        document.querySelectorAll('.analytics-range-btn').forEach(btn => {
+            const isActive = Number(btn.dataset.days) === Number(days);
+            btn.classList.toggle('btn-pink', isActive);
+            btn.classList.toggle('btn-outline-secondary', !isActive);
+        });
+
+        const rangeLabel = document.getElementById('analyticsDateRangeLabel');
+        if (rangeLabel) rangeLabel.textContent = `Loading last ${days} days...`;
+
+        try {
+            const activeTenant = getActiveTenant();
+            const res = await fetch(`/api/pos/analytics?days=${encodeURIComponent(days)}`, {
+                headers: {
+                    'Authorization': 'Bearer ' + token,
+                    'X-Tenant-ID': activeTenant
+                }
+            });
+            if (!res.ok) throw new Error('Failed to load analytics');
+            const data = await res.json();
+            renderSalonAnalytics(data);
+        } catch (err) {
+            console.error('Analytics load error:', err);
+            if (rangeLabel) rangeLabel.textContent = 'Unable to load analytics data right now.';
+        }
+    }
+
+    function destroyChartIfExists(key) {
+        if (analyticsCharts[key]) {
+            analyticsCharts[key].destroy();
+            analyticsCharts[key] = null;
+        }
+    }
+
+    function renderSalonAnalytics(data) {
+        const summary = data.summary || {};
+        const trend = Array.isArray(data.revenueTrend) ? data.revenueTrend : [];
+        const topServices = Array.isArray(data.topServices) ? data.topServices : [];
+        const peakHours = Array.isArray(data.peakHours) ? data.peakHours : [];
+        const primaryHex = getThemePrimaryHex();
+
+        // Update header & KPI cards
+        const rangeLabel = document.getElementById('analyticsDateRangeLabel');
+        if (rangeLabel) {
+            rangeLabel.textContent = `Showing ${data.startDate || ''} to ${data.endDate || ''} (Last ${data.days || 30} Days)`;
+        }
+        const granBadge = document.getElementById('trendGranularityBadge');
+        if (granBadge) granBadge.textContent = data.granularity || 'DAILY';
+
+        const headlineEl = document.getElementById('kpiHeadlineRevenue');
+        if (headlineEl) headlineEl.textContent = formatCurrency(summary.headlineRevenue);
+        const revSubEl = document.getElementById('kpiRevenueSub');
+        if (revSubEl) {
+            revSubEl.textContent = `POS: ${formatCurrency(summary.totalPosRevenue)} • Booked: ${formatCurrency(summary.totalBookedRevenue)}`;
+        }
+
+        const totalBookEl = document.getElementById('kpiTotalBookings');
+        if (totalBookEl) totalBookEl.textContent = Number(summary.totalAppointments || 0).toLocaleString();
+        const bookSubEl = document.getElementById('kpiBookingsSub');
+        if (bookSubEl) bookSubEl.textContent = `${summary.completedAppointments || 0} completed • ${summary.transactionCount || 0} POS checkouts`;
+
+        const avgEl = document.getElementById('kpiAvgTicket');
+        if (avgEl) avgEl.textContent = formatCurrency(summary.averageTicket);
+        const tipsSubEl = document.getElementById('kpiTipsSub');
+        if (tipsSubEl) tipsSubEl.textContent = `Tips collected: ${formatCurrency(summary.totalTips)}`;
+
+        const repRateEl = document.getElementById('kpiRepeatRate');
+        if (repRateEl) repRateEl.textContent = `${Number(summary.repeatClientRate || 0).toFixed(1)}%`;
+        const peakSubEl = document.getElementById('kpiPeakHourSub');
+        if (peakSubEl) peakSubEl.textContent = `Peak hour: ${summary.peakHourLabel || 'N/A'}`;
+
+        const retRepeatEl = document.getElementById('retRepeatCount');
+        const retNewEl = document.getElementById('retNewCount');
+        if (retRepeatEl) retRepeatEl.textContent = summary.repeatClients || 0;
+        if (retNewEl) retNewEl.textContent = summary.newClients || 0;
+
+        if (typeof Chart === 'undefined') return;
+
+        // 1. Revenue & Booking Trend Chart
+        destroyChartIfExists('revenueTrend');
+        const trendCtx = document.getElementById('revenueTrendChart');
+        if (trendCtx) {
+            analyticsCharts.revenueTrend = new Chart(trendCtx, {
+                type: 'bar',
+                data: {
+                    labels: trend.map(b => b.label),
+                    datasets: [
+                        {
+                            type: 'line',
+                            label: 'POS Revenue ($)',
+                            data: trend.map(b => Number(b.posRevenue || 0)),
+                            borderColor: primaryHex,
+                            backgroundColor: primaryHex + '22',
+                            borderWidth: 2.5,
+                            fill: true,
+                            tension: 0.35,
+                            yAxisID: 'y'
+                        },
+                        {
+                            type: 'line',
+                            label: 'Booked Value ($)',
+                            data: trend.map(b => Number(b.bookedRevenue || 0)),
+                            borderColor: '#0d6efd',
+                            backgroundColor: 'transparent',
+                            borderDash: [5, 4],
+                            borderWidth: 2,
+                            tension: 0.35,
+                            yAxisID: 'y'
+                        },
+                        {
+                            type: 'bar',
+                            label: 'Bookings',
+                            data: trend.map(b => Number(b.bookings || 0)),
+                            backgroundColor: 'rgba(100, 116, 139, 0.22)',
+                            borderRadius: 6,
+                            maxBarThickness: 26,
+                            yAxisID: 'y1'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } },
+                    scales: {
+                        y: {
+                            position: 'left',
+                            beginAtZero: true,
+                            ticks: { callback: v => '$' + v }
+                        },
+                        y1: {
+                            position: 'right',
+                            beginAtZero: true,
+                            grid: { drawOnChartArea: false },
+                            ticks: { precision: 0 }
+                        }
+                    }
+                }
+            });
+        }
+
+        // 2. Repeat vs. New Clients Doughnut Chart
+        destroyChartIfExists('clientRetention');
+        const retCtx = document.getElementById('clientRetentionChart');
+        if (retCtx) {
+            const rep = Number(summary.repeatClients || 0);
+            const nw = Number(summary.newClients || 0);
+            const hasData = (rep + nw) > 0;
+            analyticsCharts.clientRetention = new Chart(retCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: hasData ? ['Repeat Clients', 'New Clients'] : ['No Client Data Yet'],
+                    datasets: [{
+                        data: hasData ? [rep, nw] : [1],
+                        backgroundColor: hasData ? [primaryHex, '#38bdf8'] : ['#e2e8f0'],
+                        borderWidth: 2,
+                        borderColor: '#ffffff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '68%',
+                    plugins: {
+                        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } }
+                    }
+                }
+            });
+        }
+
+        // 3. Top-Booked Services Horizontal Bar Chart
+        destroyChartIfExists('topServices');
+        const svcCtx = document.getElementById('topServicesChart');
+        if (svcCtx) {
+            const svcLabels = topServices.length > 0 ? topServices.map(s => s.serviceName) : ['No bookings yet'];
+            const svcCounts = topServices.length > 0 ? topServices.map(s => Number(s.count || 0)) : [0];
+            const svcRevs = topServices.length > 0 ? topServices.map(s => Number(s.revenue || 0)) : [0];
+
+            analyticsCharts.topServices = new Chart(svcCtx, {
+                type: 'bar',
+                data: {
+                    labels: svcLabels,
+                    datasets: [{
+                        label: 'Bookings',
+                        data: svcCounts,
+                        backgroundColor: primaryHex + 'cc',
+                        borderRadius: 6,
+                        maxBarThickness: 24
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: (ctx) => {
+                                    const rev = svcRevs[ctx.dataIndex] || 0;
+                                    return ` ${ctx.raw} bookings (${formatCurrency(rev)})`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { beginAtZero: true, ticks: { precision: 0 } }
+                    }
+                }
+            });
+        }
+
+        // 4. Peak Booking Hours Bar Chart
+        destroyChartIfExists('peakHours');
+        const hrsCtx = document.getElementById('peakHoursChart');
+        if (hrsCtx) {
+            const counts = peakHours.map(h => Number(h.count || 0));
+            const maxVal = Math.max(0, ...counts);
+            analyticsCharts.peakHours = new Chart(hrsCtx, {
+                type: 'bar',
+                data: {
+                    labels: peakHours.map(h => h.label),
+                    datasets: [{
+                        label: 'Appointments',
+                        data: counts,
+                        backgroundColor: counts.map(c => (c > 0 && c === maxVal) ? primaryHex : 'rgba(13, 110, 253, 0.55)'),
+                        borderRadius: 6,
+                        maxBarThickness: 32
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: true, ticks: { precision: 0 } }
+                    }
+                }
+            });
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        initializeTenantContext();
+        loadSalonAnalytics(30);
+    });
 </script>
 </body>
 </html>

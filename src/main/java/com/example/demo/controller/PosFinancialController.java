@@ -1169,4 +1169,260 @@ public class PosFinancialController {
         if (value == null) return "\"\"";
         return "\"" + value.replace("\"", "\"\"") + "\"";
     }
+
+    /**
+     * Tenant-scoped Salon Analytics & Revenue Dashboard endpoint.
+     * Computes daily/weekly revenue trends, top-booked services, peak booking hours,
+     * and repeat vs. new client rate for the requested rolling window (default 30 days).
+     */
+    @GetMapping("/analytics")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ADMIN', 'ROLE_STAFF', 'STAFF', 'ROLE_NAIL_TECH')")
+    public ResponseEntity<?> getSalonAnalytics(
+            @RequestParam(defaultValue = "30") int days,
+            HttpServletRequest request
+    ) {
+        String tenantId = tenantContextResolver.resolveTenantId(request);
+        int windowDays = Math.max(7, Math.min(365, days));
+
+        LocalDate today = LocalDate.now();
+        LocalDate startDate = today.minusDays(windowDays - 1L);
+        LocalDateTime startDt = startDate.atStartOfDay();
+        LocalDateTime endDt = today.plusDays(1).atStartOfDay();
+
+        List<AppointmentTransaction> transactions = transactionRepository
+                .findAllByTenantIdAndCreatedAtBetweenOrderByCreatedAtDesc(tenantId, startDt, endDt);
+        if (transactions == null) transactions = Collections.emptyList();
+
+        List<Appointment> allTenantAppointments = appointmentRepository.findAllByTenantId(tenantId);
+        if (allTenantAppointments == null) allTenantAppointments = Collections.emptyList();
+
+        // Filter non-cancelled appointments across lifetime (for repeat-client detection)
+        List<Appointment> lifetimeValidAppts = allTenantAppointments.stream()
+                .filter(a -> a.getStatus() != Appointment.AppointmentStatus.CANCELLED)
+                .toList();
+
+        Map<String, Long> lifetimeVisitsByClient = new HashMap<>();
+        for (Appointment a : lifetimeValidAppts) {
+            String key = resolveAnalyticsClientKey(a);
+            if (!key.isEmpty()) {
+                lifetimeVisitsByClient.merge(key, 1L, Long::sum);
+            }
+        }
+
+        // Appointments within the selected date window
+        List<Appointment> windowAppts = lifetimeValidAppts.stream()
+                .filter(a -> a.getAppointmentTime() != null)
+                .filter(a -> !a.getAppointmentTime().isBefore(startDt) && a.getAppointmentTime().isBefore(endDt))
+                .toList();
+
+        // 1. KPI totals
+        BigDecimal totalPosRevenue = BigDecimal.ZERO;
+        BigDecimal totalTips = BigDecimal.ZERO;
+        for (AppointmentTransaction tx : transactions) {
+            if (tx.getTotalAmount() != null) totalPosRevenue = totalPosRevenue.add(tx.getTotalAmount());
+            if (tx.getTipAmount() != null) totalTips = totalTips.add(tx.getTipAmount());
+        }
+
+        BigDecimal totalBookedRevenue = BigDecimal.ZERO;
+        long completedCount = 0;
+        for (Appointment a : windowAppts) {
+            if (a.getStatus() == Appointment.AppointmentStatus.COMPLETED) completedCount++;
+            if (a.getService() != null && a.getService().getPrice() != null) {
+                totalBookedRevenue = totalBookedRevenue.add(a.getService().getPrice());
+            }
+        }
+
+        BigDecimal headlineRevenue = totalPosRevenue.compareTo(BigDecimal.ZERO) > 0 ? totalPosRevenue : totalBookedRevenue;
+        int ticketDivisor = !transactions.isEmpty() ? transactions.size() : windowAppts.size();
+        BigDecimal averageTicket = ticketDivisor > 0
+                ? headlineRevenue.divide(BigDecimal.valueOf(ticketDivisor), 2, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO;
+
+        // 2. Repeat vs. New Clients in window
+        Set<String> windowClients = new HashSet<>();
+        for (Appointment a : windowAppts) {
+            String key = resolveAnalyticsClientKey(a);
+            if (!key.isEmpty()) windowClients.add(key);
+        }
+        int repeatClients = 0;
+        int newClients = 0;
+        for (String clientKey : windowClients) {
+            if (lifetimeVisitsByClient.getOrDefault(clientKey, 1L) >= 2L) {
+                repeatClients++;
+            } else {
+                newClients++;
+            }
+        }
+        double repeatRate = windowClients.isEmpty() ? 0.0
+                : Math.round((repeatClients * 1000.0) / windowClients.size()) / 10.0;
+
+        // 3. Daily (<= 31 days) or Weekly (> 31 days) Revenue Trend
+        boolean useWeekly = windowDays > 31;
+        java.time.format.DateTimeFormatter shortFmt = java.time.format.DateTimeFormatter.ofPattern("MMM d");
+        Map<String, Map<String, Object>> bucketMap = new LinkedHashMap<>();
+
+        if (!useWeekly) {
+            for (LocalDate d = startDate; !d.isAfter(today); d = d.plusDays(1)) {
+                String key = d.toString();
+                Map<String, Object> b = new LinkedHashMap<>();
+                b.put("key", key);
+                b.put("label", d.format(shortFmt));
+                b.put("posRevenue", BigDecimal.ZERO);
+                b.put("bookedRevenue", BigDecimal.ZERO);
+                b.put("tips", BigDecimal.ZERO);
+                b.put("bookings", 0);
+                bucketMap.put(key, b);
+            }
+        } else {
+            LocalDate cursor = startDate;
+            while (!cursor.isAfter(today)) {
+                String key = cursor.toString();
+                Map<String, Object> b = new LinkedHashMap<>();
+                b.put("key", key);
+                b.put("label", "Wk " + cursor.format(shortFmt));
+                b.put("posRevenue", BigDecimal.ZERO);
+                b.put("bookedRevenue", BigDecimal.ZERO);
+                b.put("tips", BigDecimal.ZERO);
+                b.put("bookings", 0);
+                bucketMap.put(key, b);
+                cursor = cursor.plusDays(7);
+            }
+        }
+
+        for (AppointmentTransaction tx : transactions) {
+            if (tx.getCreatedAt() == null) continue;
+            LocalDate d = tx.getCreatedAt().toLocalDate();
+            String bKey = resolveTrendBucketKey(d, startDate, useWeekly);
+            Map<String, Object> b = bucketMap.get(bKey);
+            if (b != null) {
+                if (tx.getTotalAmount() != null) {
+                    b.put("posRevenue", ((BigDecimal) b.get("posRevenue")).add(tx.getTotalAmount()));
+                }
+                if (tx.getTipAmount() != null) {
+                    b.put("tips", ((BigDecimal) b.get("tips")).add(tx.getTipAmount()));
+                }
+            }
+        }
+
+        for (Appointment a : windowAppts) {
+            LocalDate d = a.getAppointmentTime().toLocalDate();
+            String bKey = resolveTrendBucketKey(d, startDate, useWeekly);
+            Map<String, Object> b = bucketMap.get(bKey);
+            if (b != null) {
+                b.put("bookings", ((Integer) b.get("bookings")) + 1);
+                if (a.getService() != null && a.getService().getPrice() != null) {
+                    b.put("bookedRevenue", ((BigDecimal) b.get("bookedRevenue")).add(a.getService().getPrice()));
+                }
+            }
+        }
+
+        // 4. Top-Booked Services
+        Map<String, Integer> svcCountMap = new HashMap<>();
+        Map<String, BigDecimal> svcRevMap = new HashMap<>();
+        for (Appointment a : windowAppts) {
+            String sName = (a.getService() != null && a.getService().getName() != null && !a.getService().getName().isBlank())
+                    ? a.getService().getName() : "General Service";
+            svcCountMap.merge(sName, 1, Integer::sum);
+            BigDecimal price = (a.getService() != null && a.getService().getPrice() != null)
+                    ? a.getService().getPrice() : BigDecimal.ZERO;
+            svcRevMap.merge(sName, price, BigDecimal::add);
+        }
+
+        List<Map<String, Object>> topServices = svcCountMap.entrySet().stream()
+                .sorted((e1, e2) -> Integer.compare(e2.getValue(), e1.getValue()))
+                .limit(8)
+                .map(e -> {
+                    Map<String, Object> row = new LinkedHashMap<>();
+                    row.put("serviceName", e.getKey());
+                    row.put("count", e.getValue());
+                    row.put("revenue", svcRevMap.getOrDefault(e.getKey(), BigDecimal.ZERO));
+                    return row;
+                })
+                .toList();
+
+        // 5. Peak Booking Hours (10 AM - 7 PM)
+        Map<Integer, Integer> hourCounts = new LinkedHashMap<>();
+        for (int h = 10; h <= 19; h++) {
+            hourCounts.put(h, 0);
+        }
+        for (Appointment a : windowAppts) {
+            int hr = a.getAppointmentTime().getHour();
+            if (hr >= 10 && hr <= 19) {
+                hourCounts.merge(hr, 1, Integer::sum);
+            }
+        }
+        List<Map<String, Object>> peakHours = new ArrayList<>();
+        int peakHour = 10;
+        int peakHourCount = 0;
+        for (Map.Entry<Integer, Integer> entry : hourCounts.entrySet()) {
+            int hr = entry.getKey();
+            int cnt = entry.getValue();
+            if (cnt > peakHourCount) {
+                peakHourCount = cnt;
+                peakHour = hr;
+            }
+            String label = (hr == 12) ? "12 PM" : (hr < 12 ? hr + " AM" : (hr - 12) + " PM");
+            Map<String, Object> hRow = new LinkedHashMap<>();
+            hRow.put("hour", hr);
+            hRow.put("label", label);
+            hRow.put("count", cnt);
+            peakHours.add(hRow);
+        }
+        String peakHourLabel = peakHourCount > 0
+                ? ((peakHour == 12) ? "12 PM" : (peakHour < 12 ? peakHour + " AM" : (peakHour - 12) + " PM"))
+                : "N/A";
+
+        Map<String, Object> summary = new LinkedHashMap<>();
+        summary.put("totalPosRevenue", totalPosRevenue);
+        summary.put("totalBookedRevenue", totalBookedRevenue);
+        summary.put("headlineRevenue", headlineRevenue);
+        summary.put("totalTips", totalTips);
+        summary.put("totalAppointments", windowAppts.size());
+        summary.put("completedAppointments", completedCount);
+        summary.put("transactionCount", transactions.size());
+        summary.put("averageTicket", averageTicket);
+        summary.put("repeatClients", repeatClients);
+        summary.put("newClients", newClients);
+        summary.put("repeatClientRate", repeatRate);
+        summary.put("peakHourLabel", peakHourLabel);
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("tenantId", tenantId);
+        response.put("days", windowDays);
+        response.put("granularity", useWeekly ? "WEEKLY" : "DAILY");
+        response.put("startDate", startDate.toString());
+        response.put("endDate", today.toString());
+        response.put("summary", summary);
+        response.put("revenueTrend", new ArrayList<>(bucketMap.values()));
+        response.put("topServices", topServices);
+        response.put("peakHours", peakHours);
+
+        return ResponseEntity.ok(response);
+    }
+
+    private String resolveAnalyticsClientKey(Appointment a) {
+        if (a.getCustomerEmail() != null && !a.getCustomerEmail().isBlank()
+                && !"walkin@salon.com".equalsIgnoreCase(a.getCustomerEmail().trim())) {
+            return "email:" + a.getCustomerEmail().trim().toLowerCase();
+        }
+        if (a.getCustomerPhone() != null && !a.getCustomerPhone().isBlank()) {
+            String digits = a.getCustomerPhone().replaceAll("\\D", "");
+            if (digits.length() >= 7 && !"5550000000".equals(digits)) {
+                return "phone:" + digits;
+            }
+        }
+        if (a.getCustomerName() != null && !a.getCustomerName().isBlank()
+                && !"Walk-In Guest".equalsIgnoreCase(a.getCustomerName().trim())) {
+            return "name:" + a.getCustomerName().trim().toLowerCase();
+        }
+        return "";
+    }
+
+    private String resolveTrendBucketKey(LocalDate date, LocalDate startDate, boolean useWeekly) {
+        if (!useWeekly) return date.toString();
+        long daysBetween = java.time.temporal.ChronoUnit.DAYS.between(startDate, date);
+        if (daysBetween < 0) return startDate.toString();
+        long weekIdx = daysBetween / 7;
+        return startDate.plusDays(weekIdx * 7).toString();
+    }
 }

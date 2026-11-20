@@ -4586,6 +4586,20 @@
             if (response.ok) {
                 const savedBooking = await response.json();
                 localStorage.removeItem('selectedDesign');
+                // Notify any open admin-calendar tab immediately
+                try {
+                    const pingPayload = {
+                        ts: Date.now(),
+                        customerName: bookingPayload.customerName || 'Guest',
+                        appointmentTime: bookingPayload.appointmentTime || ''
+                    };
+                    localStorage.setItem('salon_new_booking_ping', JSON.stringify(pingPayload));
+                    if (typeof BroadcastChannel !== 'undefined') {
+                        const bc = new BroadcastChannel('salon_booking_events');
+                        bc.postMessage({ type: 'NEW_BOOKING', ...pingPayload });
+                        bc.close();
+                    }
+                } catch (_) {}
                 showConfirmationScreen(bookingPayload, savedBooking);
             } else {
                 let errorMsg = 'Unable to complete booking. Please verify your details and try again.';

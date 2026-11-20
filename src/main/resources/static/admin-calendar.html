@@ -9,6 +9,7 @@
 
     <!-- Synchronous Zero-Delay Tenant Theme Preloader (Local Cache & Subdomain) -->
     <script src="/js/tenant-theme.js"></script>
+    <script src="/js/admin-privacy-lock.js"></script>
     <style id="tenant-theme-vars">
         :root {
             --primary-color: #e91e63;
@@ -256,7 +257,7 @@
             color: #ffffff;
             border: none;
             border-radius: 999px;
-            padding: 10px 18px;
+            padding: 11px 20px;
             font-weight: 700;
             font-size: 0.88rem;
             box-shadow: 0 10px 28px rgba(233, 30, 99, 0.35);
@@ -264,6 +265,55 @@
             align-items: center;
             gap: 8px;
             cursor: pointer;
+        }
+
+        .anyone-edge-badge {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            min-width: 22px;
+            height: 22px;
+            padding: 0 6px;
+            border-radius: 999px;
+            background: #dc3545;
+            color: #ffffff;
+            font-size: 0.72rem;
+            font-weight: 800;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid #ffffff;
+            box-shadow: 0 2px 6px rgba(220, 53, 69, 0.45);
+            line-height: 1;
+            pointer-events: none;
+        }
+
+        .new-booking-toast-stack {
+            position: fixed;
+            top: 80px;
+            right: 24px;
+            z-index: 1085;
+            width: 375px;
+            max-width: calc(100vw - 32px);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            pointer-events: none;
+        }
+
+        .new-booking-toast-card {
+            pointer-events: auto;
+            background: #ffffff;
+            border-left: 5px solid var(--bs-primary-pink);
+            border-radius: 12px;
+            box-shadow: 0 14px 36px rgba(15, 23, 42, 0.2);
+            padding: 12px 14px;
+            animation: slideInRightFade 0.28s ease-out;
+        }
+
+        @keyframes slideInRightFade {
+            from { opacity: 0; transform: translateX(30px); }
+            to { opacity: 1; transform: translateX(0); }
         }
 
         .staff-header-avatar {
@@ -967,6 +1017,27 @@
             aptDateDaysOffMap: {}
         });
         const prevAnyoneIdsRef = React.useRef(new Set());
+        const knownAptIdsRef = React.useRef(null);
+        const [newBookingAlerts, setNewBookingAlerts] = useState([]);
+
+        const playNewBookingChime = () => {
+            try {
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                if (!AudioCtx) return;
+                const ctx = new AudioCtx();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(660, ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.14);
+                gain.gain.setValueAtTime(0.08, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.36);
+            } catch (_) {}
+        };
         const [loading, setLoading] = useState(true);
         const [selectedAppointment, setSelectedAppointment] = useState(null);
         const [statusReason, setStatusReason] = useState('');
@@ -1350,10 +1421,51 @@
                 const srvData = srvRes.ok ? await srvRes.json() : [];
                 const daysOffData = daysOffRes.ok ? await daysOffRes.json() : [];
 
-                setStaffList(Array.isArray(staffData) ? staffData : []);
-                setAppointments(Array.isArray(apptData) ? apptData : []);
-                setServicesCatalog(Array.isArray(srvData) ? srvData : []);
-                setDaysOffList(Array.isArray(daysOffData) ? daysOffData : []);
+                const staffArr = Array.isArray(staffData) ? staffData : [];
+                const apptArr = Array.isArray(apptData) ? apptData : [];
+                const srvArr = Array.isArray(srvData) ? srvData : [];
+                const daysOffArr = Array.isArray(daysOffData) ? daysOffData : [];
+
+                // Detect newly created bookings since the previous fetch and notify the admin page
+                if (knownAptIdsRef.current === null) {
+                    knownAptIdsRef.current = new Set(apptArr.map(a => a.id));
+                } else {
+                    const newlyArrived = apptArr.filter(a => a && a.id && !knownAptIdsRef.current.has(a.id));
+                    apptArr.forEach(a => { if (a && a.id) knownAptIdsRef.current.add(a.id); });
+
+                    if (newlyArrived.length > 0) {
+                        playNewBookingChime();
+                        const alertsToAdd = newlyArrived.map(apt => {
+                            const dt = apt.appointmentTime ? new Date(apt.appointmentTime) : null;
+                            const timeStr = dt ? formatMinutesToTimeLabel(dt.getHours() * 60 + dt.getMinutes()) : '';
+                            const dateStr = apt.appointmentTime ? String(apt.appointmentTime).split('T')[0] : '';
+                            const isAnyone = (!apt.nailTech || !apt.nailTech.id) || String(apt.notes || '').includes('[ANYONE AVAILABLE]');
+                            return {
+                                id: `${apt.id}-${Date.now()}`,
+                                aptId: apt.id,
+                                apt,
+                                customerName: apt.customerName || 'Walk-In Guest',
+                                serviceName: (apt.service && apt.service.name) || 'Salon Service',
+                                dateStr,
+                                timeStr,
+                                techName: isAnyone ? 'Anyone Available' : (apt.nailTech ? (apt.nailTech.name || apt.nailTech.username) : 'Unassigned'),
+                                isAnyone
+                            };
+                        });
+
+                        setNewBookingAlerts(prev => [...alertsToAdd, ...prev].slice(0, 5));
+                        alertsToAdd.forEach(alertItem => {
+                            setTimeout(() => {
+                                setNewBookingAlerts(prev => prev.filter(x => x.id !== alertItem.id));
+                            }, 15000);
+                        });
+                    }
+                }
+
+                setStaffList(staffArr);
+                setAppointments(apptArr);
+                setServicesCatalog(srvArr);
+                setDaysOffList(daysOffArr);
             } catch (err) {
                 console.error('Error loading timeline data:', err);
             } finally {
@@ -1363,11 +1475,36 @@
 
         useEffect(() => {
             fetchScheduleData();
-            // Background polling every 30 seconds for live updates
+            // Live background polling every 8 seconds for instant booking notifications
             const pollId = setInterval(() => {
                 fetchScheduleData(true);
-            }, 30000);
-            return () => clearInterval(pollId);
+            }, 8000);
+
+            // Instant cross-tab notification when a booking is placed in booking.html
+            const handleStoragePing = (e) => {
+                if (e.key === 'salon_new_booking_ping') {
+                    fetchScheduleData(true);
+                }
+            };
+            window.addEventListener('storage', handleStoragePing);
+
+            let bc = null;
+            try {
+                if (typeof BroadcastChannel !== 'undefined') {
+                    bc = new BroadcastChannel('salon_booking_events');
+                    bc.onmessage = (ev) => {
+                        if (ev && ev.data && ev.data.type === 'NEW_BOOKING') {
+                            fetchScheduleData(true);
+                        }
+                    };
+                }
+            } catch (_) {}
+
+            return () => {
+                clearInterval(pollId);
+                window.removeEventListener('storage', handleStoragePing);
+                if (bc) { try { bc.close(); } catch (_) {} }
+            };
         }, [fetchScheduleData]);
 
         const dayAppointments = useMemo(() => {
@@ -2621,6 +2758,28 @@
                     }, [
                         h('i', { className: 'bi bi-gift-fill text-warning me-1' }),
                         'Gift Cards'
+                    ]),
+                    h('button', {
+                        type: 'button',
+                        className: 'btn btn-sm px-3 fw-bold d-flex align-items-center gap-1 shadow-sm position-relative',
+                        style: {
+                            backgroundColor: anyoneAvailableAppts.length > 0 ? 'var(--bs-primary-pink)' : '#ffffff',
+                            color: anyoneAvailableAppts.length > 0 ? '#ffffff' : 'var(--bs-primary-pink)',
+                            border: '1.5px solid var(--bs-primary-pink)'
+                        },
+                        title: 'View & Assign Anyone Available Bookings',
+                        onClick: () => {
+                            if (anyoneAvailableAppts.length === 0) {
+                                setDragToast({ type: 'info', message: '✅ No unassigned Anyone Available bookings right now.' });
+                                setTimeout(() => setDragToast(null), 3500);
+                            } else {
+                                setAnyonePopup(prev => ({ ...prev, minimized: !prev.minimized }));
+                            }
+                        }
+                    }, [
+                        h('i', { className: 'bi bi-lightning-charge-fill me-1' }),
+                        'Anyone Available',
+                        anyoneAvailableAppts.length > 0 && h('span', { className: 'anyone-edge-badge' }, anyoneAvailableAppts.length)
                     ])
                 )
             ),
@@ -2813,6 +2972,67 @@
                     )
                   ),
 
+            /* Live New Booking Notification Toasts */
+            newBookingAlerts.length > 0 && h('div', { className: 'new-booking-toast-stack' },
+                newBookingAlerts.map(alertItem =>
+                    h('div', { key: alertItem.id, className: 'new-booking-toast-card' },
+                        h('div', { className: 'd-flex justify-content-between align-items-start gap-2' },
+                            h('div', { className: 'overflow-hidden' },
+                                h('div', { className: 'd-flex align-items-center gap-1 fw-bold text-dark', style: { fontSize: '0.88rem' } },
+                                    h('span', null, '🔔 New Booking!'),
+                                    alertItem.isAnyone && h('span', { className: 'badge bg-danger rounded-pill extra-small ms-1' }, 'Anyone Available')
+                                ),
+                                h('div', { className: 'small text-dark fw-semibold text-truncate mt-1' },
+                                    `${alertItem.customerName} — ${alertItem.serviceName}`
+                                ),
+                                h('div', { className: 'extra-small text-muted' },
+                                    `${alertItem.dateStr} at ${alertItem.timeStr} • ${alertItem.techName}`
+                                )
+                            ),
+                            h('button', {
+                                type: 'button',
+                                className: 'btn-close',
+                                style: { fontSize: '0.68rem' },
+                                onClick: () => setNewBookingAlerts(prev => prev.filter(x => x.id !== alertItem.id))
+                            })
+                        ),
+                        h('div', { className: 'd-flex gap-2 mt-2' },
+                            h('button', {
+                                type: 'button',
+                                className: 'btn btn-sm text-white fw-semibold rounded-pill px-3 py-0',
+                                style: { backgroundColor: 'var(--bs-primary-pink)', fontSize: '0.76rem' },
+                                onClick: () => {
+                                    if (alertItem.dateStr) {
+                                        const parts = alertItem.dateStr.split('-');
+                                        if (parts.length === 3) {
+                                            setSelectedDate(new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2])));
+                                        }
+                                    }
+                                    if (alertItem.isAnyone) {
+                                        setAnyonePopup(prev => ({
+                                            ...prev,
+                                            minimized: false,
+                                            activeAptId: alertItem.aptId,
+                                            showStaffPicker: true,
+                                            selectedTechId: null
+                                        }));
+                                    } else {
+                                        setSelectedAppointment(alertItem.apt);
+                                    }
+                                    setNewBookingAlerts(prev => prev.filter(x => x.id !== alertItem.id));
+                                }
+                            }, alertItem.isAnyone ? 'Assign Specialist' : 'View Booking'),
+                            h('button', {
+                                type: 'button',
+                                className: 'btn btn-outline-secondary btn-sm rounded-pill px-2 py-0',
+                                style: { fontSize: '0.74rem' },
+                                onClick: () => setNewBookingAlerts(prev => prev.filter(x => x.id !== alertItem.id))
+                            }, 'Dismiss')
+                        )
+                    )
+                )
+            ),
+
             /* Anyone Available Live Assignment Popup Box */
             anyoneAvailableAppts.length > 0 && (
                 anyonePopup.minimized
@@ -2822,8 +3042,9 @@
                         onClick: () => setAnyonePopup(prev => ({ ...prev, minimized: false }))
                     },
                         h('i', { className: 'bi bi-lightning-charge-fill' }),
-                        h('span', null, `Anyone Available (${anyoneAvailableAppts.length})`),
-                        h('i', { className: 'bi bi-chevron-up ms-1' })
+                        h('span', null, 'Anyone Available'),
+                        h('i', { className: 'bi bi-chevron-up ms-1' }),
+                        h('span', { className: 'anyone-edge-badge' }, anyoneAvailableAppts.length)
                     )
                     : h('div', { className: 'anyone-queue-popup' },
                         /* Popup Header */

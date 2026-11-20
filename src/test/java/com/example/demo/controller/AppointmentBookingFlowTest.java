@@ -1140,6 +1140,7 @@ class AppointmentBookingFlowTest {
         mockMvc.perform(get("/api/appointments/available-slots")
                         .header("X-Tenant-ID", "default")
                         .param("date", "2026-11-20")
+                        .param("clientNow", "2026-11-20T09:00:00")
                         .param("techId", "7")
                         .param("durationMinutes", "40")
                         .param("bufferMinutes", "15"))

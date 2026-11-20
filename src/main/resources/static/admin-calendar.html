@@ -165,6 +165,107 @@
             z-index: 5;
         }
 
+        .anyone-queue-popup {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            width: 390px;
+            max-width: calc(100vw - 32px);
+            max-height: 75vh;
+            background: #ffffff;
+            border-radius: 16px;
+            border: 2px solid var(--bs-primary-pink);
+            box-shadow: 0 18px 45px rgba(15, 23, 42, 0.22);
+            z-index: 1060;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .anyone-queue-header {
+            background: linear-gradient(135deg, var(--bs-primary-pink), #c2185b);
+            color: #ffffff;
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+        }
+
+        .anyone-queue-body {
+            padding: 12px;
+            overflow-y: auto;
+            max-height: calc(75vh - 56px);
+            background: #f8fafc;
+        }
+
+        .anyone-queue-card {
+            background: #ffffff;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 12px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .anyone-queue-card:hover,
+        .anyone-queue-card.active {
+            border-color: var(--bs-primary-pink);
+            box-shadow: 0 4px 14px rgba(233, 30, 99, 0.12);
+        }
+
+        .anyone-staff-chip {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            text-align: left;
+            padding: 8px 12px;
+            border-radius: 10px;
+            border: 1.5px solid #e2e8f0;
+            background: #ffffff;
+            margin-bottom: 6px;
+            font-size: 0.85rem;
+            transition: all 0.15s ease;
+        }
+
+        .anyone-staff-chip.free:hover {
+            border-color: #198754;
+            background: #f0fdf4;
+        }
+
+        .anyone-staff-chip.selected {
+            border-color: var(--bs-primary-pink);
+            background: #fdf2f8;
+            box-shadow: 0 0 0 2px rgba(233, 30, 99, 0.15);
+        }
+
+        .anyone-staff-chip.unavailable {
+            opacity: 0.55;
+            background: #f8fafc;
+            cursor: not-allowed;
+        }
+
+        .anyone-queue-fab {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            z-index: 1060;
+            background: linear-gradient(135deg, var(--bs-primary-pink), #c2185b);
+            color: #ffffff;
+            border: none;
+            border-radius: 999px;
+            padding: 10px 18px;
+            font-weight: 700;
+            font-size: 0.88rem;
+            box-shadow: 0 10px 28px rgba(233, 30, 99, 0.35);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+        }
+
         .staff-header-avatar {
             width: 36px;
             height: 36px;
@@ -856,6 +957,16 @@
             saving: false,
             error: null
         });
+        const [anyonePopup, setAnyonePopup] = useState({
+            minimized: false,
+            activeAptId: null,
+            showStaffPicker: false,
+            selectedTechId: null,
+            saving: false,
+            error: null,
+            aptDateDaysOffMap: {}
+        });
+        const prevAnyoneIdsRef = React.useRef(new Set());
         const [loading, setLoading] = useState(true);
         const [selectedAppointment, setSelectedAppointment] = useState(null);
         const [statusReason, setStatusReason] = useState('');
@@ -1306,6 +1417,181 @@
             }
             return cols;
         }, [staffList, dayAppointments, daysOffMap]);
+
+        // Pending "Anyone Available" / unassigned bookings (today & upcoming)
+        const anyoneAvailableAppts = useMemo(() => {
+            const todayStr = toDateKey(new Date());
+            return appointments
+                .filter(apt => {
+                    if (!apt || !apt.appointmentTime) return false;
+                    const st = String(apt.status || 'PENDING').toUpperCase();
+                    if (st === 'CANCELLED' || st === 'COMPLETED' || st === 'NO_SHOW') return false;
+                    const datePart = String(apt.appointmentTime).split('T')[0];
+                    if (datePart < todayStr && datePart !== selectedDateKey) return false;
+                    const isUnassigned = !apt.nailTech || !apt.nailTech.id;
+                    const hasAnyoneTag = String(apt.notes || '').includes('[ANYONE AVAILABLE]');
+                    return isUnassigned || hasAnyoneTag;
+                })
+                .sort((a, b) => String(a.appointmentTime).localeCompare(String(b.appointmentTime)));
+        }, [appointments, selectedDateKey]);
+
+        // Auto-expand popup when a brand new Anyone Available booking arrives
+        useEffect(() => {
+            const currentIds = new Set(anyoneAvailableAppts.map(a => a.id));
+            let hasNew = false;
+            currentIds.forEach(id => {
+                if (!prevAnyoneIdsRef.current.has(id)) hasNew = true;
+            });
+            prevAnyoneIdsRef.current = currentIds;
+            if (hasNew && anyoneAvailableAppts.length > 0) {
+                setAnyonePopup(prev => ({
+                    ...prev,
+                    minimized: false,
+                    activeAptId: prev.activeAptId && currentIds.has(prev.activeAptId)
+                        ? prev.activeAptId
+                        : anyoneAvailableAppts[0].id
+                }));
+            }
+        }, [anyoneAvailableAppts]);
+
+        const handleOpenAnyoneAssignPicker = async (apt) => {
+            const aptDateKey = String(apt.appointmentTime || '').split('T')[0];
+            setAnyonePopup(prev => ({
+                ...prev,
+                activeAptId: apt.id,
+                showStaffPicker: true,
+                selectedTechId: null,
+                error: null
+            }));
+
+            // If this booking is for a date different from selectedDateKey, fetch days-off for that date
+            if (aptDateKey && aptDateKey !== selectedDateKey && !anyonePopup.aptDateDaysOffMap[aptDateKey]) {
+                try {
+                    const headers = {
+                        'X-Tenant-ID': activeTenant,
+                        ...(token ? { 'Authorization': 'Bearer ' + token } : {})
+                    };
+                    const res = await fetch(`/api/nail-techs/days-off?date=${aptDateKey}`, { headers });
+                    if (res.ok) {
+                        const list = await res.json();
+                        const mapForDate = {};
+                        if (Array.isArray(list)) {
+                            list.forEach(item => { if (item.staffId) mapForDate[item.staffId] = item; });
+                        }
+                        setAnyonePopup(prev => ({
+                            ...prev,
+                            aptDateDaysOffMap: { ...prev.aptDateDaysOffMap, [aptDateKey]: mapForDate }
+                        }));
+                    }
+                } catch (ignored) {}
+            }
+        };
+
+        const getStaffAvailabilityForApt = (apt) => {
+            if (!apt || !apt.appointmentTime) return [];
+            const aptDateKey = String(apt.appointmentTime).split('T')[0];
+            const dt = new Date(apt.appointmentTime);
+            const startMins = dt.getHours() * 60 + dt.getMinutes();
+            const duration = Number((apt.service && apt.service.durationMinutes) || 45);
+            const endMins = startMins + duration;
+            const buffer = 15;
+
+            const offMap = (aptDateKey === selectedDateKey)
+                ? daysOffMap
+                : (anyonePopup.aptDateDaysOffMap[aptDateKey] || {});
+
+            const sameDayAppts = appointments.filter(other => {
+                if (!other || !other.appointmentTime || other.id === apt.id) return false;
+                if (String(other.status || '').toUpperCase() === 'CANCELLED') return false;
+                return String(other.appointmentTime).split('T')[0] === aptDateKey;
+            });
+
+            return staffList.map(tech => {
+                const techName = tech.name || tech.username;
+                const offRec = offMap[tech.id];
+                if (offRec) {
+                    return {
+                        tech,
+                        name: techName,
+                        isFree: false,
+                        statusLabel: `💤 Off (${offRec.reason || 'Day Off'})`
+                    };
+                }
+
+                const busyAppt = sameDayAppts.find(other => {
+                    if (!other.nailTech || other.nailTech.id !== tech.id) return false;
+                    const odt = new Date(other.appointmentTime);
+                    const oStart = odt.getHours() * 60 + odt.getMinutes();
+                    const oDur = Number((other.service && other.service.durationMinutes) || 45);
+                    const oEnd = oStart + oDur + buffer;
+                    return startMins < oEnd && oStart < (endMins + buffer);
+                });
+
+                if (busyAppt) {
+                    return {
+                        tech,
+                        name: techName,
+                        isFree: false,
+                        statusLabel: 'Busy at this time'
+                    };
+                }
+
+                return {
+                    tech,
+                    name: techName,
+                    isFree: true,
+                    statusLabel: '✓ Free'
+                };
+            }).sort((a, b) => (a.isFree === b.isFree ? a.name.localeCompare(b.name) : (a.isFree ? -1 : 1)));
+        };
+
+        const handleConfirmAnyoneAssignment = async (apt) => {
+            if (!apt || !anyonePopup.selectedTechId) return;
+            const targetTech = staffList.find(t => t.id === anyonePopup.selectedTechId);
+            const targetName = targetTech ? (targetTech.name || targetTech.username) : 'Specialist';
+
+            setAnyonePopup(prev => ({ ...prev, saving: true, error: null }));
+            try {
+                const res = await fetch(`/api/appointments/${apt.id}/assign-tech`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Tenant-ID': activeTenant,
+                        ...(token ? { 'Authorization': 'Bearer ' + token } : {})
+                    },
+                    body: JSON.stringify({
+                        techId: anyonePopup.selectedTechId,
+                        reason: `Assigned Anyone Available booking to ${targetName}`
+                    })
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    throw new Error(data.message || 'Unable to assign specialist.');
+                }
+
+                setDragToast({
+                    type: 'success',
+                    message: `✅ Assigned ${apt.customerName || 'Guest'} to ${targetName}!`
+                });
+                setAnyonePopup(prev => ({
+                    ...prev,
+                    activeAptId: null,
+                    showStaffPicker: false,
+                    selectedTechId: null,
+                    saving: false,
+                    error: null
+                }));
+                await fetchScheduleData(true);
+            } catch (err) {
+                setAnyonePopup(prev => ({
+                    ...prev,
+                    saving: false,
+                    error: err.message || 'Failed to assign specialist.'
+                }));
+            } finally {
+                setTimeout(() => setDragToast(null), 5000);
+            }
+        };
 
         const handleStaffHeaderClick = (col) => {
             if (col.isUnassigned) return;
@@ -2526,6 +2812,185 @@
                         )
                     )
                   ),
+
+            /* Anyone Available Live Assignment Popup Box */
+            anyoneAvailableAppts.length > 0 && (
+                anyonePopup.minimized
+                    ? h('button', {
+                        type: 'button',
+                        className: 'anyone-queue-fab',
+                        onClick: () => setAnyonePopup(prev => ({ ...prev, minimized: false }))
+                    },
+                        h('i', { className: 'bi bi-lightning-charge-fill' }),
+                        h('span', null, `Anyone Available (${anyoneAvailableAppts.length})`),
+                        h('i', { className: 'bi bi-chevron-up ms-1' })
+                    )
+                    : h('div', { className: 'anyone-queue-popup' },
+                        /* Popup Header */
+                        h('div', {
+                            className: 'anyone-queue-header',
+                            onClick: () => setAnyonePopup(prev => ({ ...prev, minimized: true }))
+                        },
+                            h('div', { className: 'd-flex align-items-center gap-2' },
+                                h('i', { className: 'bi bi-lightning-charge-fill fs-5' }),
+                                h('div', null,
+                                    h('div', { className: 'fw-bold lh-1', style: { fontSize: '0.92rem' } },
+                                        `Anyone Available (${anyoneAvailableAppts.length})`
+                                    ),
+                                    h('div', { style: { fontSize: '0.72rem', opacity: 0.9 } },
+                                        'Click a booking below to assign a free specialist'
+                                    )
+                                )
+                            ),
+                            h('button', {
+                                type: 'button',
+                                className: 'btn btn-sm btn-light bg-opacity-25 text-dark rounded-pill px-2 py-0',
+                                title: 'Minimize',
+                                onClick: (e) => {
+                                    e.stopPropagation();
+                                    setAnyonePopup(prev => ({ ...prev, minimized: true }));
+                                }
+                            }, h('i', { className: 'bi bi-dash-lg' }))
+                        ),
+
+                        /* Popup Body */
+                        h('div', { className: 'anyone-queue-body' },
+                            anyonePopup.error && h('div', { className: 'alert alert-danger py-2 px-3 small rounded-3 mb-2' }, anyonePopup.error),
+
+                            anyoneAvailableAppts.map(apt => {
+                                const isActive = anyonePopup.activeAptId === apt.id || anyoneAvailableAppts.length === 1;
+                                const isPickingStaff = isActive && anyonePopup.showStaffPicker;
+                                const dt = new Date(apt.appointmentTime);
+                                const dateStr = String(apt.appointmentTime).split('T')[0];
+                                const startMins = dt.getHours() * 60 + dt.getMinutes();
+                                const dur = Number((apt.service && apt.service.durationMinutes) || 45);
+                                const timeLabel = `${formatMinutesToTimeLabel(startMins)} – ${formatMinutesToTimeLabel(startMins + dur)}`;
+                                const srvName = (apt.service && apt.service.name) || 'Salon Service';
+                                const currentTechName = apt.nailTech ? (apt.nailTech.name || apt.nailTech.username) : null;
+
+                                const staffOptions = isPickingStaff ? getStaffAvailabilityForApt(apt) : [];
+                                const selectedTechObj = staffList.find(t => t.id === anyonePopup.selectedTechId);
+                                const selectedTechName = selectedTechObj ? (selectedTechObj.name || selectedTechObj.username) : '';
+
+                                return h('div', {
+                                    key: `anyone-apt-${apt.id}`,
+                                    className: `anyone-queue-card ${isActive ? 'active' : ''}`,
+                                    onClick: () => {
+                                        if (anyonePopup.activeAptId !== apt.id) {
+                                            setAnyonePopup(prev => ({
+                                                ...prev,
+                                                activeAptId: apt.id,
+                                                showStaffPicker: false,
+                                                selectedTechId: null,
+                                                error: null
+                                            }));
+                                        }
+                                    }
+                                },
+                                    /* Card Summary Row */
+                                    h('div', { className: 'd-flex justify-content-between align-items-start gap-2' },
+                                        h('div', { className: 'overflow-hidden' },
+                                            h('div', { className: 'fw-bold text-dark text-truncate', style: { fontSize: '0.92rem' } },
+                                                apt.customerName || 'Walk-In Guest'
+                                            ),
+                                            h('div', { className: 'small text-secondary text-truncate' }, srvName),
+                                            h('div', { className: 'd-flex align-items-center flex-wrap gap-1 mt-1' },
+                                                h('span', { className: 'badge bg-light text-dark border extra-small' },
+                                                    `${dateStr === selectedDateKey ? 'Selected Day' : dateStr} • ${timeLabel}`
+                                                ),
+                                                currentTechName && h('span', { className: 'badge bg-warning-subtle text-dark border border-warning-subtle extra-small' },
+                                                    `Tentative: ${currentTechName}`
+                                                )
+                                            )
+                                        ),
+                                        !isPickingStaff && h('button', {
+                                            type: 'button',
+                                            className: 'btn btn-sm text-white fw-semibold rounded-pill px-3 flex-shrink-0',
+                                            style: { backgroundColor: 'var(--bs-primary-pink)', fontSize: '0.78rem' },
+                                            onClick: (e) => {
+                                                e.stopPropagation();
+                                                handleOpenAnyoneAssignPicker(apt);
+                                            }
+                                        },
+                                            h('i', { className: 'bi bi-person-plus-fill me-1' }),
+                                            'Assign'
+                                        )
+                                    ),
+
+                                    /* Expanded Staff Picker & Confirm Step */
+                                    isPickingStaff && h('div', {
+                                        className: 'mt-3 pt-2 border-top',
+                                        onClick: (e) => e.stopPropagation()
+                                    },
+                                        h('div', { className: 'd-flex justify-content-between align-items-center mb-2' },
+                                            h('span', { className: 'small fw-bold text-dark' }, 'Select a Free Specialist:'),
+                                            h('button', {
+                                                type: 'button',
+                                                className: 'btn btn-link btn-sm text-muted p-0 text-decoration-none',
+                                                onClick: () => setAnyonePopup(prev => ({
+                                                    ...prev,
+                                                    showStaffPicker: false,
+                                                    selectedTechId: null,
+                                                    error: null
+                                                }))
+                                            }, 'Close')
+                                        ),
+
+                                        staffOptions.length === 0
+                                            ? h('div', { className: 'text-muted small py-2 text-center' }, 'No staff members found.')
+                                            : h('div', { style: { maxHeight: '200px', overflowY: 'auto' } },
+                                                staffOptions.map(opt => {
+                                                    const isSelected = anyonePopup.selectedTechId === opt.tech.id;
+                                                    return h('button', {
+                                                        key: `opt-${apt.id}-${opt.tech.id}`,
+                                                        type: 'button',
+                                                        disabled: !opt.isFree || anyonePopup.saving,
+                                                        className: `anyone-staff-chip ${opt.isFree ? 'free' : 'unavailable'} ${isSelected ? 'selected' : ''}`,
+                                                        onClick: () => {
+                                                            if (!opt.isFree) return;
+                                                            setAnyonePopup(prev => ({
+                                                                ...prev,
+                                                                selectedTechId: opt.tech.id,
+                                                                error: null
+                                                            }));
+                                                        }
+                                                    },
+                                                        h('span', { className: 'fw-semibold text-dark text-truncate' },
+                                                            isSelected ? `✔ ${opt.name}` : opt.name
+                                                        ),
+                                                        h('span', {
+                                                            className: `badge rounded-pill extra-small ${opt.isFree ? 'bg-success-subtle text-success border border-success-subtle' : 'bg-secondary-subtle text-secondary border'}`
+                                                        }, opt.statusLabel)
+                                                    );
+                                                })
+                                            ),
+
+                                        /* Confirm Button (shown once a free staff name is selected) */
+                                        anyonePopup.selectedTechId && h('div', { className: 'd-flex gap-2 mt-2 pt-2 border-top' },
+                                            h('button', {
+                                                type: 'button',
+                                                className: 'btn btn-success btn-sm fw-bold rounded-pill flex-grow-1',
+                                                disabled: anyonePopup.saving,
+                                                onClick: () => handleConfirmAnyoneAssignment(apt)
+                                            },
+                                                anyonePopup.saving
+                                                    ? h('span', { className: 'spinner-border spinner-border-sm me-1' })
+                                                    : h('i', { className: 'bi bi-check-circle-fill me-1' }),
+                                                `Confirm — ${selectedTechName}`
+                                            ),
+                                            h('button', {
+                                                type: 'button',
+                                                className: 'btn btn-outline-secondary btn-sm rounded-pill px-3',
+                                                disabled: anyonePopup.saving,
+                                                onClick: () => setAnyonePopup(prev => ({ ...prev, selectedTechId: null }))
+                                            }, 'Cancel')
+                                        )
+                                    )
+                                );
+                            })
+                        )
+                    )
+            ),
 
             /* Staff Day Off Toggle Modal */
             dayOffModal.isOpen && h('div', {

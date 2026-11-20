@@ -1105,6 +1105,7 @@ public class AppointmentController {
                     LocalDateTime serviceSlotEnd = serviceApptTime.plusMinutes(srvDuration);
 
                     // Conflict & Overbooking check
+                    boolean bookedAsAnyoneAvailable = (serviceSpecificTech == null && !Boolean.TRUE.equals(bookingRequest.getManualOverride()));
                     if (!Boolean.TRUE.equals(bookingRequest.getManualOverride())) {
                         if (serviceSpecificTech != null && serviceSpecificTech.getId() != null) {
                             Long checkTechId = serviceSpecificTech.getId();
@@ -1144,12 +1145,15 @@ public class AppointmentController {
                     appt.setService(srv);
 
                     String baseNotes = guest.getNotes() != null ? guest.getNotes().trim() : "";
+                    String formattedNotes = baseNotes;
                     if (guestItems.size() > 1) {
                         String prefix = "[" + label + "]";
-                        appt.setNotes(baseNotes.isEmpty() ? prefix : prefix + " " + baseNotes);
-                    } else {
-                        appt.setNotes(baseNotes);
+                        formattedNotes = formattedNotes.isEmpty() ? prefix : prefix + " " + formattedNotes;
                     }
+                    if (bookedAsAnyoneAvailable && !formattedNotes.contains("[ANYONE AVAILABLE]")) {
+                        formattedNotes = formattedNotes.isEmpty() ? "[ANYONE AVAILABLE]" : "[ANYONE AVAILABLE] " + formattedNotes;
+                    }
+                    appt.setNotes(formattedNotes);
 
                     Appointment saved = appointmentRepository.save(appt);
                     savedAppointments.add(saved);
@@ -1267,6 +1271,7 @@ public class AppointmentController {
                 ? tenantService.get().getDurationMinutes() : 45;
         LocalDateTime singleSlotEnd = singleApptTime.plusMinutes(estDuration);
 
+        boolean singleBookedAsAnyoneAvailable = (resolvedTech == null && !Boolean.TRUE.equals(bookingRequest.getManualOverride()));
         if (!Boolean.TRUE.equals(bookingRequest.getManualOverride())) {
             if (resolvedTech == null && !tenantTechs.isEmpty()) {
                 List<Appointment> dayAppts = appointmentRepository.findByTenantIdAndAppointmentTimeBetween(
@@ -1307,7 +1312,11 @@ public class AppointmentController {
         appointment.setCustomerEmail(bookingRequest.getCustomerEmail() != null ? bookingRequest.getCustomerEmail().trim() : "");
         appointment.setCustomerPhone(bookingRequest.getCustomerPhone().trim());
         appointment.setAppointmentTime(singleApptTime);
-        appointment.setNotes(bookingRequest.getNotes());
+        String singleNotes = bookingRequest.getNotes() != null ? bookingRequest.getNotes().trim() : "";
+        if (singleBookedAsAnyoneAvailable && !singleNotes.contains("[ANYONE AVAILABLE]")) {
+            singleNotes = singleNotes.isEmpty() ? "[ANYONE AVAILABLE]" : "[ANYONE AVAILABLE] " + singleNotes;
+        }
+        appointment.setNotes(singleNotes.isEmpty() ? bookingRequest.getNotes() : singleNotes);
         appointment.setStationPreference(bookingRequest.getStationPreference());
         appointment.setCancellationToken(UUID.randomUUID().toString());
         if (customer != null) {
@@ -2091,6 +2100,11 @@ public class AppointmentController {
             );
 
             Long techIdToCheck = targetTech.getId();
+            if (staffDayOffRepository != null && staffDayOffRepository.existsByTenantIdAndStaffIdAndOffDate(tenantId, techIdToCheck, apptTime.toLocalDate())) {
+                String techName = targetTech.getName() != null ? targetTech.getName() : targetTech.getUsername();
+                return ResponseEntity.badRequest()
+                        .body(Map.of("message", techName + " is off on this date. Please choose another specialist."));
+            }
             boolean conflict = dayAppts.stream()
                     .filter(a -> !a.getId().equals(appt.getId()))
                     .filter(a -> a.getStatus() != Appointment.AppointmentStatus.CANCELLED)
@@ -2110,6 +2124,9 @@ public class AppointmentController {
         appt.setNailTech(targetTech);
         String reason = (body != null && body.containsKey("reason")) ? String.valueOf(body.get("reason")) : "Reassigned from " + oldTechName + " to " + newTechName;
         String existingNotes = appt.getNotes() != null ? appt.getNotes().trim() : "";
+        if (targetTech != null) {
+            existingNotes = existingNotes.replace("[ANYONE AVAILABLE]", "").replaceAll("\\s{2,}", " ").trim();
+        }
         String reassignTag = "[REASSIGNED: " + oldTechName + " -> " + newTechName + "]";
         appt.setNotes(existingNotes.isEmpty() ? reassignTag : existingNotes + " | " + reassignTag);
 

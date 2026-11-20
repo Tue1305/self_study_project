@@ -140,9 +140,29 @@
                     <input type="email" class="form-control rounded-3" id="techEmail" placeholder="e.g. jenny@example.com" required>
                 </div>
                 <div class="mb-3">
-                    <label for="techSpecialty" class="form-label fw-semibold text-secondary small">Specialty / Capabilities</label>
-                    <input type="text" class="form-control rounded-3" id="techSpecialty" placeholder="e.g. ALL, NAIL_ART or MANICURE">
-                    <div class="form-text">Comma-separated tags (e.g. ALL, NAIL_ART, MANICURE, BODY_MASSAGE, WAXING, FACIAL)</div>
+                    <label class="form-label fw-semibold text-secondary small">Specialty / Capabilities</label>
+                    <input type="hidden" id="techSpecialty">
+                    <div class="dropdown w-100">
+                        <button class="btn btn-outline-secondary dropdown-toggle w-100 text-start d-flex justify-content-between align-items-center rounded-3 bg-white text-dark"
+                                type="button"
+                                id="specialtyDropdownBtn"
+                                data-bs-toggle="dropdown"
+                                data-bs-auto-close="outside"
+                                aria-expanded="false">
+                            <span id="specialtyDropdownLabel" class="text-truncate text-muted">Select specialties...</span>
+                        </button>
+                        <div class="dropdown-menu w-100 p-2 shadow-sm rounded-3 border" aria-labelledby="specialtyDropdownBtn" id="specialtyDropdownMenu">
+                            <div class="d-flex justify-content-between align-items-center px-2 pb-2 mb-2 border-bottom">
+                                <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none fw-semibold text-pink" onclick="selectAllSpecialties()">Select All</button>
+                                <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none text-muted" onclick="clearAllSpecialties()">Clear</button>
+                            </div>
+                            <div id="specialtyCheckboxList" class="d-flex flex-column gap-1 px-1">
+                                <!-- Populated via JS -->
+                            </div>
+                        </div>
+                    </div>
+                    <div id="selectedSpecialtyBadges" class="d-flex flex-wrap gap-1 mt-2"></div>
+                    <div class="form-text">Choose one or more specialties from the dropdown menu.</div>
                 </div>
                 <div class="mb-3">
                     <label for="techCommissionRate" class="form-label fw-semibold text-secondary small">Service Commission Rate (%)</label>
@@ -208,7 +228,7 @@
                 const base64Url = jwtToken.split('.')[1];
                 const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
                 const jsonPayload = decodeURIComponent(atob(base64).split('').map(c => {
-                    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                   return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
                 }).join(''));
 
                 const payload = JSON.parse(jsonPayload);
@@ -296,8 +316,130 @@
         }
     }
 
+    const SPECIALTY_OPTIONS = [
+        { value: 'MANICURE', label: 'Manicures' },
+        { value: 'PEDICURE', label: 'Pedicures' },
+        { value: 'KID_SERVICES', label: 'Kids' },
+        { value: 'BODY_MASSAGE', label: 'Body Massage' },
+        { value: 'WAXING', label: 'Waxing' },
+        { value: 'FACIAL', label: 'Facial' },
+        { value: 'EYELASH', label: 'Eyelash' }
+    ];
+
+    const SPECIALTY_LABEL_MAP = SPECIALTY_OPTIONS.reduce((acc, opt) => {
+        acc[opt.value] = opt.label;
+        return acc;
+    }, {});
+
+    function parseSpecialtyString(raw) {
+        if (!raw || raw === 'undefined') return [];
+        const parts = String(raw).split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+        if (parts.includes('ALL') || parts.includes('FULL EVERYTHING') || parts.includes('GENERAL')) {
+            return SPECIALTY_OPTIONS.map(o => o.value);
+        }
+        const selected = [];
+        parts.forEach(p => {
+            if (p === 'MANICURES' || p === 'MANICURE' || p === 'NAIL_ART') {
+                if (!selected.includes('MANICURE')) selected.push('MANICURE');
+            } else if (p === 'PEDICURES' || p === 'PEDICURE') {
+                if (!selected.includes('PEDICURE')) selected.push('PEDICURE');
+            } else if (p === 'KIDS' || p === 'KID_SERVICES' || p === 'KID SERVICES') {
+                if (!selected.includes('KID_SERVICES')) selected.push('KID_SERVICES');
+            } else if (p === 'BODY_MASSAGE' || p === 'BODY MASSAGE' || p === 'MASSAGE') {
+                if (!selected.includes('BODY_MASSAGE')) selected.push('BODY_MASSAGE');
+            } else if (p === 'WAXING' || p === 'WAX') {
+                if (!selected.includes('WAXING')) selected.push('WAXING');
+            } else if (p === 'FACIAL' || p === 'FACIALS') {
+                if (!selected.includes('FACIAL')) selected.push('FACIAL');
+            } else if (p === 'EYELASH' || p === 'EYELASHES' || p === 'LASH' || p === 'LASHES') {
+                if (!selected.includes('EYELASH')) selected.push('EYELASH');
+            }
+        });
+        return selected;
+    }
+
+    function renderSpecialtyDropdownCheckboxes() {
+        const container = document.getElementById('specialtyCheckboxList');
+        if (!container) return;
+        container.innerHTML = SPECIALTY_OPTIONS.map(opt => `
+            <label class="d-flex align-items-center gap-2 px-2 py-1 rounded-2" style="cursor: pointer;" onmouseover="this.style.background='#fdf2f8'" onmouseout="this.style.background='transparent'">
+                <input type="checkbox" class="form-check-input m-0 specialty-checkbox" value="${opt.value}" onchange="syncSelectedSpecialtiesUI()">
+                <span class="small fw-semibold text-dark">${opt.label}</span>
+            </label>
+        `).join('');
+    }
+
+    function setSelectedSpecialties(values) {
+        const set = new Set(values || []);
+        document.querySelectorAll('.specialty-checkbox').forEach(cb => {
+            cb.checked = set.has(cb.value);
+        });
+        syncSelectedSpecialtiesUI();
+    }
+
+    function selectAllSpecialties() {
+        setSelectedSpecialties(SPECIALTY_OPTIONS.map(o => o.value));
+    }
+
+    function clearAllSpecialties() {
+        setSelectedSpecialties([]);
+    }
+
+    function removeSpecialtyTag(val) {
+        const cb = document.querySelector(`.specialty-checkbox[value="${val}"]`);
+        if (cb) {
+            cb.checked = false;
+            syncSelectedSpecialtiesUI();
+        }
+    }
+
+    function syncSelectedSpecialtiesUI() {
+        const checked = Array.from(document.querySelectorAll('.specialty-checkbox:checked')).map(cb => cb.value);
+        const hiddenInput = document.getElementById('techSpecialty');
+        const labelEl = document.getElementById('specialtyDropdownLabel');
+        const badgesEl = document.getElementById('selectedSpecialtyBadges');
+
+        if (hiddenInput) hiddenInput.value = checked.join(', ');
+
+        if (labelEl) {
+            if (checked.length === 0) {
+                labelEl.textContent = 'Select specialties...';
+                labelEl.classList.add('text-muted');
+            } else if (checked.length === SPECIALTY_OPTIONS.length) {
+                labelEl.textContent = 'All Specialties (7 selected)';
+                labelEl.classList.remove('text-muted');
+            } else {
+                labelEl.textContent = checked.map(v => SPECIALTY_LABEL_MAP[v] || v).join(', ');
+                labelEl.classList.remove('text-muted');
+            }
+        }
+
+        if (badgesEl) {
+            badgesEl.innerHTML = checked.map(v => `
+                <span class="badge rounded-pill bg-danger-subtle text-pink border border-danger-subtle d-inline-flex align-items-center gap-1 px-2 py-1">
+                    ${SPECIALTY_LABEL_MAP[v] || v}
+                    <button type="button" class="btn-close" style="font-size: 0.55rem;" aria-label="Remove" onclick="removeSpecialtyTag('${v}')"></button>
+                </span>
+            `).join('');
+        }
+    }
+
+    function renderSpecialtyBadgesHtml(rawSpecialty) {
+        const parsed = parseSpecialtyString(rawSpecialty);
+        if (parsed.length === 0) {
+            return `<span class="badge bg-light text-muted border">${rawSpecialty || 'General'}</span>`;
+        }
+        if (parsed.length === SPECIALTY_OPTIONS.length) {
+            return `<span class="badge bg-danger-subtle text-pink border border-danger-subtle">All Specialties</span>`;
+        }
+        return `<div class="d-flex flex-wrap gap-1">${parsed.map(v =>
+            `<span class="badge bg-light text-dark border">${SPECIALTY_LABEL_MAP[v] || v}</span>`
+        ).join('')}</div>`;
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
         techModalInstance = new bootstrap.Modal(document.getElementById('techModal'));
+        renderSpecialtyDropdownCheckboxes();
         loadBranding();
         loadNailTechs();
     });
@@ -334,7 +476,7 @@
                         <td>#${index + 1}</td>
                         <td class="fw-semibold">${tech.name || tech.username}</td>
                         <td>${tech.email || tech.username}</td>
-                        <td><span class="badge bg-light text-dark border">${tech.specialty || 'General'}</span></td>
+                        <td>${renderSpecialtyBadgesHtml(tech.specialty)}</td>
                         <td>
                             <span class="badge bg-primary-subtle text-primary border border-primary-subtle fw-bold">
                                 ${comm}% Tech / ${salonCut}% House
@@ -365,7 +507,7 @@
         document.getElementById('techId').value = '';
         document.getElementById('techName').value = '';
         document.getElementById('techEmail').value = '';
-        document.getElementById('techSpecialty').value = '';
+        setSelectedSpecialties([]);
         document.getElementById('techCommissionRate').value = '60';
         document.getElementById('modalTitle').innerText = 'Add New Nail Technician';
         techModalInstance.show();
@@ -375,7 +517,7 @@
         document.getElementById('techId').value = id;
         document.getElementById('techName').value = name;
         document.getElementById('techEmail').value = email;
-        document.getElementById('techSpecialty').value = specialty === 'undefined' ? '' : specialty;
+        setSelectedSpecialties(parseSpecialtyString(specialty));
         document.getElementById('techCommissionRate').value = (commissionRate != null) ? commissionRate : '60';
         document.getElementById('modalTitle').innerText = 'Edit Nail Technician';
         techModalInstance.show();

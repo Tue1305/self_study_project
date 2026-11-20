@@ -113,6 +113,9 @@ public class NailTechController {
         if (lower.contains("wax") || lower.contains("waxing")) {
             return "WAXING";
         }
+        if (lower.contains("eyelash") || lower.contains("lash")) {
+            return "EYELASH";
+        }
         if (lower.contains("facial") || lower.contains("babor") || lower.contains("collagen")) {
             return "FACIAL";
         }

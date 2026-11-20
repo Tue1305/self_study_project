@@ -464,7 +464,7 @@ public class PosFinancialController {
      * to the End-of-Day Register Closing and Staff Commission Payouts.
      */
     @PostMapping("/verify-owner-password")
-    @PreAuthorize("permitAll()")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ADMIN', 'ROLE_STAFF', 'STAFF', 'ROLE_NAIL_TECH')")
     public ResponseEntity<?> verifyOwnerPassword(
             @RequestBody(required = false) Map<String, String> body,
             HttpServletRequest request

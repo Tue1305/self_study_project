@@ -143,7 +143,6 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.DELETE, "/api/showcase", "/api/showcase/**").hasAnyAuthority("ROLE_ADMIN", "ADMIN")
                         // Customers admin API rules
                         .requestMatchers("/api/customers", "/api/customers/**").hasAnyAuthority("ROLE_ADMIN", "ADMIN")
-                        .requestMatchers("/api/pos/verify-owner-password").permitAll()
                         .requestMatchers("/api/pos", "/api/pos/**").hasAnyAuthority("ROLE_ADMIN", "ADMIN", "ROLE_STAFF", "STAFF", "ROLE_NAIL_TECH")
                         .requestMatchers("/api/gift-cards/verify", "/api/gift-cards/purchase").permitAll()
                         .requestMatchers("/api/gift-cards", "/api/gift-cards/**").hasAnyAuthority("ROLE_ADMIN", "ADMIN", "ROLE_STAFF", "STAFF", "ROLE_NAIL_TECH")

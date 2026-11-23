@@ -1019,31 +1019,139 @@
         const prevAnyoneIdsRef = React.useRef(new Set());
         const knownAptIdsRef = React.useRef(null);
         const audioCtxRef = React.useRef(null);
+        const chimeAudioRef = React.useRef(null);
+        const soundUnlockedRef = React.useRef(false);
+        const [soundUnlocked, setSoundUnlocked] = useState(false);
         const [newBookingAlerts, setNewBookingAlerts] = useState([]);
 
-        // Unlock shared AudioContext on first user interaction so background poll chimes aren't blocked by browser autoplay rules
+        // Build an in-memory 16-bit PCM WAV data URL for a loud, crisp 3-note front-desk bell chime.
+        // Using HTML5 <audio> plays on the mobile media channel (works on iPhone even when side Silent switch is on).
+        const buildChimeWavUrl = () => {
+            const sampleRate = 22050;
+            const durationSec = 1.15;
+            const numSamples = Math.floor(sampleRate * durationSec);
+            const buffer = new ArrayBuffer(44 + numSamples * 2);
+            const view = new DataView(buffer);
+            const writeStr = (offset, str) => {
+                for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
+            };
+            writeStr(0, 'RIFF');
+            view.setUint32(4, 36 + numSamples * 2, true);
+            writeStr(8, 'WAVE');
+            writeStr(12, 'fmt ');
+            view.setUint32(16, 16, true);
+            view.setUint16(20, 1, true); // PCM
+            view.setUint16(22, 1, true); // Mono
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, sampleRate * 2, true);
+            view.setUint16(32, 2, true);
+            view.setUint16(34, 16, true);
+            writeStr(36, 'data');
+            view.setUint32(40, numSamples * 2, true);
+
+            const notes = [
+                { freq: 880.00,  start: 0.00, dur: 0.45, amp: 0.78 },
+                { freq: 1108.73, start: 0.14, dur: 0.45, amp: 0.78 },
+                { freq: 1318.51, start: 0.28, dur: 0.80, amp: 0.90 }
+            ];
+            for (let i = 0; i < numSamples; i++) {
+                const t = i / sampleRate;
+                let sample = 0;
+                for (let n = 0; n < notes.length; n++) {
+                    const note = notes[n];
+                    const dt = t - note.start;
+                    if (dt >= 0 && dt <= note.dur) {
+                        const attack = Math.min(1, dt / 0.012);
+                        const decay = Math.exp(-3.6 * (dt / note.dur));
+                        const env = attack * decay;
+                        const phase = (dt * note.freq) % 1;
+                        const tri = 4 * Math.abs(phase - 0.5) - 1;
+                        const overtone = Math.sin(2 * Math.PI * note.freq * 2 * dt);
+                        sample += (tri * 0.75 + overtone * 0.28) * note.amp * env;
+                    }
+                }
+                // Soft limiter to maximize perceived volume without harsh digital clipping
+                const limited = Math.tanh(sample * 1.35);
+                view.setInt16(44 + i * 2, Math.max(-32767, Math.min(32767, Math.round(limited * 32767))), true);
+            }
+            const blob = new Blob([buffer], { type: 'audio/wav' });
+            return URL.createObjectURL(blob);
+        };
+
+        // Initialize persistent HTML5 Audio element + unlock audio reliably on mobile (iOS Safari / Android Chrome)
         useEffect(() => {
-            const unlockAudio = () => {
+            let objectUrl = null;
+            try {
+                objectUrl = buildChimeWavUrl();
+                const audio = new Audio(objectUrl);
+                audio.preload = 'auto';
+                audio.volume = 1.0;
+                audio.setAttribute('playsinline', 'true');
+                chimeAudioRef.current = audio;
+            } catch (_) {}
+
+            const unlockOnGesture = () => {
+                if (soundUnlockedRef.current) return;
+                // 1. Unlock Web Audio API with a 1-sample silent buffer (required by iOS Safari)
                 try {
                     const AudioCtx = window.AudioContext || window.webkitAudioContext;
-                    if (!AudioCtx) return;
-                    if (!audioCtxRef.current) {
-                        audioCtxRef.current = new AudioCtx();
-                    }
-                    if (audioCtxRef.current.state === 'suspended') {
-                        audioCtxRef.current.resume().catch(() => {});
+                    if (AudioCtx) {
+                        if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
+                            audioCtxRef.current = new AudioCtx();
+                        }
+                        const ctx = audioCtxRef.current;
+                        if (ctx.state === 'suspended') {
+                            ctx.resume().catch(() => {});
+                        }
+                        const silentBuf = ctx.createBuffer(1, 1, 22050);
+                        const src = ctx.createBufferSource();
+                        src.buffer = silentBuf;
+                        src.connect(ctx.destination);
+                        src.start(0);
                     }
                 } catch (_) {}
+
+                // 2. Unlock persistent HTML5 <audio> element silently inside the user tap/click
+                const audio = chimeAudioRef.current;
+                if (audio) {
+                    const prevMuted = audio.muted;
+                    audio.muted = true;
+                    const p = audio.play();
+                    if (p && typeof p.then === 'function') {
+                        p.then(() => {
+                            audio.pause();
+                            audio.currentTime = 0;
+                            audio.muted = prevMuted;
+                            soundUnlockedRef.current = true;
+                            setSoundUnlocked(true);
+                        }).catch(() => {
+                            audio.muted = prevMuted;
+                        });
+                    } else {
+                        audio.pause();
+                        audio.currentTime = 0;
+                        audio.muted = prevMuted;
+                        soundUnlockedRef.current = true;
+                        setSoundUnlocked(true);
+                    }
+                }
             };
-            window.addEventListener('pointerdown', unlockAudio, { once: true });
-            window.addEventListener('keydown', unlockAudio, { once: true });
+
+            // Do NOT use { once: true } — keep trying on real taps/clicks until browser confirms unlock
+            window.addEventListener('touchend', unlockOnGesture, { passive: true });
+            window.addEventListener('click', unlockOnGesture, { passive: true });
+            window.addEventListener('keydown', unlockOnGesture, { passive: true });
             return () => {
-                window.removeEventListener('pointerdown', unlockAudio);
-                window.removeEventListener('keydown', unlockAudio);
+                window.removeEventListener('touchend', unlockOnGesture);
+                window.removeEventListener('click', unlockOnGesture);
+                window.removeEventListener('keydown', unlockOnGesture);
+                if (objectUrl) {
+                    try { URL.revokeObjectURL(objectUrl); } catch (_) {}
+                }
             };
         }, []);
 
-        const playNewBookingChime = () => {
+        const playWebAudioFallback = () => {
             try {
                 const AudioCtx = window.AudioContext || window.webkitAudioContext;
                 if (!AudioCtx) return;
@@ -1054,28 +1162,20 @@
                 if (ctx.state === 'suspended') {
                     ctx.resume().catch(() => {});
                 }
-
-                // Compressor prevents clipping while maximizing perceived loudness
                 const compressor = ctx.createDynamicsCompressor();
                 compressor.threshold.setValueAtTime(-12, ctx.currentTime);
                 compressor.knee.setValueAtTime(10, ctx.currentTime);
                 compressor.ratio.setValueAtTime(6, ctx.currentTime);
-                compressor.attack.setValueAtTime(0.003, ctx.currentTime);
-                compressor.release.setValueAtTime(0.2, ctx.currentTime);
                 compressor.connect(ctx.destination);
 
-                // Bright, loud 3-note front-desk bell chime (A5 -> C#6 -> E6)
                 const notes = [
                     { freq: 880.00,  start: 0.00, dur: 0.45, peak: 0.65 },
                     { freq: 1108.73, start: 0.14, dur: 0.45, peak: 0.65 },
                     { freq: 1318.51, start: 0.28, dur: 0.75, peak: 0.75 }
                 ];
-
                 const baseTime = ctx.currentTime + 0.01;
                 notes.forEach(({ freq, start, dur, peak }) => {
                     const t0 = baseTime + start;
-
-                    // Primary triangle wave (richer and cuts through salon noise better than pure sine)
                     const osc = ctx.createOscillator();
                     const gain = ctx.createGain();
                     osc.type = 'triangle';
@@ -1087,21 +1187,39 @@
                     gain.connect(compressor);
                     osc.start(t0);
                     osc.stop(t0 + dur + 0.02);
-
-                    // Bright upper-octave bell overtone
-                    const overtone = ctx.createOscillator();
-                    const overGain = ctx.createGain();
-                    overtone.type = 'sine';
-                    overtone.frequency.setValueAtTime(freq * 2, t0);
-                    overGain.gain.setValueAtTime(0.001, t0);
-                    overGain.gain.linearRampToValueAtTime(peak * 0.35, t0 + 0.01);
-                    overGain.gain.exponentialRampToValueAtTime(0.001, t0 + dur * 0.7);
-                    overtone.connect(overGain);
-                    overGain.connect(compressor);
-                    overtone.start(t0);
-                    overtone.stop(t0 + dur * 0.7 + 0.02);
                 });
             } catch (_) {}
+        };
+
+        const playNewBookingChime = () => {
+            // Haptic vibration on Android phones
+            try {
+                if (navigator && typeof navigator.vibrate === 'function') {
+                    navigator.vibrate([220, 100, 220]);
+                }
+            } catch (_) {}
+
+            // Primary: HTML5 <audio> synthesized WAV (best mobile & iPhone Silent-Switch reliability)
+            const audio = chimeAudioRef.current;
+            if (audio) {
+                try {
+                    audio.muted = false;
+                    audio.volume = 1.0;
+                    audio.currentTime = 0;
+                    const playPromise = audio.play();
+                    if (playPromise && typeof playPromise.then === 'function') {
+                        playPromise.then(() => {
+                            soundUnlockedRef.current = true;
+                            setSoundUnlocked(true);
+                        }).catch(() => {
+                            playWebAudioFallback();
+                        });
+                        return;
+                    }
+                    return;
+                } catch (_) {}
+            }
+            playWebAudioFallback();
         };
         const [loading, setLoading] = useState(true);
         const [selectedAppointment, setSelectedAppointment] = useState(null);
@@ -2845,6 +2963,27 @@
                         h('i', { className: 'bi bi-lightning-charge-fill me-1' }),
                         'Anyone Available',
                         anyoneAvailableAppts.length > 0 && h('span', { className: 'anyone-edge-badge' }, anyoneAvailableAppts.length)
+                    ]),
+                    h('button', {
+                        type: 'button',
+                        className: 'btn btn-sm px-3 fw-bold d-flex align-items-center gap-1 shadow-sm',
+                        style: soundUnlocked
+                            ? { backgroundColor: '#ffffff', color: '#198754', border: '1.5px solid #198754' }
+                            : { backgroundColor: '#fff3cd', color: '#856404', border: '1.5px solid #ffc107' },
+                        title: soundUnlocked
+                            ? 'Booking alert sound is active — click to test volume'
+                            : 'Tap once to enable booking alert sounds on mobile/desktop',
+                        onClick: () => {
+                            playNewBookingChime();
+                            setDragToast({
+                                type: 'success',
+                                message: '🔔 Booking alert sound enabled! You will hear this chime when new bookings arrive.'
+                            });
+                            setTimeout(() => setDragToast(null), 3000);
+                        }
+                    }, [
+                        h('i', { className: soundUnlocked ? 'bi bi-volume-up-fill' : 'bi bi-volume-mute-fill' }),
+                        soundUnlocked ? 'Sound On' : 'Tap for Sound'
                     ])
                 )
             ),

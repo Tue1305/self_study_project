@@ -1877,7 +1877,8 @@
         const activeGuestTotals = activeGuest ? calculateGuestTotals(activeGuest) : { duration: 45 };
         const totalDuration = activeGuestTotals.duration || getTotalBookingDurationMinutes();
         const activeServices = (activeGuest && Array.isArray(activeGuest.services)) ? activeGuest.services : [];
-        const isMultiService = activeServices.length >= 2;
+        const expandedActiveServices = expandGuestServicesForBooking(activeServices);
+        const isMultiService = expandedActiveServices.length >= 2;
         const customSlots = (activeGuest && activeGuest.serviceTimeSlots && Object.keys(activeGuest.serviceTimeSlots).length > 0)
             ? activeGuest.serviceTimeSlots
             : (bookingState.serviceTimeSlots || {});
@@ -1885,15 +1886,15 @@
 
         if (isMultiService && chosenSlotKeys.length > 0 && bookingState.slotSelectionMode !== 'combined') {
             const scheduledParts = [];
-            activeServices.forEach(s => {
-                const sSlot = customSlots[String(s.id)];
+            expandedActiveServices.forEach(item => {
+                const sSlot = customSlots[String(item.key)];
                 if (sSlot) {
-                    const techId = activeGuest.serviceStaffAssignments ? activeGuest.serviceStaffAssignments[s.id] : undefined;
+                    const techId = activeGuest.serviceStaffAssignments ? activeGuest.serviceStaffAssignments[item.key] : undefined;
                     const tech = (techId && techId !== 'anyone') ? (bookingState.staffList || []).find(t => String(t.id) === String(techId)) : null;
                     const techName = tech ? (tech.name || tech.username) : 'Anyone';
                     scheduledParts.push({
                         sortKey: sSlot,
-                        text: `${s.name} (${techName}): ${formatTime24ToRangeLabel(sSlot, s.durationMinutes || 45)}`
+                        text: `${item.name} (${techName}): ${formatTime24ToRangeLabel(sSlot, item.durationMinutes || 45)}`
                     });
                 }
             });
@@ -1999,7 +2000,7 @@
         if (!container) return;
 
         const guest0 = getActiveDetailsGuest();
-        const guest0Services = (guest0 && Array.isArray(guest0.services)) ? guest0.services : [];
+        const guest0Services = expandGuestServicesForBooking((guest0 && Array.isArray(guest0.services)) ? guest0.services : []);
         if (guest0Services.length < 2) {
             container.style.display = 'none';
             container.innerHTML = '';
@@ -2017,12 +2018,12 @@
             const dur = Number(srv.durationMinutes || 45);
             totalDuration += dur;
 
-            const rawSlot = guestSlots[String(srv.id)] || (bookingState.serviceTimeSlots && bookingState.serviceTimeSlots[String(srv.id)]) || '';
+            const rawSlot = guestSlots[String(srv.key)] || (bookingState.serviceTimeSlots && bookingState.serviceTimeSlots[String(srv.key)]) || '';
             const startMin = parseSlotToMinutes(rawSlot);
             const endMin = startMin !== null ? startMin + dur : null;
 
             let techName = 'Anyone Available';
-            const assignedTid = guest0.serviceStaffAssignments ? guest0.serviceStaffAssignments[srv.id] : undefined;
+            const assignedTid = guest0.serviceStaffAssignments ? guest0.serviceStaffAssignments[srv.key] : undefined;
             if (assignedTid != null && assignedTid !== 'anyone' && !isNaN(Number(assignedTid)) && Number(assignedTid) > 0) {
                 const techObj = (bookingState.staffList || []).find(t => t.id === Number(assignedTid));
                 if (techObj) techName = techObj.name || techObj.username;
@@ -2128,7 +2129,7 @@
         if (!startValue24 || !startValue24.includes(':')) return;
         if (!bookingState.serviceTimeSlots) bookingState.serviceTimeSlots = {};
         const guest0 = getActiveDetailsGuest();
-        const services = (guest0 && Array.isArray(guest0.services)) ? guest0.services : [];
+        const services = expandGuestServicesForBooking((guest0 && Array.isArray(guest0.services)) ? guest0.services : []);
         if (services.length === 0) return;
 
         let cleanStart = startValue24.trim();
@@ -2143,14 +2144,15 @@
             const m = currentMinutes % 60;
             const curVal = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`;
             const dur = Number(srv.durationMinutes || 45);
+            const key = String(srv.key);
 
-            bookingState.serviceTimeSlots[String(srv.id)] = curVal;
+            bookingState.serviceTimeSlots[key] = curVal;
             if (guest0) {
                 if (!guest0.serviceTimeSlots) guest0.serviceTimeSlots = {};
-                guest0.serviceTimeSlots[String(srv.id)] = curVal;
+                guest0.serviceTimeSlots[key] = curVal;
             }
 
-            const badge = document.getElementById(`srvBadge_${srv.id}`);
+            const badge = document.getElementById(`srvBadge_${key}`);
             if (badge) {
                 badge.textContent = formatTime24ToRangeLabel(curVal, dur);
             }
@@ -2240,13 +2242,14 @@
         const newEnd = newStart !== null ? newStart + newDur : null;
 
         if (guest0 && Array.isArray(guest0.services) && newStart !== null && newEnd !== null) {
+            const expandedGuestServices = expandGuestServicesForBooking(guest0.services);
             // Keep track of non-overlapping occupied intervals starting with the newly chosen service
             const occupied = [{ srvKey, startMin: newStart, endMin: newEnd }];
 
             // First keep all other services that do NOT overlap with the newly chosen slot
             const overlappingOthers = [];
-            guest0.services.forEach(otherSrv => {
-                const otherKey = String(otherSrv.id);
+            expandedGuestServices.forEach(otherSrv => {
+                const otherKey = String(otherSrv.key);
                 if (otherKey === srvKey) return;
                 const otherSlot = (guest0.serviceTimeSlots && guest0.serviceTimeSlots[otherKey]) || bookingState.serviceTimeSlots[otherKey];
                 const oStart = parseSlotToMinutes(otherSlot);
@@ -2263,8 +2266,8 @@
 
             // Auto-adjust any overlapping other service to its earliest non-overlapping available slot (before OR after!)
             overlappingOthers.forEach(otherSrv => {
-                const otherKey = String(otherSrv.id);
-                const otherSeg = servicesAvail.find(seg => String(seg.serviceId) === otherKey);
+                const otherKey = String(otherSrv.key);
+                const otherSeg = servicesAvail.find(seg => String(seg.slotKey || seg.serviceId) === otherKey);
                 const otherDur = Number(otherSrv.durationMinutes || 45);
                 let replacement = null;
                 if (otherSeg) {
@@ -2485,7 +2488,7 @@
 
         // Keep existing valid non-overlapping selections first
         servicesAvail.forEach(seg => {
-            const srvId = String(seg.serviceId);
+            const srvId = String(seg.slotKey || seg.serviceId);
             const segDur = Number(seg.durationMinutes || 45);
             let curSlot = (guest0 && guest0.serviceTimeSlots && guest0.serviceTimeSlots[srvId])
                 || bookingState.serviceTimeSlots[srvId] || '';
@@ -2517,7 +2520,7 @@
 
         // Pass 2: For any service without a selection yet, pick its earliest available slot that doesn't overlap already-chosen services
         servicesAvail.forEach(seg => {
-            const srvId = String(seg.serviceId);
+            const srvId = String(seg.slotKey || seg.serviceId);
             if (assignedBySrvId[srvId]) return;
             const segDur = Number(seg.durationMinutes || 45);
             const bestSlot = findEarliestNonOverlappingSlot(seg, occupiedIntervals, isToday, nowPlusBuffer);
@@ -2550,7 +2553,7 @@
 
         // Pass 3: Render each service's slot grid with dynamic overlap indicators against all OTHER services
         servicesAvail.forEach((seg, srvIdx) => {
-            const srvId = String(seg.serviceId);
+            const srvId = String(seg.slotKey || seg.serviceId);
             const segDur = Number(seg.durationMinutes || 45);
             const currentSelectedSlot = assignedBySrvId[srvId] || '';
             const otherIntervals = occupiedIntervals.filter(o => o.srvId !== srvId);
@@ -2694,11 +2697,12 @@
 
         const guest0 = getActiveDetailsGuest();
         const guest0Services = (guest0 && Array.isArray(guest0.services)) ? guest0.services : [];
-        const isMultiService = guest0Services.length >= 2;
+        const expandedGuest0Services = expandGuestServicesForBooking(guest0Services);
+        const isMultiService = expandedGuest0Services.length >= 2;
         const apiResponse = bookingState.lastAvailabilityResponse;
         const servicesAvail = (apiResponse && Array.isArray(apiResponse.servicesAvailability)) ? apiResponse.servicesAvailability : [];
 
-        // 1. If 2+ services exist and servicesAvailability is returned, provide Per-Service & Staff Time Slot option
+        // 1. If 2+ services (or a combo with 2+ parts) exist and servicesAvailability is returned, provide Per-Service & Staff Time Slot option
         if (isMultiService && servicesAvail.length >= 2) {
             if (modeSelector) modeSelector.style.display = 'block';
             renderPerServiceSlotCards(servicesAvail, guest0Services);
@@ -2803,19 +2807,19 @@
         if (!container) return;
 
         const guest0 = getActiveDetailsGuest();
-        const guest0Services = (guest0 && Array.isArray(guest0.services)) ? guest0.services : [];
+        const guest0Services = expandGuestServicesForBooking((guest0 && Array.isArray(guest0.services)) ? guest0.services : []);
         const isMultiService = guest0Services.length >= 2;
 
         // Collect assigned staff
         const assignedStaffList = [];
         if (isMultiService && guest0.serviceStaffAssignments) {
             guest0Services.forEach(s => {
-                const staffId = guest0.serviceStaffAssignments[s.id];
+                const staffId = guest0.serviceStaffAssignments[s.key];
                 if (staffId && staffId !== 'anyone') {
                     const foundTech = (bookingState.staffList || []).find(t => String(t.id) === String(staffId));
                     if (foundTech) {
                         assignedStaffList.push({
-                            serviceId: s.id,
+                            serviceId: s.key,
                             serviceName: s.name,
                             techId: foundTech.id,
                             techName: foundTech.name || foundTech.username
@@ -3030,11 +3034,12 @@
         params.set('clientNow', getLocalNowIsoStr());
 
         const activeServices = (activeGuest && Array.isArray(activeGuest.services)) ? activeGuest.services : [];
-        if (activeServices.length > 0) {
-            params.set('serviceIds', activeServices.map(s => s.id).join(','));
-            params.set('serviceDurations', activeServices.map(s => s.durationMinutes || 45).join(','));
-            const srvTechs = activeServices.map(s => {
-                const assigned = activeGuest.serviceStaffAssignments ? activeGuest.serviceStaffAssignments[s.id] : undefined;
+        const expandedActiveItems = expandGuestServicesForBooking(activeServices);
+        if (expandedActiveItems.length > 0) {
+            params.set('serviceIds', expandedActiveItems.map(item => item.parentServiceId).join(','));
+            params.set('serviceDurations', expandedActiveItems.map(item => item.durationMinutes || 45).join(','));
+            const srvTechs = expandedActiveItems.map(item => {
+                const assigned = activeGuest.serviceStaffAssignments ? activeGuest.serviceStaffAssignments[item.key] : undefined;
                 if (assigned != null && assigned !== 'anyone' && !isNaN(Number(assigned))) {
                     return Number(assigned);
                 }
@@ -3051,8 +3056,9 @@
 
         // Collect unique assigned technician IDs for the active guest only
         const activeGuestTechIds = [];
-        if (activeGuest && activeGuest.services && activeGuest.services.length > 1 && activeGuest.serviceStaffAssignments) {
-            Object.values(activeGuest.serviceStaffAssignments).forEach(id => {
+        if (activeGuest && expandedActiveItems.length > 1 && activeGuest.serviceStaffAssignments) {
+            expandedActiveItems.forEach(item => {
+                const id = activeGuest.serviceStaffAssignments[item.key];
                 if (id != null && id !== 'anyone' && !isNaN(Number(id)) && Number(id) > 0) {
                     activeGuestTechIds.push(Number(id));
                 }
@@ -3081,6 +3087,16 @@
                     }
                     if (submitBtn) submitBtn.disabled = true;
                     return;
+                }
+
+                // Tag each returned segment with its unique expanded slotKey & display name (so combo parts like "10_mani" and "10_pedi" stay distinct)
+                if (Array.isArray(data.servicesAvailability) && expandedActiveItems.length === data.servicesAvailability.length) {
+                    data.servicesAvailability.forEach((seg, idx) => {
+                        seg.slotKey = expandedActiveItems[idx].key;
+                        if (expandedActiveItems[idx].isComboPart) {
+                            seg.serviceName = expandedActiveItems[idx].name;
+                        }
+                    });
                 }
 
                 bookingState.lastAvailabilityResponse = data;
@@ -3369,22 +3385,143 @@
         return { isCombo, includesManicure, includesPedicure };
     }
 
+    /**
+     * Expands combo services (e.g., Manicure & Pedicure Combo) into their individual component services
+     * so customers can pick a separate specialist and flexible time slot for each service inside a combo.
+     */
+    function expandGuestServicesForBooking(guestServices) {
+        if (!Array.isArray(guestServices)) return [];
+        const expanded = [];
+        guestServices.forEach(srv => {
+            if (!srv) return;
+            const totalDur = Number(srv.durationMinutes || 45);
+            const cov = getComboCoverage(srv);
+            if (cov.isCombo) {
+                if (cov.includesManicure && cov.includesPedicure) {
+                    const maniDur = Math.max(20, Math.round((totalDur * 0.45) / 5) * 5);
+                    const pediDur = Math.max(25, totalDur - maniDur);
+                    expanded.push({
+                        key: `${srv.id}_mani`,
+                        id: `${srv.id}_mani`,
+                        parentServiceId: srv.id,
+                        isComboPart: true,
+                        comboPartLabel: 'Manicure',
+                        name: `${srv.name} — Manicure`,
+                        categoryId: 'manicures',
+                        backendCat: 'MANICURE',
+                        durationMinutes: maniDur,
+                        price: srv.price,
+                        srv
+                    });
+                    expanded.push({
+                        key: `${srv.id}_pedi`,
+                        id: `${srv.id}_pedi`,
+                        parentServiceId: srv.id,
+                        isComboPart: true,
+                        comboPartLabel: 'Pedicure',
+                        name: `${srv.name} — Pedicure`,
+                        categoryId: 'pedicures',
+                        backendCat: 'PEDICURE',
+                        durationMinutes: pediDur,
+                        price: srv.price,
+                        srv
+                    });
+                    return;
+                }
+                // Fallback for other combo services (e.g., "Eyebrow & Lip Wax Combo", "Facial & Massage Combo")
+                const cleanTitle = String(srv.name || '').replace(/\b(combo|duo|package)\b/gi, '').trim();
+                const splitParts = cleanTitle.split(/\s*(?:&|\+|\/|\band\b)\s*/i).map(p => p.trim()).filter(Boolean);
+                if (splitParts.length >= 2) {
+                    const partCount = Math.min(splitParts.length, 3);
+                    const baseDur = Math.max(15, Math.round((totalDur / partCount) / 5) * 5);
+                    for (let i = 0; i < partCount; i++) {
+                        const pLabel = splitParts[i];
+                        const pKey = `${srv.id}_part${i + 1}`;
+                        const pDur = (i === partCount - 1) ? Math.max(15, totalDur - baseDur * (partCount - 1)) : baseDur;
+                        const synthSrv = { name: pLabel, description: srv.description || '' };
+                        const pCatId = getCategoryForService(synthSrv);
+                        expanded.push({
+                            key: pKey,
+                            id: pKey,
+                            parentServiceId: srv.id,
+                            isComboPart: true,
+                            comboPartLabel: pLabel,
+                            name: `${srv.name} — ${pLabel}`,
+                            categoryId: pCatId,
+                            backendCat: mapCategoryToBackend(pCatId),
+                            durationMinutes: pDur,
+                            price: srv.price,
+                            srv
+                        });
+                    }
+                    return;
+                }
+                // Generic combo fallback if name doesn't explicitly list parts: default to Manicure + Pedicure
+                const maniDur = Math.max(20, Math.round((totalDur * 0.45) / 5) * 5);
+                const pediDur = Math.max(25, totalDur - maniDur);
+                expanded.push({
+                    key: `${srv.id}_mani`,
+                    id: `${srv.id}_mani`,
+                    parentServiceId: srv.id,
+                    isComboPart: true,
+                    comboPartLabel: 'Manicure',
+                    name: `${srv.name} — Manicure`,
+                    categoryId: 'manicures',
+                    backendCat: 'MANICURE',
+                    durationMinutes: maniDur,
+                    price: srv.price,
+                    srv
+                });
+                expanded.push({
+                    key: `${srv.id}_pedi`,
+                    id: `${srv.id}_pedi`,
+                    parentServiceId: srv.id,
+                    isComboPart: true,
+                    comboPartLabel: 'Pedicure',
+                    name: `${srv.name} — Pedicure`,
+                    categoryId: 'pedicures',
+                    backendCat: 'PEDICURE',
+                    durationMinutes: pediDur,
+                    price: srv.price,
+                    srv
+                });
+                return;
+            }
+
+            const catId = getCategoryForService(srv);
+            expanded.push({
+                key: String(srv.id),
+                id: String(srv.id),
+                parentServiceId: srv.id,
+                isComboPart: false,
+                comboPartLabel: null,
+                name: srv.name,
+                categoryId: catId,
+                backendCat: mapCategoryToBackend(catId),
+                durationMinutes: totalDur,
+                price: srv.price,
+                srv
+            });
+        });
+        return expanded;
+    }
+
     function cleanUpServiceAssignments(guest, serviceId) {
         if (!guest || !serviceId) return;
         const sIdStr = String(serviceId);
         const sIdNum = Number(serviceId);
-        if (guest.serviceStaffAssignments) {
-            delete guest.serviceStaffAssignments[sIdStr];
-            delete guest.serviceStaffAssignments[sIdNum];
-        }
-        if (guest.serviceTimeSlots) {
-            delete guest.serviceTimeSlots[sIdStr];
-            delete guest.serviceTimeSlots[sIdNum];
-        }
-        if (bookingState.serviceTimeSlots) {
-            delete bookingState.serviceTimeSlots[sIdStr];
-            delete bookingState.serviceTimeSlots[sIdNum];
-        }
+        const prefix = `${sIdStr}_`;
+        const cleanObj = (obj) => {
+            if (!obj) return;
+            delete obj[sIdStr];
+            delete obj[sIdNum];
+            Object.keys(obj).forEach(k => {
+                if (k.startsWith(prefix)) delete obj[k];
+            });
+        };
+        cleanObj(guest.serviceStaffAssignments);
+        cleanObj(guest.serviceTimeSlots);
+        cleanObj(bookingState.serviceTimeSlots);
     }
 
     function toggleService(serviceId, catId) {
@@ -3836,6 +3973,7 @@
 
     function renderStaffSelectionUI(currentGuest) {
         const guestServices = currentGuest.services || [];
+        const expandedItems = expandGuestServicesForBooking(guestServices);
         const singleContainer = document.getElementById('singleServiceStaffContainer');
         const multiContainer = document.getElementById('multiServiceCategoryContainer');
         const singleGrid = document.getElementById('singleStaffGrid');
@@ -3846,7 +3984,7 @@
             currentGuest.serviceStaffAssignments = {};
         }
 
-        if (guestServices.length <= 1) {
+        if (expandedItems.length <= 1) {
             // ==================== 1 SERVICE SELECTION ====================
             // Don't show specific staff per service or mode options.
             // Show regular staff cards: (Anyone Available) first, then qualified staff.
@@ -3925,43 +4063,43 @@
                 nextBtn.disabled = true;
             }
         } else {
-            // ==================== 2+ SERVICES SELECTION (DYNAMIC N-SERVICES) ====================
-            // Iterates dynamically over every single selected service (guestServices.map)
-            // Displays qualified technicians per service + "Anyone Available" option
+            // ==================== 2+ SERVICES OR COMBO SELECTION (DYNAMIC N-SERVICES) ====================
+            // Iterates dynamically over every service & combo sub-service so guests can choose a separate specialist for each
             singleContainer.classList.add('d-none');
             multiContainer.classList.remove('d-none');
             categoryCardsContainer.innerHTML = '';
 
-            // Default any unassigned services to 'Anyone Available' (null) so user can proceed or customize freely
-            guestServices.forEach(s => {
-                if (!currentGuest.serviceStaffAssignments.hasOwnProperty(s.id)) {
-                    currentGuest.serviceStaffAssignments[s.id] = null;
+            // Default any unassigned items to 'Anyone Available' (null) so user can proceed or customize freely
+            expandedItems.forEach(item => {
+                if (!currentGuest.serviceStaffAssignments.hasOwnProperty(item.key)) {
+                    currentGuest.serviceStaffAssignments[item.key] = null;
                 }
             });
 
-            guestServices.forEach((srv, srvIdx) => {
-                const catId = getCategoryForService(srv);
-                const backendCat = mapCategoryToBackend(catId);
+            expandedItems.forEach((item, srvIdx) => {
+                const catId = item.categoryId;
+                const backendCat = item.backendCat;
                 const catCfg = serviceCategoryConfigs.find(c => c.id === catId);
-                const catTitle = catCfg ? catCfg.title : 'Treatment';
-                const qualifiedTechs = bookingState.staffList.filter(t => isTechQualifiedForBackend(t, backendCat, srv));
+                const catTitle = item.isComboPart ? `Combo &bull; ${item.comboPartLabel}` : (catCfg ? catCfg.title : 'Treatment');
+                const qualifiedTechs = bookingState.staffList.filter(t => isTechQualifiedForBackend(t, backendCat, item.srv));
 
-                const assignedVal = currentGuest.serviceStaffAssignments ? currentGuest.serviceStaffAssignments[srv.id] : undefined;
+                const assignedVal = currentGuest.serviceStaffAssignments ? currentGuest.serviceStaffAssignments[item.key] : undefined;
                 const isAnyoneAssigned = (assignedVal === null);
+                const safeItemKey = String(item.key).replace(/'/g, "\\'");
 
                 // Service card
                 const serviceCard = document.createElement('div');
                 serviceCard.className = 'card border rounded-4 p-4 shadow-sm bg-white mb-3';
-                serviceCard.id = `srvBigCard-${srv.id}`;
+                serviceCard.id = `srvBigCard-${item.key}`;
 
                 let staffCardsHtml = '';
 
-                // 1. Anyone Available card for this specific service
+                // 1. Anyone Available card for this specific service / combo part
                 staffCardsHtml += `
                     <div class="col-md-6">
                         <div class="staff-card d-flex align-items-center justify-content-between ${isAnyoneAssigned ? 'selected' : ''}"
-                             id="srvCard-${srv.id}-anyone"
-                             onclick="selectServiceStaff(${srv.id}, 'anyone')">
+                             id="srvCard-${item.key}-anyone"
+                             onclick="selectServiceStaff('${safeItemKey}', 'anyone')">
                             <div class="d-flex align-items-center gap-3">
                                 <div class="staff-avatar"><i class="bi bi-lightning-charge-fill"></i></div>
                                 <div>
@@ -3974,7 +4112,7 @@
                     </div>
                 `;
 
-                // 2. Qualified staff cards for this specific service
+                // 2. Qualified staff cards for this specific service / combo part
                 qualifiedTechs.forEach(tech => {
                     const isTechAssigned = (assignedVal === tech.id);
                     const isOff = bookingState.staffDaysOffInfo && bookingState.staffDaysOffInfo[tech.id];
@@ -3990,12 +4128,12 @@
                     const safeName = (tech.name || tech.username).replace(/'/g, "\\'");
                     const clickHandler = isOff
                         ? `showAlert('${safeName} is off today. Please select another specialist or Anyone Available.')`
-                        : `selectServiceStaff(${srv.id}, ${tech.id})`;
+                        : `selectServiceStaff('${safeItemKey}', ${tech.id})`;
 
                     staffCardsHtml += `
                         <div class="col-md-6">
                             <div class="staff-card d-flex align-items-center justify-content-between ${isTechAssigned ? 'selected' : ''} ${isOff ? 'disabled-off' : ''}"
-                                 id="srvCard-${srv.id}-${tech.id}"
+                                 id="srvCard-${item.key}-${tech.id}"
                                  onclick="${clickHandler}">
                                 <div class="d-flex align-items-center gap-3">
                                     <div class="staff-avatar ${isOff ? 'bg-secondary-subtle text-secondary' : ''}"><i class="bi bi-${isOff ? 'moon-stars' : 'person-fill'}"></i></div>
@@ -4010,20 +4148,24 @@
                     `;
                 });
 
+                const priceLabel = item.isComboPart
+                    ? `Included in combo ($${Number(item.price || 0).toFixed(2)} total) &bull; ~${item.durationMinutes} mins`
+                    : `$${Number(item.price || 0).toFixed(2)} &bull; ${item.durationMinutes} mins`;
+
                 serviceCard.innerHTML = `
                     <div class="d-flex flex-wrap justify-content-between align-items-center border-bottom pb-3 mb-3">
                         <div>
                             <span class="badge bg-danger-subtle text-pink border border-danger-subtle px-2 py-1 rounded-pill small mb-1">
-                                Service ${srvIdx + 1} of ${guestServices.length} &bull; ${catTitle}
+                                Service ${srvIdx + 1} of ${expandedItems.length} &bull; ${catTitle}
                             </span>
-                            <h5 class="fw-bold text-dark mb-1 mt-1"><i class="bi bi-stars text-pink me-2"></i>${srv.name}</h5>
-                            <div class="small text-muted">$${Number(srv.price || 0).toFixed(2)} &bull; ${srv.durationMinutes || 45} mins</div>
+                            <h5 class="fw-bold text-dark mb-1 mt-1"><i class="bi bi-stars text-pink me-2"></i>${item.name}</h5>
+                            <div class="small text-muted">${priceLabel}</div>
                         </div>
                         <span class="badge bg-light text-secondary border px-3 py-2 rounded-pill small">
                             ${qualifiedTechs.length} Specialists Available
                         </span>
                     </div>
-                    <div class="row g-3" id="srvStaffGrid-${srv.id}">
+                    <div class="row g-3" id="srvStaffGrid-${item.key}">
                         ${staffCardsHtml}
                     </div>
                 `;
@@ -4093,18 +4235,19 @@
         if (!currentGuest.serviceStaffAssignments) {
             currentGuest.serviceStaffAssignments = {};
         }
+        const key = String(serviceId);
 
         if (identifier === 'anyone') {
-            currentGuest.serviceStaffAssignments[serviceId] = null;
-            document.querySelectorAll(`#srvStaffGrid-${serviceId} .staff-card`).forEach(c => c.classList.remove('selected'));
-            const card = document.getElementById(`srvCard-${serviceId}-anyone`);
+            currentGuest.serviceStaffAssignments[key] = null;
+            document.querySelectorAll(`#srvStaffGrid-${CSS.escape(key)} .staff-card`).forEach(c => c.classList.remove('selected'));
+            const card = document.getElementById(`srvCard-${key}-anyone`);
             if (card) card.classList.add('selected');
         } else {
             const tech = bookingState.staffList.find(t => t.id === identifier);
             if (!tech) return;
-            currentGuest.serviceStaffAssignments[serviceId] = tech.id;
-            document.querySelectorAll(`#srvStaffGrid-${serviceId} .staff-card`).forEach(c => c.classList.remove('selected'));
-            const card = document.getElementById(`srvCard-${serviceId}-${tech.id}`);
+            currentGuest.serviceStaffAssignments[key] = tech.id;
+            document.querySelectorAll(`#srvStaffGrid-${CSS.escape(key)} .staff-card`).forEach(c => c.classList.remove('selected'));
+            const card = document.getElementById(`srvCard-${key}-${tech.id}`);
             if (card) card.classList.add('selected');
         }
 
@@ -4112,17 +4255,17 @@
     }
 
     function checkMultiServiceStaffCompletion(currentGuest) {
-        const allServices = currentGuest.services || [];
-        const allAssigned = allServices.every(s =>
+        const allItems = expandGuestServicesForBooking(currentGuest.services || []);
+        const allAssigned = allItems.every(item =>
             currentGuest.serviceStaffAssignments &&
-            currentGuest.serviceStaffAssignments.hasOwnProperty(s.id) &&
-            currentGuest.serviceStaffAssignments[s.id] !== undefined
+            currentGuest.serviceStaffAssignments.hasOwnProperty(item.key) &&
+            currentGuest.serviceStaffAssignments[item.key] !== undefined
         );
         const nextBtn = document.getElementById('step2NextBtn');
 
-        if (allAssigned && allServices.length > 0) {
+        if (allAssigned && allItems.length > 0) {
             nextBtn.disabled = false;
-            const assignedValues = allServices.map(s => currentGuest.serviceStaffAssignments[s.id]);
+            const assignedValues = allItems.map(item => currentGuest.serviceStaffAssignments[item.key]);
             const allNull = assignedValues.every(v => v === null);
             const uniqueTechIds = [...new Set(assignedValues.filter(v => v !== null))];
 
@@ -4142,7 +4285,7 @@
             } else {
                 currentGuest.selectedStaff = {
                     id: null,
-                    name: 'Specific Staff Per Service (' + allServices.length + ' services)',
+                    name: 'Specific Staff Per Service (' + allItems.length + ' services)',
                     isAnyoneAvailable: false
                 };
             }
@@ -4154,10 +4297,10 @@
             triggerStaffFloatingActionBar(currentGuest.selectedStaff.name);
         } else {
             nextBtn.disabled = true;
-            const assignedCount = allServices.filter(s =>
+            const assignedCount = allItems.filter(item =>
                 currentGuest.serviceStaffAssignments &&
-                currentGuest.serviceStaffAssignments.hasOwnProperty(s.id) &&
-                currentGuest.serviceStaffAssignments[s.id] !== undefined
+                currentGuest.serviceStaffAssignments.hasOwnProperty(item.key) &&
+                currentGuest.serviceStaffAssignments[item.key] !== undefined
             ).length;
             const floatingBar = document.getElementById('floatingStaffActionBar');
             const nameEl = document.getElementById('floatingStaffName');
@@ -4595,19 +4738,20 @@
 
         const primaryGuest = bookingState.guests[0] || {};
 
-        // Preserve custom flexible-order per-service slots; only auto-populate sequentially in combined mode or if none chosen yet
-        if (selectedTime && primaryGuest.services && primaryGuest.services.length > 1) {
+        // Preserve custom flexible-order per-service slots (including combo parts); only auto-populate sequentially in combined mode or if none chosen yet
+        const expandedPrimaryItems = expandGuestServicesForBooking(primaryGuest.services || []);
+        if (selectedTime && expandedPrimaryItems.length > 1) {
             const existingPrimarySlots = (primaryGuest.serviceTimeSlots && Object.keys(primaryGuest.serviceTimeSlots).length > 0)
                 ? primaryGuest.serviceTimeSlots
                 : (bookingState.serviceTimeSlots || {});
-            const allHaveSlots = primaryGuest.services.every(s => Boolean(existingPrimarySlots[String(s.id)]));
+            const allHaveSlots = expandedPrimaryItems.every(item => Boolean(existingPrimarySlots[String(item.key)]));
             if (bookingState.slotSelectionMode === 'combined' || Object.keys(existingPrimarySlots).length === 0) {
                 autoPopulateSequentialServiceSlots(selectedTime);
             } else if (!allHaveSlots) {
-                const missingSrv = primaryGuest.services.find(s => !existingPrimarySlots[String(s.id)]);
+                const missingItem = expandedPrimaryItems.find(item => !existingPrimarySlots[String(item.key)]);
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = originalBtnHtml;
-                showAlert(`Please select an available time slot for ${missingSrv ? missingSrv.name : 'all selected services'}.`);
+                showAlert(`Please select an available time slot for ${missingItem ? missingItem.name : 'all selected services'}.`);
                 return;
             }
         }

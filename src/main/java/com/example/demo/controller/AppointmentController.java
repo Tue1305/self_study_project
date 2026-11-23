@@ -28,6 +28,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.LinkedHashSet;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -1049,133 +1050,175 @@ public class AppointmentController {
                 LocalDateTime currentServiceStart = bookingRequest.getAppointmentTime();
 
                 for (ServiceEntity srv : guestServices) {
-                    int srvDuration = (srv.getDurationMinutes() != null && srv.getDurationMinutes() > 0) ? srv.getDurationMinutes() : 45;
-
-                    Appointment appt = new Appointment();
-                    appt.setTenantId(tenantId);
-                    appt.setCustomerName(guest.getCustomerName().trim());
-                    appt.setCustomerEmail(guest.getCustomerEmail() != null ? guest.getCustomerEmail().trim() : "");
-                    appt.setCustomerPhone(guest.getCustomerPhone().trim());
-                    // Resolve per-service time slot if provided (e.g. { "101": "15:00:00", "102": "15:30:00" })
-                    LocalDateTime serviceApptTime = currentServiceStart;
+                    int totalSrvDuration = (srv.getDurationMinutes() != null && srv.getDurationMinutes() > 0) ? srv.getDurationMinutes() : 45;
                     Map<String, String> timeSlots = (guest.getServiceTimeSlots() != null && !guest.getServiceTimeSlots().isEmpty())
                             ? guest.getServiceTimeSlots()
                             : bookingRequest.getServiceTimeSlots();
-                    if (timeSlots != null && srv.getId() != null) {
-                        String customSlot = timeSlots.get(String.valueOf(srv.getId()));
-                        if (customSlot != null && !customSlot.isBlank()) {
-                            try {
-                                if (customSlot.contains("T")) {
-                                    serviceApptTime = LocalDateTime.parse(customSlot.trim());
-                                } else {
-                                    LocalTime parsedTime = LocalTime.parse(customSlot.trim());
-                                    serviceApptTime = bookingRequest.getAppointmentTime().toLocalDate().atTime(parsedTime);
-                                }
-                            } catch (Exception ignored) {
+
+                    // Detect combo split keys (e.g., "10_mani", "10_pedi") so each combo component can have its own specialist & time slot
+                    Set<String> splitKeys = new LinkedHashSet<>();
+                    if (srv.getId() != null) {
+                        String prefix = srv.getId() + "_";
+                        if (guest.getServiceStaffAssignments() != null) {
+                            for (String k : guest.getServiceStaffAssignments().keySet()) {
+                                if (k != null && k.startsWith(prefix)) splitKeys.add(k);
+                            }
+                        }
+                        if (timeSlots != null) {
+                            for (String k : timeSlots.keySet()) {
+                                if (k != null && k.startsWith(prefix)) splitKeys.add(k);
                             }
                         }
                     }
-                    appt.setAppointmentTime(serviceApptTime);
-                    appt.setStationPreference(bookingRequest.getStationPreference());
-                    appt.setCancellationToken(UUID.randomUUID().toString());
-                    if (guestCustomer != null) {
-                        if (guestCustomer.getMedicalFlags() != null && !guestCustomer.getMedicalFlags().isBlank()) {
-                            appt.setMedicalFlags(guestCustomer.getMedicalFlags());
-                        }
-                        if (guestCustomer.getColorFormula() != null && !guestCustomer.getColorFormula().isBlank()) {
-                            appt.setColorFormula(guestCustomer.getColorFormula());
-                        }
-                    }
+                    List<String> keysToSchedule = splitKeys.size() >= 2
+                            ? new ArrayList<>(splitKeys)
+                            : Collections.singletonList(srv.getId() != null ? String.valueOf(srv.getId()) : "");
 
-                    // Check if per-service staff selection was assigned for this service
-                    UserEntity serviceSpecificTech = resolvedTech;
-                    if (guest.getServiceStaffAssignments() != null && srv.getId() != null) {
-                        String srvKey = String.valueOf(srv.getId());
-                        if (guest.getServiceStaffAssignments().containsKey(srvKey)) {
-                            Long assignedTechId = guest.getServiceStaffAssignments().get(srvKey);
-                            if (assignedTechId != null && assignedTechId > 0) {
-                                serviceSpecificTech = userRepository.findByTenantIdAndId(tenantId, assignedTechId).orElse(null);
+                    for (int partIdx = 0; partIdx < keysToSchedule.size(); partIdx++) {
+                        String srvKey = keysToSchedule.get(partIdx);
+                        boolean isComboPart = splitKeys.size() >= 2;
+                        int srvDuration = totalSrvDuration;
+                        String comboPartTag = null;
+                        if (isComboPart) {
+                            String suffix = srvKey.substring((srv.getId() + "_").length()).toLowerCase();
+                            if ("mani".equals(suffix)) {
+                                srvDuration = Math.max(20, (int) (Math.round((totalSrvDuration * 0.45) / 5.0) * 5));
+                                comboPartTag = "[Combo: Manicure]";
+                            } else if ("pedi".equals(suffix)) {
+                                int maniPart = Math.max(20, (int) (Math.round((totalSrvDuration * 0.45) / 5.0) * 5));
+                                srvDuration = Math.max(25, totalSrvDuration - maniPart);
+                                comboPartTag = "[Combo: Pedicure]";
                             } else {
-                                // Explicitly unassigned or "Anyone Available" for this service
-                                serviceSpecificTech = null;
+                                srvDuration = Math.max(15, totalSrvDuration / keysToSchedule.size());
+                                comboPartTag = "[Combo Part " + (partIdx + 1) + "]";
                             }
                         }
-                    }
 
-                    LocalDateTime serviceSlotEnd = serviceApptTime.plusMinutes(srvDuration);
-
-                    // Conflict & Overbooking check
-                    boolean bookedAsAnyoneAvailable = (serviceSpecificTech == null && !Boolean.TRUE.equals(bookingRequest.getManualOverride()));
-                    if (!Boolean.TRUE.equals(bookingRequest.getManualOverride())) {
-                        if (serviceSpecificTech != null && serviceSpecificTech.getId() != null) {
-                            Long checkTechId = serviceSpecificTech.getId();
-                            if (staffDayOffRepository != null && staffDayOffRepository.existsByTenantIdAndStaffIdAndOffDate(tenantId, checkTechId, serviceApptTime.toLocalDate())) {
-                                String tName = (serviceSpecificTech.getName() != null && !serviceSpecificTech.getName().isBlank()) ? serviceSpecificTech.getName() : "Selected specialist";
-                                return ResponseEntity.badRequest().body(Map.of("message", tName + " is off on this date. Please choose another specialist or Anyone Available."));
-                            }
-                            boolean hasConf = isTechBusyAtWindow(checkTechId, serviceApptTime, serviceSlotEnd, 15, dayAppts, savedAppointments);
-                            if (hasConf) {
-                                String tName = serviceSpecificTech.getName() != null ? serviceSpecificTech.getName() : "Selected specialist";
-                                return ResponseEntity.status(HttpStatus.CONFLICT)
-                                        .body(Map.of("message", tName + " is already booked at " + formatTime12Hour(serviceApptTime) + ". Please choose another time or specialist."));
-                            }
-                        } else if (!tenantTechs.isEmpty()) {
-                            // Anyone Available mode: find a free specialist who is not booked at this window and NOT off
-                            UserEntity freeTech = null;
-                            for (UserEntity tech : tenantTechs) {
-                                if (tech.getId() == null) continue;
-                                if (staffDayOffRepository != null && staffDayOffRepository.existsByTenantIdAndStaffIdAndOffDate(tenantId, tech.getId(), serviceApptTime.toLocalDate())) {
-                                    continue;
-                                }
-                                boolean busy = isTechBusyAtWindow(tech.getId(), serviceApptTime, serviceSlotEnd, 15, dayAppts, savedAppointments);
-                                if (!busy) {
-                                    freeTech = tech;
-                                    break;
+                        Appointment appt = new Appointment();
+                        appt.setTenantId(tenantId);
+                        appt.setCustomerName(guest.getCustomerName().trim());
+                        appt.setCustomerEmail(guest.getCustomerEmail() != null ? guest.getCustomerEmail().trim() : "");
+                        appt.setCustomerPhone(guest.getCustomerPhone().trim());
+                        // Resolve per-service (or per-combo-part) time slot if provided
+                        LocalDateTime serviceApptTime = currentServiceStart;
+                        if (timeSlots != null && !srvKey.isEmpty()) {
+                            String customSlot = timeSlots.get(srvKey);
+                            if (customSlot != null && !customSlot.isBlank()) {
+                                try {
+                                    if (customSlot.contains("T")) {
+                                        serviceApptTime = LocalDateTime.parse(customSlot.trim());
+                                    } else {
+                                        LocalTime parsedTime = LocalTime.parse(customSlot.trim());
+                                        serviceApptTime = bookingRequest.getAppointmentTime().toLocalDate().atTime(parsedTime);
+                                    }
+                                } catch (Exception ignored) {
                                 }
                             }
-                            if (freeTech == null) {
-                                return ResponseEntity.status(HttpStatus.CONFLICT)
-                                        .body(Map.of("message", "All specialists are booked for " + srv.getName() + " at " + formatTime12Hour(serviceApptTime) + ". Please choose another time."));
-                            }
-                            serviceSpecificTech = freeTech;
                         }
-                    }
+                        appt.setAppointmentTime(serviceApptTime);
+                        appt.setStationPreference(bookingRequest.getStationPreference());
+                        appt.setCancellationToken(UUID.randomUUID().toString());
+                        if (guestCustomer != null) {
+                            if (guestCustomer.getMedicalFlags() != null && !guestCustomer.getMedicalFlags().isBlank()) {
+                                appt.setMedicalFlags(guestCustomer.getMedicalFlags());
+                            }
+                            if (guestCustomer.getColorFormula() != null && !guestCustomer.getColorFormula().isBlank()) {
+                                appt.setColorFormula(guestCustomer.getColorFormula());
+                            }
+                        }
 
-                    appt.setNailTech(serviceSpecificTech);
-                    appt.setService(srv);
+                        // Check if per-service (or per-combo-part) staff selection was assigned
+                        UserEntity serviceSpecificTech = resolvedTech;
+                        if (guest.getServiceStaffAssignments() != null && !srvKey.isEmpty()) {
+                            if (guest.getServiceStaffAssignments().containsKey(srvKey)) {
+                                Long assignedTechId = guest.getServiceStaffAssignments().get(srvKey);
+                                if (assignedTechId != null && assignedTechId > 0) {
+                                    serviceSpecificTech = userRepository.findByTenantIdAndId(tenantId, assignedTechId).orElse(null);
+                                } else {
+                                    // Explicitly unassigned or "Anyone Available" for this service/part
+                                    serviceSpecificTech = null;
+                                }
+                            }
+                        }
 
-                    String baseNotes = guest.getNotes() != null ? guest.getNotes().trim() : "";
-                    String formattedNotes = baseNotes;
-                    if (guestItems.size() > 1) {
-                        String prefix = "[" + label + "]";
-                        formattedNotes = formattedNotes.isEmpty() ? prefix : prefix + " " + formattedNotes;
-                    }
-                    if (bookedAsAnyoneAvailable && !formattedNotes.contains("[ANYONE AVAILABLE]")) {
-                        formattedNotes = formattedNotes.isEmpty() ? "[ANYONE AVAILABLE]" : "[ANYONE AVAILABLE] " + formattedNotes;
-                    }
-                    appt.setNotes(formattedNotes);
+                        LocalDateTime serviceSlotEnd = serviceApptTime.plusMinutes(srvDuration);
 
-                    Appointment saved = appointmentRepository.save(appt);
-                    savedAppointments.add(saved);
+                        // Conflict & Overbooking check
+                        boolean bookedAsAnyoneAvailable = (serviceSpecificTech == null && !Boolean.TRUE.equals(bookingRequest.getManualOverride()));
+                        if (!Boolean.TRUE.equals(bookingRequest.getManualOverride())) {
+                            if (serviceSpecificTech != null && serviceSpecificTech.getId() != null) {
+                                Long checkTechId = serviceSpecificTech.getId();
+                                if (staffDayOffRepository != null && staffDayOffRepository.existsByTenantIdAndStaffIdAndOffDate(tenantId, checkTechId, serviceApptTime.toLocalDate())) {
+                                    String tName = (serviceSpecificTech.getName() != null && !serviceSpecificTech.getName().isBlank()) ? serviceSpecificTech.getName() : "Selected specialist";
+                                    return ResponseEntity.badRequest().body(Map.of("message", tName + " is off on this date. Please choose another specialist or Anyone Available."));
+                                }
+                                boolean hasConf = isTechBusyAtWindow(checkTechId, serviceApptTime, serviceSlotEnd, 15, dayAppts, savedAppointments);
+                                if (hasConf) {
+                                    String tName = serviceSpecificTech.getName() != null ? serviceSpecificTech.getName() : "Selected specialist";
+                                    return ResponseEntity.status(HttpStatus.CONFLICT)
+                                            .body(Map.of("message", tName + " is already booked at " + formatTime12Hour(serviceApptTime) + ". Please choose another time or specialist."));
+                                }
+                            } else if (!tenantTechs.isEmpty()) {
+                                // Anyone Available mode: find a free specialist who is not booked at this window and NOT off
+                                UserEntity freeTech = null;
+                                for (UserEntity tech : tenantTechs) {
+                                    if (tech.getId() == null) continue;
+                                    if (staffDayOffRepository != null && staffDayOffRepository.existsByTenantIdAndStaffIdAndOffDate(tenantId, tech.getId(), serviceApptTime.toLocalDate())) {
+                                        continue;
+                                    }
+                                    boolean busy = isTechBusyAtWindow(tech.getId(), serviceApptTime, serviceSlotEnd, 15, dayAppts, savedAppointments);
+                                    if (!busy) {
+                                        freeTech = tech;
+                                        break;
+                                    }
+                                }
+                                if (freeTech == null) {
+                                    return ResponseEntity.status(HttpStatus.CONFLICT)
+                                            .body(Map.of("message", "All specialists are booked for " + srv.getName() + " at " + formatTime12Hour(serviceApptTime) + ". Please choose another time."));
+                                }
+                                serviceSpecificTech = freeTech;
+                            }
+                        }
 
-                    // Advance sequential start time for the next service in this guest's visit
-                    currentServiceStart = serviceApptTime.plusMinutes(srvDuration);
+                        appt.setNailTech(serviceSpecificTech);
+                        appt.setService(srv);
 
-                    if (auditService != null) {
-                        String performedBy = Boolean.TRUE.equals(bookingRequest.getManualOverride())
-                                ? auditService.resolvePerformedBy("ADMIN")
-                                : auditService.resolvePerformedBy("CUSTOMER");
-                        auditService.logActivity(
-                                tenantId,
-                                guestCustomer != null ? guestCustomer.getId() : null,
-                                saved.getId(),
-                                saved.getCustomerName(),
-                                saved.getCustomerEmail(),
-                                saved.getCustomerPhone(),
-                                "BOOKED",
-                                performedBy,
-                                saved.getNotes()
-                        );
+                        String baseNotes = guest.getNotes() != null ? guest.getNotes().trim() : "";
+                        String formattedNotes = baseNotes;
+                        if (comboPartTag != null) {
+                            formattedNotes = formattedNotes.isEmpty() ? comboPartTag : comboPartTag + " " + formattedNotes;
+                        }
+                        if (guestItems.size() > 1) {
+                            String prefix = "[" + label + "]";
+                            formattedNotes = formattedNotes.isEmpty() ? prefix : prefix + " " + formattedNotes;
+                        }
+                        if (bookedAsAnyoneAvailable && !formattedNotes.contains("[ANYONE AVAILABLE]")) {
+                            formattedNotes = formattedNotes.isEmpty() ? "[ANYONE AVAILABLE]" : "[ANYONE AVAILABLE] " + formattedNotes;
+                        }
+                        appt.setNotes(formattedNotes);
+
+                        Appointment saved = appointmentRepository.save(appt);
+                        savedAppointments.add(saved);
+
+                        // Advance sequential start time for the next service/part in this guest's visit
+                        currentServiceStart = serviceApptTime.plusMinutes(srvDuration);
+
+                        if (auditService != null) {
+                            String performedBy = Boolean.TRUE.equals(bookingRequest.getManualOverride())
+                                    ? auditService.resolvePerformedBy("ADMIN")
+                                    : auditService.resolvePerformedBy("CUSTOMER");
+                            auditService.logActivity(
+                                    tenantId,
+                                    guestCustomer != null ? guestCustomer.getId() : null,
+                                    saved.getId(),
+                                    saved.getCustomerName(),
+                                    saved.getCustomerEmail(),
+                                    saved.getCustomerPhone(),
+                                    "BOOKED",
+                                    performedBy,
+                                    saved.getNotes()
+                            );
+                        }
                     }
                 }
 

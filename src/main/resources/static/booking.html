@@ -1861,25 +1861,34 @@
         return Math.max(g1Totals.duration || 0, g2Totals.duration || 0) || 45;
     }
 
+    function getActiveDetailsGuest() {
+        return (bookingState.guests && bookingState.guests[bookingState.detailsGuestIndex])
+            || (bookingState.guests && bookingState.guests[0])
+            || null;
+    }
+
     function updateSummaryTimeWindowDisplay() {
         const summaryTimeEl = document.getElementById('summaryTimeWindow');
         const selectedRangeBadge = document.getElementById('selectedTimeRangeDisplay');
         const dateVal = document.getElementById('appointmentDate') ? document.getElementById('appointmentDate').value : '';
         const slotVal = document.getElementById('appointmentTimeSlot') ? document.getElementById('appointmentTimeSlot').value : '';
-        const totalDuration = getTotalBookingDurationMinutes();
 
-        const guest0 = bookingState.guests && bookingState.guests[0];
-        const guest0Services = (guest0 && Array.isArray(guest0.services)) ? guest0.services : [];
-        const isMultiService = guest0Services.length >= 2;
-        const customSlots = bookingState.serviceTimeSlots || {};
+        const activeGuest = getActiveDetailsGuest();
+        const activeGuestTotals = activeGuest ? calculateGuestTotals(activeGuest) : { duration: 45 };
+        const totalDuration = activeGuestTotals.duration || getTotalBookingDurationMinutes();
+        const activeServices = (activeGuest && Array.isArray(activeGuest.services)) ? activeGuest.services : [];
+        const isMultiService = activeServices.length >= 2;
+        const customSlots = (activeGuest && activeGuest.serviceTimeSlots && Object.keys(activeGuest.serviceTimeSlots).length > 0)
+            ? activeGuest.serviceTimeSlots
+            : (bookingState.serviceTimeSlots || {});
         const chosenSlotKeys = Object.keys(customSlots);
 
         if (isMultiService && chosenSlotKeys.length > 0 && bookingState.slotSelectionMode !== 'combined') {
             const parts = [];
-            guest0Services.forEach(s => {
+            activeServices.forEach(s => {
                 const sSlot = customSlots[String(s.id)];
                 if (sSlot) {
-                    const techId = guest0.serviceStaffAssignments ? guest0.serviceStaffAssignments[s.id] : undefined;
+                    const techId = activeGuest.serviceStaffAssignments ? activeGuest.serviceStaffAssignments[s.id] : undefined;
                     const tech = (techId && techId !== 'anyone') ? (bookingState.staffList || []).find(t => String(t.id) === String(techId)) : null;
                     const techName = tech ? (tech.name || tech.username) : 'Anyone';
                     parts.push(`${s.name} (${techName}): ${formatTime24ToRangeLabel(sSlot, s.durationMinutes || 45)}`);
@@ -1943,7 +1952,7 @@
         const container = document.getElementById('multiServiceTimeLapseContainer');
         if (!container) return;
 
-        const guest0 = bookingState.guests && bookingState.guests[0];
+        const guest0 = getActiveDetailsGuest();
         const guest0Services = (guest0 && Array.isArray(guest0.services)) ? guest0.services : [];
         if (guest0Services.length < 2) {
             container.style.display = 'none';
@@ -2082,7 +2091,7 @@
     function autoPopulateSequentialServiceSlots(startValue24) {
         if (!startValue24 || !startValue24.includes(':')) return;
         if (!bookingState.serviceTimeSlots) bookingState.serviceTimeSlots = {};
-        const guest0 = bookingState.guests && bookingState.guests[0];
+        const guest0 = getActiveDetailsGuest();
         const services = (guest0 && Array.isArray(guest0.services)) ? guest0.services : [];
         if (services.length === 0) return;
 
@@ -2133,6 +2142,11 @@
         if (hiddenInput) hiddenInput.value = cleanVal;
         bookingState.selectedTimeSlot = cleanVal;
         bookingState.selectedTimeRangeLabel = rangeLabel;
+        const activeGuest = getActiveDetailsGuest();
+        if (activeGuest) {
+            activeGuest.selectedTimeSlot = cleanVal;
+            activeGuest.selectedTimeRangeLabel = rangeLabel;
+        }
 
         document.querySelectorAll('#timeSlotsGrid .time-slot-card').forEach(card => {
             card.classList.toggle('selected', card.getAttribute('data-slot-value') === cleanVal);
@@ -2166,7 +2180,7 @@
         }
         bookingState.serviceTimeSlots[String(srvId)] = cleanSlot;
 
-        const guest0 = bookingState.guests && bookingState.guests[0];
+        const guest0 = getActiveDetailsGuest();
         if (guest0) {
             if (!guest0.serviceTimeSlots) guest0.serviceTimeSlots = {};
             guest0.serviceTimeSlots[String(srvId)] = cleanSlot;
@@ -2251,7 +2265,7 @@
         if (cleanSlot.toUpperCase().includes('AM') || cleanSlot.toUpperCase().includes('PM')) {
             cleanSlot = convert12To24Hour(cleanSlot);
         }
-        const guest0 = bookingState.guests && bookingState.guests[0];
+        const guest0 = getActiveDetailsGuest();
         if (guest0) {
             if (!guest0.serviceStaffAssignments) guest0.serviceStaffAssignments = {};
             guest0.serviceStaffAssignments[srvId] = null;
@@ -2294,7 +2308,7 @@
         const banner = document.getElementById('singleServiceStatusBanner');
         if (!banner) return;
 
-        const guest0 = bookingState.guests && bookingState.guests[0];
+        const guest0 = getActiveDetailsGuest();
         const staff = guest0 ? guest0.selectedStaff : bookingState.selectedStaff;
         const tName = (staff && !staff.isAnyoneAvailable) ? staff.name : (slot.staffBookedDesc || 'Specialist');
         const nextAvail = slot.nextAvailable || (slot.staffBreakdown && slot.staffBreakdown[0] ? slot.staffBreakdown[0].nextAvailable : null) || 'later';
@@ -2329,12 +2343,15 @@
         if (cleanSlot.toUpperCase().includes('AM') || cleanSlot.toUpperCase().includes('PM')) {
             cleanSlot = convert12To24Hour(cleanSlot);
         }
-        bookingState.selectedStaff = { id: null, name: 'Anyone Available', isAnyoneAvailable: true };
-        if (bookingState.guests[0]) {
-            bookingState.guests[0].selectedStaff = { id: null, name: 'Anyone Available', isAnyoneAvailable: true };
-            if (bookingState.guests[0].serviceStaffAssignments) {
-                Object.keys(bookingState.guests[0].serviceStaffAssignments).forEach(k => {
-                    bookingState.guests[0].serviceStaffAssignments[k] = null;
+        const activeGuestForSwitch = getActiveDetailsGuest();
+        if (bookingState.detailsGuestIndex === 0) {
+            bookingState.selectedStaff = { id: null, name: 'Anyone Available', isAnyoneAvailable: true };
+        }
+        if (activeGuestForSwitch) {
+            activeGuestForSwitch.selectedStaff = { id: null, name: 'Anyone Available', isAnyoneAvailable: true };
+            if (activeGuestForSwitch.serviceStaffAssignments) {
+                Object.keys(activeGuestForSwitch.serviceStaffAssignments).forEach(k => {
+                    activeGuestForSwitch.serviceStaffAssignments[k] = null;
                 });
             }
         }
@@ -2349,7 +2366,7 @@
         const banner = document.getElementById('singleServiceStatusBanner');
         if (!banner) return;
 
-        const guest0 = bookingState.guests && bookingState.guests[0];
+        const guest0 = getActiveDetailsGuest();
         const staff = guest0 ? guest0.selectedStaff : bookingState.selectedStaff;
         if (!staff || staff.isAnyoneAvailable) {
             banner.innerHTML = '';
@@ -2425,7 +2442,7 @@
                 if (currentSlotM < minAllowedMinutes) {
                     currentSelectedSlot = formatMinutesTo24Hour(minAllowedMinutes);
                     bookingState.serviceTimeSlots[srvId] = currentSelectedSlot;
-                    const guest0 = bookingState.guests && bookingState.guests[0];
+                    const guest0 = getActiveDetailsGuest();
                     if (guest0) {
                         if (!guest0.serviceTimeSlots) guest0.serviceTimeSlots = {};
                         guest0.serviceTimeSlots[srvId] = currentSelectedSlot;
@@ -2437,7 +2454,7 @@
                 if (firstAvail && firstAvail.value) {
                     currentSelectedSlot = firstAvail.value;
                     bookingState.serviceTimeSlots[srvId] = currentSelectedSlot;
-                    const guest0 = bookingState.guests && bookingState.guests[0];
+                    const guest0 = getActiveDetailsGuest();
                     if (guest0) {
                         if (!guest0.serviceTimeSlots) guest0.serviceTimeSlots = {};
                         guest0.serviceTimeSlots[srvId] = currentSelectedSlot;
@@ -2624,7 +2641,7 @@
         const isToday = (selectedDate === getLocalTodayDateStr());
         const nowPlusBuffer = new Date(Date.now() + 15 * 60 * 1000);
 
-        const guest0 = bookingState.guests && bookingState.guests[0];
+        const guest0 = getActiveDetailsGuest();
         const guest0Services = (guest0 && Array.isArray(guest0.services)) ? guest0.services : [];
         const isMultiService = guest0Services.length >= 2;
         const apiResponse = bookingState.lastAvailabilityResponse;
@@ -2734,7 +2751,7 @@
         const container = document.getElementById('staffAvailabilityBreakdownContainer');
         if (!container) return;
 
-        const guest0 = bookingState.guests && bookingState.guests[0];
+        const guest0 = getActiveDetailsGuest();
         const guest0Services = (guest0 && Array.isArray(guest0.services)) ? guest0.services : [];
         const isMultiService = guest0Services.length >= 2;
 
@@ -2950,50 +2967,49 @@
             showAlert(`Notice: ${offSpecialistsNotice.join(', ')} is off on ${selectedDate}. Please select another specialist or choose Anyone Available.`);
         }
 
-        const totalDuration = getTotalBookingDurationMinutes();
+        const activeGuest = getActiveDetailsGuest();
+        const activeGuestTotals = activeGuest ? calculateGuestTotals(activeGuest) : { duration: 45 };
+        const totalDuration = activeGuestTotals.duration || getTotalBookingDurationMinutes();
 
-        // Build query parameters including per-service sequential durations and assigned technician IDs
-        const guest0 = bookingState.guests[0];
+        // Build query parameters for the currently active guest's services & chosen specialist(s)
         const params = new URLSearchParams();
         params.set('date', selectedDate);
         params.set('durationMinutes', String(totalDuration));
         params.set('bufferMinutes', '15');
         params.set('clientNow', getLocalNowIsoStr());
 
-        const guest0Services = (guest0 && Array.isArray(guest0.services)) ? guest0.services : [];
-        if (guest0Services.length > 0) {
-            params.set('serviceIds', guest0Services.map(s => s.id).join(','));
-            params.set('serviceDurations', guest0Services.map(s => s.durationMinutes || 45).join(','));
-            const srvTechs = guest0Services.map(s => {
-                const assigned = guest0.serviceStaffAssignments ? guest0.serviceStaffAssignments[s.id] : undefined;
+        const activeServices = (activeGuest && Array.isArray(activeGuest.services)) ? activeGuest.services : [];
+        if (activeServices.length > 0) {
+            params.set('serviceIds', activeServices.map(s => s.id).join(','));
+            params.set('serviceDurations', activeServices.map(s => s.durationMinutes || 45).join(','));
+            const srvTechs = activeServices.map(s => {
+                const assigned = activeGuest.serviceStaffAssignments ? activeGuest.serviceStaffAssignments[s.id] : undefined;
                 if (assigned != null && assigned !== 'anyone' && !isNaN(Number(assigned))) {
                     return Number(assigned);
                 }
                 if (assigned === null || assigned === 'anyone') {
                     return 0;
                 }
-                if (guest0.selectedStaff && !guest0.selectedStaff.isAnyoneAvailable && guest0.selectedStaff.id && !isNaN(Number(guest0.selectedStaff.id))) {
-                    return Number(guest0.selectedStaff.id);
+                if (activeGuest.selectedStaff && !activeGuest.selectedStaff.isAnyoneAvailable && activeGuest.selectedStaff.id && !isNaN(Number(activeGuest.selectedStaff.id))) {
+                    return Number(activeGuest.selectedStaff.id);
                 }
                 return 0;
             });
             params.set('serviceTechIds', srvTechs.join(','));
         }
 
-        // Collect all unique assigned technician IDs across all guests
-        const allAssignedTechIds = [];
-        bookingState.guests.forEach(g => {
-            if (g && g.services && g.services.length > 1 && g.serviceStaffAssignments) {
-                Object.values(g.serviceStaffAssignments).forEach(id => {
-                    if (id != null && id !== 'anyone' && !isNaN(Number(id)) && Number(id) > 0) {
-                        allAssignedTechIds.push(Number(id));
-                    }
-                });
-            } else if (g && g.selectedStaff && !g.selectedStaff.isAnyoneAvailable && g.selectedStaff.id && !isNaN(Number(g.selectedStaff.id))) {
-                allAssignedTechIds.push(Number(g.selectedStaff.id));
-            }
-        });
-        const uniqueAssignedIds = [...new Set(allAssignedTechIds)];
+        // Collect unique assigned technician IDs for the active guest only
+        const activeGuestTechIds = [];
+        if (activeGuest && activeGuest.services && activeGuest.services.length > 1 && activeGuest.serviceStaffAssignments) {
+            Object.values(activeGuest.serviceStaffAssignments).forEach(id => {
+                if (id != null && id !== 'anyone' && !isNaN(Number(id)) && Number(id) > 0) {
+                    activeGuestTechIds.push(Number(id));
+                }
+            });
+        } else if (activeGuest && activeGuest.selectedStaff && !activeGuest.selectedStaff.isAnyoneAvailable && activeGuest.selectedStaff.id && !isNaN(Number(activeGuest.selectedStaff.id))) {
+            activeGuestTechIds.push(Number(activeGuest.selectedStaff.id));
+        }
+        const uniqueAssignedIds = [...new Set(activeGuestTechIds)];
         if (uniqueAssignedIds.length === 1) {
             params.set('techId', String(uniqueAssignedIds[0]));
         } else if (uniqueAssignedIds.length > 1) {
@@ -4200,10 +4216,6 @@
             }
             bookingState.detailsGuestIndex = 0;
             renderGuestDetailsForm(0);
-            const dateInput = document.getElementById('appointmentDate');
-            if (dateInput && dateInput.value) {
-                handleDateChange(dateInput.value);
-            }
         }
 
         bookingState.currentStep = targetStep;
@@ -4391,6 +4403,20 @@
                 submitBtn.innerHTML = `<i class="bi bi-calendar2-check me-1"></i> Confirm Booking ($${gTotals.subtotal.toFixed(2)})`;
             }
         }
+
+        // Sync time slots UI to this specific guest's chosen specialist(s)
+        bookingState.serviceTimeSlots = guest.serviceTimeSlots ? { ...guest.serviceTimeSlots } : {};
+        bookingState.selectedTimeSlot = guest.selectedTimeSlot || null;
+        bookingState.selectedTimeRangeLabel = guest.selectedTimeRangeLabel || null;
+        const slotInput = document.getElementById('appointmentTimeSlot');
+        if (slotInput) slotInput.value = guest.selectedTimeSlot || '';
+        if (guest.selectedTimeSlot) {
+            bookingState.pendingSelectSlot = { slotValue: guest.selectedTimeSlot };
+        }
+        const dateInput = document.getElementById('appointmentDate');
+        if (dateInput && dateInput.value) {
+            handleDateChange(dateInput.value);
+        }
     }
 
     function handleDetailsBack() {
@@ -4560,16 +4586,22 @@
                 ? { id: primaryGuest.services[0].id }
                 : null,
             serviceTimeSlots: bookingState.serviceTimeSlots || {},
-            guests: bookingState.guests.map((g, idx) => ({
-                guestNumber: idx + 1,
-                customerName: g.customerName,
-                customerPhone: g.customerPhone,
-                customerEmail: g.customerEmail,
-                notes: g.notes,
-                serviceIds: g.services.map(s => s.id),
-                serviceStaffAssignments: cleanServiceStaffAssignments(g.serviceStaffAssignments),
-                serviceTimeSlots: g.serviceTimeSlots || bookingState.serviceTimeSlots || {}
-            }))
+            guests: bookingState.guests.map((g, idx) => {
+                const gSlots = g.serviceTimeSlots ? { ...g.serviceTimeSlots } : {};
+                if (g.selectedTimeSlot && Array.isArray(g.services) && g.services.length > 0 && Object.keys(gSlots).length === 0) {
+                    gSlots[String(g.services[0].id)] = g.selectedTimeSlot;
+                }
+                return {
+                    guestNumber: idx + 1,
+                    customerName: g.customerName,
+                    customerPhone: g.customerPhone,
+                    customerEmail: g.customerEmail,
+                    notes: g.notes,
+                    serviceIds: g.services.map(s => s.id),
+                    serviceStaffAssignments: cleanServiceStaffAssignments(g.serviceStaffAssignments),
+                    serviceTimeSlots: Object.keys(gSlots).length > 0 ? gSlots : (bookingState.serviceTimeSlots || {})
+                };
+            })
         };
 
         const headers = getActiveTenantHeaders({ 'Content-Type': 'application/json' });

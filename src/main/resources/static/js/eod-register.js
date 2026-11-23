@@ -590,7 +590,7 @@
                 headers: headers
             });
 
-            if (!res.ok) throw new Error('Failed to load daily financial summary.');
+            if (!res.ok) new Error('Failed to load daily financial summary.');
             const data = await res.json();
             currentEodData = data;
             renderEodSummary(data);
@@ -828,8 +828,8 @@
                 body: JSON.stringify(payload)
             });
 
-            if (!res.ok) throw new Error('Failed to finalize register closing.');
-            const data = await res.json();
+            if (!res.ok) new Error('Failed to finalize register closing.');
+
 
             // Refresh current view
             await loadEodSummary(selectedEodDate);

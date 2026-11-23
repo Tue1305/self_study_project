@@ -911,7 +911,7 @@
                                     </div>
                                     <label class="form-label fw-semibold mb-1" id="combinedSlotsLabel">
                                         Choose an Available Time Slot Card <span class="text-danger">*</span>
-                                        <span class="small fw-normal text-muted ms-1" id="slotDurationBufferHint">(Includes service duration + 15m turnover buffer check)</span>
+<!--                                        <span class="small fw-normal text-muted ms-1" id="slotDurationBufferHint">(Includes service duration + 15m turnover buffer check)</span>-->
                                     </label>
                                     <input type="hidden" id="appointmentTimeSlot" value="" required>
                                     <div id="timeSlotsGrid" class="time-slots-grid">
@@ -2341,23 +2341,17 @@
 
     function showServiceSlotConflict(srvId, slot, techName) {
         const banner = document.getElementById(`srvStatusBanner_${srvId}`);
-        const textEl = document.getElementById(`srvStatusText_${srvId}`);
         const btnsEl = document.getElementById(`srvActionButtons_${srvId}`);
-        if (!banner || !textEl || !btnsEl) return;
-
-        const tName = techName || 'This specialist';
-        const nextAvail = slot.nextAvailable || 'later';
-        const msg = slot.statusMessage || `${tName} is booked at this time. The next available is ${nextAvail}, or choose Anyone Available at ${slot.label}`;
-        textEl.textContent = msg;
+        if (!banner || !btnsEl) return;
 
         const slotValue = slot.value || slot.time;
         btnsEl.innerHTML = `
             <button type="button" class="btn btn-sm btn-pink rounded-pill px-3 fw-bold" onclick="switchTechToAnyoneAndSelect('${srvId}', '${slotValue}')">
-                <i class="bi bi-lightning-charge-fill me-1"></i>Choose Anyone Available at ${slot.label}
+                <i class="bi bi-lightning-charge-fill me-1"></i>Anyone Available
             </button>
             ${slot.nextAvailable ? `
             <button type="button" class="btn btn-sm btn-outline-pink rounded-pill px-3 fw-bold" onclick="selectServiceTimeSlotByLabel('${srvId}', '${slot.nextAvailable}')">
-                <i class="bi bi-check-circle me-1"></i>Next Available: ${slot.nextAvailable}
+                <i class="bi bi-check-circle me-1"></i>Next Available at ${slot.nextAvailable}
             </button>` : ''}
         `;
         banner.classList.remove('d-none');
@@ -2368,29 +2362,18 @@
         const banner = document.getElementById('singleServiceStatusBanner');
         if (!banner) return;
 
-        const guest0 = getActiveDetailsGuest();
-        const staff = guest0 ? guest0.selectedStaff : bookingState.selectedStaff;
-        const tName = (staff && !staff.isAnyoneAvailable) ? staff.name : (slot.staffBookedDesc || 'Specialist');
-        const nextAvail = slot.nextAvailable || (slot.staffBreakdown && slot.staffBreakdown[0] ? slot.staffBreakdown[0].nextAvailable : null) || 'later';
+        const nextAvail = slot.nextAvailable || (slot.staffBreakdown && slot.staffBreakdown[0] ? slot.staffBreakdown[0].nextAvailable : null);
         const slotValue = slot.value || slot.time;
 
         banner.innerHTML = `
-            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
-                <div class="d-flex align-items-center gap-2 small">
-                    <span class="badge bg-warning text-dark fw-bold"><i class="bi bi-clock-history me-1"></i>Schedule Notice</span>
-                    <span class="text-dark">
-                        <strong>${tName} is booked at ${slot.label}.</strong> The next available is <strong>${nextAvail}</strong>, or choose Anyone Available at ${slot.label}.
-                    </span>
-                </div>
-                <div class="d-flex gap-2">
-                    <button type="button" class="btn btn-sm btn-pink rounded-pill px-3 fw-bold" onclick="switchSingleTechToAnyone('${slotValue}')">
-                        <i class="bi bi-lightning-charge-fill me-1"></i>Anyone Available at ${slot.label}
-                    </button>
-                    ${nextAvail && nextAvail !== 'later' ? `
-                    <button type="button" class="btn btn-sm btn-outline-pink rounded-pill px-3 fw-bold" onclick="selectTimeSlotCardByLabel('${nextAvail}')">
-                        <i class="bi bi-check-circle me-1"></i>Next Available: ${nextAvail}
-                    </button>` : ''}
-                </div>
+            <div class="d-flex flex-wrap align-items-center gap-2">
+                <button type="button" class="btn btn-sm btn-pink rounded-pill px-3 fw-bold" onclick="switchSingleTechToAnyone('${slotValue}')">
+                    <i class="bi bi-lightning-charge-fill me-1"></i>Anyone Available
+                </button>
+                ${nextAvail && nextAvail !== 'later' ? `
+                <button type="button" class="btn btn-sm btn-outline-pink rounded-pill px-3 fw-bold" onclick="selectTimeSlotCardByLabel('${nextAvail}')">
+                    <i class="bi bi-check-circle me-1"></i>Next Available at ${nextAvail}
+                </button>` : ''}
             </div>
         `;
         banner.classList.remove('d-none');
@@ -2434,32 +2417,22 @@
             return;
         }
 
-        const tName = staff.name || 'Specialist';
         const conflicts = (apiResponse && Array.isArray(apiResponse.staffConflicts)) ? apiResponse.staffConflicts : [];
         if (conflicts.length > 0) {
             const firstConf = conflicts[0];
             const b0 = (firstConf.breakdown && firstConf.breakdown[0]) ? firstConf.breakdown[0] : {};
-            const nextAvail = b0.nextAvailable || 'later';
-            const slotLabel = firstConf.time || 'this timeslot';
+            const nextAvail = b0.nextAvailable || null;
             const slotVal = firstConf.value || firstConf.time;
 
             banner.innerHTML = `
-                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
-                    <div class="d-flex align-items-center gap-2 small">
-                        <span class="badge bg-warning text-dark fw-bold"><i class="bi bi-clock-history me-1"></i>Schedule Notice</span>
-                        <span class="text-dark">
-                            <strong>${tName} is booked at ${slotLabel}.</strong> The next available is <strong>${nextAvail}</strong>, or choose Anyone Available at ${slotLabel}.
-                        </span>
-                    </div>
-                    <div class="d-flex gap-2">
-                        <button type="button" class="btn btn-sm btn-pink rounded-pill px-3 fw-bold" onclick="switchSingleTechToAnyone('${slotVal}')">
-                            <i class="bi bi-lightning-charge-fill me-1"></i>Anyone Available at ${slotLabel}
-                        </button>
-                        ${nextAvail && nextAvail !== 'later' ? `
-                        <button type="button" class="btn btn-sm btn-outline-pink rounded-pill px-3 fw-bold" onclick="selectTimeSlotCardByLabel('${nextAvail}')">
-                            <i class="bi bi-check-circle me-1"></i>Next Available: ${nextAvail}
-                        </button>` : ''}
-                    </div>
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    <button type="button" class="btn btn-sm btn-pink rounded-pill px-3 fw-bold" onclick="switchSingleTechToAnyone('${slotVal}')">
+                        <i class="bi bi-lightning-charge-fill me-1"></i>Anyone Available
+                    </button>
+                    ${nextAvail && nextAvail !== 'later' ? `
+                    <button type="button" class="btn btn-sm btn-outline-pink rounded-pill px-3 fw-bold" onclick="selectTimeSlotCardByLabel('${nextAvail}')">
+                        <i class="bi bi-check-circle me-1"></i>Next Available at ${nextAvail}
+                    </button>` : ''}
                 </div>
             `;
             banner.classList.remove('d-none');
@@ -2580,25 +2553,17 @@
                         </span>
                     </div>
                 </div>
-                <div id="srvStatusBanner_${srvId}" class="alert alert-light border border-warning-subtle rounded-3 p-3 mb-3 ${conflictSlot ? '' : 'd-none'}">
-                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
-                        <div class="d-flex align-items-center gap-2 small">
-                            <span class="badge bg-warning text-dark fw-bold"><i class="bi bi-clock-history me-1"></i>Notice</span>
-                            <span class="text-dark" id="srvStatusText_${srvId}">
-                                ${conflictSlot ? (conflictSlot.statusMessage || `${seg.techName} is booked at this time. The next available is ${conflictSlot.nextAvailable || 'later'}, or choose Anyone Available at ${conflictSlot.label}`) : ''}
-                            </span>
-                        </div>
-                        <div class="d-flex gap-2" id="srvActionButtons_${srvId}">
-                            ${conflictSlot ? `
-                                <button type="button" class="btn btn-sm btn-pink rounded-pill px-3 fw-bold" onclick="switchTechToAnyoneAndSelect('${srvId}', '${conflictSlot.value || conflictSlot.time}')">
-                                    <i class="bi bi-lightning-charge-fill me-1"></i>Anyone at ${conflictSlot.label}
-                                </button>
-                                ${conflictSlot.nextAvailable ? `
-                                <button type="button" class="btn btn-sm btn-outline-pink rounded-pill px-3 fw-bold" onclick="selectServiceTimeSlotByLabel('${srvId}', '${conflictSlot.nextAvailable}')">
-                                    <i class="bi bi-check-circle me-1"></i>Next: ${conflictSlot.nextAvailable}
-                                </button>` : ''}
-                            ` : ''}
-                        </div>
+                <div id="srvStatusBanner_${srvId}" class="alert alert-light border border-warning-subtle rounded-3 p-2 px-3 mb-3 ${conflictSlot ? '' : 'd-none'}">
+                    <div class="d-flex flex-wrap align-items-center gap-2" id="srvActionButtons_${srvId}">
+                        ${conflictSlot ? `
+                            <button type="button" class="btn btn-sm btn-pink rounded-pill px-3 fw-bold" onclick="switchTechToAnyoneAndSelect('${srvId}', '${conflictSlot.value || conflictSlot.time}')">
+                                <i class="bi bi-lightning-charge-fill me-1"></i>Anyone Available
+                            </button>
+                            ${conflictSlot.nextAvailable ? `
+                            <button type="button" class="btn btn-sm btn-outline-pink rounded-pill px-3 fw-bold" onclick="selectServiceTimeSlotByLabel('${srvId}', '${conflictSlot.nextAvailable}')">
+                                <i class="bi bi-check-circle me-1"></i>Next Available at ${conflictSlot.nextAvailable}
+                            </button>` : ''}
+                        ` : ''}
                     </div>
                 </div>
                 <div class="small fw-semibold text-muted mb-2">Available Time Slots for ${seg.serviceName} (${seg.techName}):</div>
@@ -2638,7 +2603,6 @@
                     card.setAttribute('data-slot-value', slot.value);
                     card.innerHTML = `
                         <div class="slot-start">${slot.label}</div>
-                        <div class="slot-range">${slot.timeRangeLabel}</div>
                         <span class="slot-status-tag text-danger"><i class="bi bi-person-x-fill me-1"></i>Booked</span>
                     `;
                     card.onclick = () => showServiceSlotConflict(srvId, slot, seg.techName);
@@ -2651,7 +2615,6 @@
                     card.setAttribute('title', `Overlaps ${overlappingOther.serviceName} (${overlappingOther.startLabel} – ${overlappingOther.endLabel}). Click to pick this time and auto-adjust ${overlappingOther.serviceName}.`);
                     card.innerHTML = `
                         <div class="slot-start text-muted">${slot.label}</div>
-                        <div class="slot-range text-muted">${slot.timeRangeLabel}</div>
                         <span class="slot-status-tag text-warning-emphasis"><i class="bi bi-arrow-left-right me-1"></i>Overlaps ${overlappingOther.serviceName}</span>
                     `;
                     card.onclick = () => selectServiceTimeSlot(srvId, slot.value, slot.timeRangeLabel, segDur);
@@ -2660,7 +2623,6 @@
                     card.setAttribute('data-slot-value', slot.value);
                     card.innerHTML = `
                         <div class="slot-start">${slot.label}</div>
-                        <div class="slot-range">${slot.timeRangeLabel}</div>
                         <span class="slot-status-tag text-success"><i class="bi bi-check-circle-fill me-1"></i>Available</span>
                     `;
                     card.onclick = () => selectServiceTimeSlot(srvId, slot.value, slot.timeRangeLabel, segDur);
@@ -2781,7 +2743,6 @@
                 card.setAttribute('data-slot-value', slot.value);
                 card.innerHTML = `
                     <div class="slot-start">${slot.label}</div>
-                    <div class="slot-range">${slot.timeRangeLabel}</div>
                     <span class="slot-status-tag text-success"><i class="bi bi-check-circle-fill me-1"></i>Available</span>
                 `;
                 card.onclick = () => selectTimeSlotCard(slot.value, slot.timeRangeLabel);
@@ -2790,7 +2751,6 @@
                 card.setAttribute('data-slot-value', slot.value);
                 card.innerHTML = `
                     <div class="slot-start">${slot.label}</div>
-                    <div class="slot-range">${slot.timeRangeLabel}</div>
                     <span class="slot-status-tag text-danger"><i class="bi bi-person-x-fill me-1"></i>Booked</span>
                 `;
                 card.onclick = () => showSingleServiceSlotConflict(slot);
@@ -2856,93 +2816,7 @@
             }
         });
 
-        // 1. Multi-Service with 2+ Specific Staff Assigned
-        if (isMultiService && assignedStaffList.length >= 2) {
-            if (conflicts.length > 0) {
-                // Get representative conflict slot to show the breakdown
-                const repConflict = conflicts[0];
-                const breakdownItems = repConflict.breakdown || [];
-
-                let breakdownItemsHtml = '';
-                breakdownItems.forEach(b => {
-                    const isAvail = Boolean(b.available);
-                    const sName = b.serviceName || 'Service';
-                    const tName = b.techName || 'Specialist';
-                    if (!isAvail) {
-                        breakdownItemsHtml += `
-                            <div class="p-2 px-3 rounded-3 bg-danger-subtle border border-danger-subtle d-flex flex-wrap align-items-center justify-content-between gap-2 small">
-                                <div class="d-flex align-items-center gap-2">
-                                    <span class="badge bg-danger text-white"><i class="bi bi-x-circle-fill me-1"></i>Staff Booked</span>
-                                    <span class="text-dark"><strong>${sName} — ${tName}:</strong> Booked ${b.busyWindow || ''}</span>
-                                </div>
-                                <span class="badge bg-success text-white"><i class="bi bi-clock-history me-1"></i>Next available: ${b.nextAvailable || 'Later'}</span>
-                            </div>
-                        `;
-                    } else {
-                        breakdownItemsHtml += `
-                            <div class="p-2 px-3 rounded-3 bg-success-subtle border border-success-subtle d-flex flex-wrap align-items-center justify-content-between gap-2 small">
-                                <div class="d-flex align-items-center gap-2">
-                                    <span class="badge bg-success text-white"><i class="bi bi-check-circle-fill me-1"></i>Available</span>
-                                    <span class="text-dark"><strong>${sName} — ${tName}:</strong> ${b.message || 'Available'}</span>
-                                </div>
-                                <span class="text-muted small">Open</span>
-                            </div>
-                        `;
-                    }
-                });
-
-                const earliestWindowLabel = earliestSlot ? (earliestSlot.timeRangeLabel || earliestSlot.label) : null;
-
-                container.innerHTML = `
-                    <div class="card border rounded-4 p-3 shadow-sm bg-white mb-3">
-                        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2 pb-2 border-bottom">
-                            <div class="d-flex align-items-center gap-2">
-                                <span class="badge bg-pink text-white rounded-pill px-2 py-1"><i class="bi bi-people-fill me-1"></i>Specific Staff Schedule</span>
-                                <span class="small fw-bold text-dark">Individual Specialist Availability Breakdown</span>
-                            </div>
-                            ${earliestWindowLabel ? `<span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-1 fw-semibold"><i class="bi bi-check2-circle me-1"></i>Earliest Both Free: ${earliestWindowLabel}</span>` : ''}
-                        </div>
-                        <div class="small text-muted mb-2">
-                            Because you chose specific specialists per service, booking slots automatically align to when <strong>both specialists are sequentially free</strong>:
-                        </div>
-                        <div class="d-flex flex-column gap-2">
-                            ${breakdownItemsHtml}
-                        </div>
-                    </div>
-                `;
-                container.classList.remove('d-none');
-                return;
-            } else {
-                container.innerHTML = '';
-                container.classList.add('d-none');
-                return;
-            }
-        }
-
-        // 2. Single Service / Single Staff Assigned
-        const singleStaff = (guest0 && guest0.selectedStaff && !guest0.selectedStaff.isAnyoneAvailable) ? guest0.selectedStaff : null;
-        if (singleStaff || assignedStaffList.length === 1) {
-            const techName = singleStaff ? singleStaff.name : assignedStaffList[0].techName;
-            if (conflicts.length > 0) {
-                const rep = conflicts[0];
-                const busyDesc = rep.staffBookedDesc || (techName + ' is booked');
-                const b0 = (rep.breakdown && rep.breakdown[0]) ? rep.breakdown[0] : null;
-                const nextAvail = b0 ? b0.nextAvailable : null;
-
-                container.innerHTML = `
-                    <div class="alert alert-light border border-secondary-subtle py-2 px-3 rounded-3 mb-3 d-flex flex-wrap align-items-center justify-content-between gap-2 small">
-                        <div class="d-flex align-items-center gap-2">
-                            <span class="badge bg-warning text-dark fw-bold"><i class="bi bi-person-x-fill me-1"></i>Staff Booked</span>
-                            <span class="text-dark"><strong>${busyDesc}</strong></span>
-                        </div>
-                        ${nextAvail ? `<span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1 fw-semibold"><i class="bi bi-clock-history me-1"></i>Next open slot: ${nextAvail}</span>` : ''}
-                    </div>
-                `;
-                container.classList.remove('d-none');
-                return;
-            }
-        }
-
+        // Keep detailed staff-booked hours breakdown hidden for a cleaner customer booking UI
         container.innerHTML = '';
         container.classList.add('d-none');
     }

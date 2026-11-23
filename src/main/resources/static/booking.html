@@ -1884,19 +1884,24 @@
         const chosenSlotKeys = Object.keys(customSlots);
 
         if (isMultiService && chosenSlotKeys.length > 0 && bookingState.slotSelectionMode !== 'combined') {
-            const parts = [];
+            const scheduledParts = [];
             activeServices.forEach(s => {
                 const sSlot = customSlots[String(s.id)];
                 if (sSlot) {
                     const techId = activeGuest.serviceStaffAssignments ? activeGuest.serviceStaffAssignments[s.id] : undefined;
                     const tech = (techId && techId !== 'anyone') ? (bookingState.staffList || []).find(t => String(t.id) === String(techId)) : null;
                     const techName = tech ? (tech.name || tech.username) : 'Anyone';
-                    parts.push(`${s.name} (${techName}): ${formatTime24ToRangeLabel(sSlot, s.durationMinutes || 45)}`);
+                    scheduledParts.push({
+                        sortKey: sSlot,
+                        text: `${s.name} (${techName}): ${formatTime24ToRangeLabel(sSlot, s.durationMinutes || 45)}`
+                    });
                 }
             });
+            scheduledParts.sort((a, b) => String(a.sortKey).localeCompare(String(b.sortKey)));
+            const parts = scheduledParts.map(p => p.text);
 
             if (parts.length > 0) {
-                const summaryText = parts.join(' | ');
+                const summaryText = parts.join(' → ');
                 if (selectedRangeBadge) {
                     selectedRangeBadge.textContent = summaryText;
                     selectedRangeBadge.classList.remove('d-none');
@@ -1948,6 +1953,47 @@
         updateSummaryTimeWindowDisplay();
     }
 
+    function parseSlotToMinutes(slotVal) {
+        if (!slotVal) return null;
+        let clean = String(slotVal).trim();
+        if (clean.toUpperCase().includes('AM') || clean.toUpperCase().includes('PM')) {
+            clean = convert12To24Hour(clean);
+        }
+        if (!clean.includes(':')) return null;
+        const p = clean.split(':');
+        const h = parseInt(p[0], 10);
+        const m = parseInt(p[1] || '0', 10);
+        if (isNaN(h) || isNaN(m)) return null;
+        return h * 60 + m;
+    }
+
+    function intervalsOverlap(startA, endA, startB, endB) {
+        return startA < endB && startB < endA;
+    }
+
+    function findEarliestNonOverlappingSlot(seg, occupiedIntervals, isToday, nowPlusBuffer) {
+        const segDur = Number(seg.durationMinutes || 45);
+        const rawSlots = Array.isArray(seg.slots) ? seg.slots : [];
+        for (let i = 0; i < rawSlots.length; i++) {
+            const s = rawSlots[i];
+            if (!s || !s.available || s.isPast || !s.value) continue;
+            if (isToday) {
+                const p = s.value.split(':');
+                const dt = new Date();
+                dt.setHours(parseInt(p[0], 10), parseInt(p[1] || '0', 10), 0, 0);
+                if (dt < nowPlusBuffer) continue;
+            }
+            const sStart = parseSlotToMinutes(s.value);
+            if (sStart === null) continue;
+            const sEnd = sStart + segDur;
+            const hasOverlap = occupiedIntervals.some(o => intervalsOverlap(sStart, sEnd, o.startMin, o.endMin));
+            if (!hasOverlap) {
+                return s.value;
+            }
+        }
+        return null;
+    }
+
     function renderMultiServiceTimeLapseWidget() {
         const container = document.getElementById('multiServiceTimeLapseContainer');
         if (!container) return;
@@ -1962,52 +2008,19 @@
 
         container.style.display = 'block';
 
-        // Retrieve current start time for Service 1
-        const srv1 = guest0Services[0];
-        let srv1Val = (bookingState.serviceTimeSlots && bookingState.serviceTimeSlots[srv1.id]) || bookingState.selectedTimeSlot || '10:00:00';
-        if (srv1Val.includes('AM') || srv1Val.includes('PM')) {
-            srv1Val = convert12To24Hour(srv1Val);
-        }
-
-        const parts1 = srv1Val.split(':');
-        let currentMinutes = parseInt(parts1[0], 10) * 60 + parseInt(parts1[1] || '0', 10);
-        const overallStartMinutes = currentMinutes;
+        const guestSlots = (guest0 && guest0.serviceTimeSlots && Object.keys(guest0.serviceTimeSlots).length > 0)
+            ? guest0.serviceTimeSlots
+            : (bookingState.serviceTimeSlots || {});
 
         let totalDuration = 0;
-        guest0Services.forEach(s => {
-            totalDuration += Number(s.durationMinutes || 45);
-        });
-
-        let stepsHtml = '';
-        let stepCursor = currentMinutes;
-
-        guest0Services.forEach((srv, idx) => {
+        const scheduledItems = guest0Services.map(srv => {
             const dur = Number(srv.durationMinutes || 45);
-            let srvStartVal = (bookingState.serviceTimeSlots && bookingState.serviceTimeSlots[srv.id]);
-            if (srvStartVal) {
-                if (srvStartVal.includes('AM') || srvStartVal.includes('PM')) {
-                    srvStartVal = convert12To24Hour(srvStartVal);
-                }
-                const p = srvStartVal.split(':');
-                let parsedM = parseInt(p[0], 10) * 60 + parseInt(p[1] || '0', 10);
-                if (idx > 0 && parsedM < stepCursor) {
-                    parsedM = stepCursor;
-                    const h = Math.floor(stepCursor / 60);
-                    const m = stepCursor % 60;
-                    bookingState.serviceTimeSlots[String(srv.id)] = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`;
-                }
-                stepCursor = parsedM;
-            }
+            totalDuration += dur;
 
-            const startH = Math.floor(stepCursor / 60);
-            const startM = stepCursor % 60;
-            const startStr = `${String(startH).padStart(2, '0')}:${String(startM).padStart(2, '0')}:00`;
-            const startLabel = formatMinutesTo12Hour(stepCursor);
+            const rawSlot = guestSlots[String(srv.id)] || (bookingState.serviceTimeSlots && bookingState.serviceTimeSlots[String(srv.id)]) || '';
+            const startMin = parseSlotToMinutes(rawSlot);
+            const endMin = startMin !== null ? startMin + dur : null;
 
-            const endCursor = stepCursor + dur;
-            const endLabel = formatMinutesTo12Hour(endCursor);
-
-            // Tech Name
             let techName = 'Anyone Available';
             const assignedTid = guest0.serviceStaffAssignments ? guest0.serviceStaffAssignments[srv.id] : undefined;
             if (assignedTid != null && assignedTid !== 'anyone' && !isNaN(Number(assignedTid)) && Number(assignedTid) > 0) {
@@ -2017,13 +2030,34 @@
                 techName = guest0.selectedStaff.name;
             }
 
+            return { srv, dur, startMin, endMin, techName };
+        });
+
+        // Sort chronologically by chosen start time (unassigned at the end)
+        scheduledItems.sort((a, b) => {
+            if (a.startMin === null && b.startMin === null) return 0;
+            if (a.startMin === null) return 1;
+            if (b.startMin === null) return -1;
+            return a.startMin - b.startMin;
+        });
+
+        const assignedOnly = scheduledItems.filter(it => it.startMin !== null);
+        const overallStartMinutes = assignedOnly.length > 0 ? assignedOnly[0].startMin : null;
+        const overallEndMinutes = assignedOnly.length > 0 ? Math.max(...assignedOnly.map(it => it.endMin)) : null;
+
+        let stepsHtml = '';
+        scheduledItems.forEach((item, idx) => {
+            const { srv, dur, startMin, endMin, techName } = item;
             const isNextService = (idx > 0);
+            const timeBadgeHtml = startMin !== null
+                ? `<span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1 fw-bold"><i class="bi bi-clock me-1"></i>${formatMinutesTo12Hour(startMin)} – ${formatMinutesTo12Hour(endMin)}</span>`
+                : `<span class="badge bg-warning-subtle text-dark border border-warning-subtle px-2 py-1 fw-bold"><i class="bi bi-exclamation-circle me-1"></i>Pick a time below</span>`;
 
             stepsHtml += `
                 <div class="time-lapse-step card border-0 rounded-3 p-3 shadow-sm mb-2" style="background: ${isNextService ? '#fff8fa' : '#ffffff'}; border-left: 4px solid var(--bs-primary-pink) !important;">
                     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
                         <div class="d-flex align-items-center gap-2">
-                            <span class="badge ${isNextService ? 'bg-pink' : 'bg-dark'} text-white rounded-pill px-2 py-1">Service ${idx + 1}</span>
+                            <span class="badge ${isNextService ? 'bg-pink' : 'bg-dark'} text-white rounded-pill px-2 py-1">#${idx + 1}</span>
                             <strong class="text-dark fs-6">${srv.name}</strong>
                             <span class="badge bg-light text-muted border">${dur} mins</span>
                         </div>
@@ -2031,32 +2065,36 @@
                             <span class="badge bg-light text-dark border">
                                 <i class="bi bi-person-fill text-pink me-1"></i>${techName}
                             </span>
-                            <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1 fw-bold">
-                                <i class="bi bi-clock me-1"></i>${startLabel} – ${endLabel}
-                            </span>
+                            ${timeBadgeHtml}
                         </div>
                     </div>
                 </div>
             `;
 
-            // If there is a subsequent service, show the Time Lapse connector
-            if (idx + 1 < guest0Services.length) {
-                const nextSrv = guest0Services[idx + 1];
-                stepsHtml += `
-                    <div class="time-lapse-connector d-flex align-items-center gap-2 px-3 py-1 mb-2">
-                        <div class="text-pink fw-bold fs-5"><i class="bi bi-arrow-down-short"></i></div>
-                        <div class="badge bg-white text-dark border shadow-sm px-3 py-2 rounded-pill small">
-                            <i class="bi bi-hourglass-split text-pink me-1"></i>
-                            <strong>${dur} min session finishes at ${endLabel}</strong> &bull; ${nextSrv.name} cannot begin until <strong>${endLabel}</strong>
+            if (idx + 1 < scheduledItems.length) {
+                const nextItem = scheduledItems[idx + 1];
+                if (endMin !== null && nextItem.startMin !== null) {
+                    const gapMins = nextItem.startMin - endMin;
+                    const endLabel = formatMinutesTo12Hour(endMin);
+                    const nextStartLabel = formatMinutesTo12Hour(nextItem.startMin);
+                    const gapText = gapMins > 0
+                        ? `<strong>${dur} min finishes at ${endLabel}</strong> &bull; ${gapMins} min break before ${nextItem.srv.name} at <strong>${nextStartLabel}</strong>`
+                        : `<strong>${dur} min finishes at ${endLabel}</strong> &bull; ${nextItem.srv.name} starts right away at <strong>${nextStartLabel}</strong>`;
+                    stepsHtml += `
+                        <div class="time-lapse-connector d-flex align-items-center gap-2 px-3 py-1 mb-2">
+                            <div class="text-pink fw-bold fs-5"><i class="bi bi-arrow-down-short"></i></div>
+                            <div class="badge bg-white text-dark border shadow-sm px-3 py-2 rounded-pill small">
+                                <i class="bi bi-hourglass-split text-pink me-1"></i>${gapText}
+                            </div>
                         </div>
-                    </div>
-                `;
+                    `;
+                }
             }
-
-            stepCursor = endCursor;
         });
 
-        const overallEndLabel = formatMinutesTo12Hour(stepCursor);
+        const overallWindowBadge = (overallStartMinutes !== null && overallEndMinutes !== null)
+            ? `<span class="badge bg-pink text-white rounded-pill px-3 py-2 fw-bold"><i class="bi bi-calendar-check me-1"></i>${formatMinutesTo12Hour(overallStartMinutes)} – ${formatMinutesTo12Hour(overallEndMinutes)}</span>`
+            : `<span class="badge bg-secondary text-white rounded-pill px-3 py-2 fw-bold">Choose times below</span>`;
 
         container.innerHTML = `
             <div class="card border-0 rounded-4 shadow-sm mb-3 overflow-hidden" style="background: linear-gradient(135deg, #fff5f8 0%, #ffffff 100%); border-left: 5px solid var(--bs-primary-pink) !important;">
@@ -2067,17 +2105,15 @@
                                 <i class="bi bi-clock-history text-pink fs-5"></i>
                             </div>
                             <div>
-                                <h6 class="fw-bold mb-0 text-dark">Multi-Service Schedule &amp; Time Lapse</h6>
-                                <small class="text-muted">Automatic sequential timeline ensuring services do not overlap</small>
+                                <h6 class="fw-bold mb-0 text-dark">Multi-Service Schedule (Flexible Order)</h6>
+                                <small class="text-muted">Pick whichever specialist is free first &mdash; overlapping times update automatically</small>
                             </div>
                         </div>
                         <div class="d-flex align-items-center gap-2">
                             <span class="badge bg-light text-dark border px-3 py-2 rounded-pill small">
                                 <i class="bi bi-hourglass me-1"></i>Total: ${totalDuration} mins
                             </span>
-                            <span class="badge bg-pink text-white rounded-pill px-3 py-2 fw-bold">
-                                <i class="bi bi-calendar-check me-1"></i>${formatMinutesTo12Hour(overallStartMinutes)} – ${overallEndLabel}
-                            </span>
+                            ${overallWindowBadge}
                         </div>
                     </div>
                     <div class="d-flex flex-column">
@@ -2178,12 +2214,13 @@
         if (cleanSlot.toUpperCase().includes('AM') || cleanSlot.toUpperCase().includes('PM')) {
             cleanSlot = convert12To24Hour(cleanSlot);
         }
-        bookingState.serviceTimeSlots[String(srvId)] = cleanSlot;
+        const srvKey = String(srvId);
+        bookingState.serviceTimeSlots[srvKey] = cleanSlot;
 
         const guest0 = getActiveDetailsGuest();
         if (guest0) {
             if (!guest0.serviceTimeSlots) guest0.serviceTimeSlots = {};
-            guest0.serviceTimeSlots[String(srvId)] = cleanSlot;
+            guest0.serviceTimeSlots[srvKey] = cleanSlot;
         }
 
         const badge = document.getElementById(`srvBadge_${srvId}`);
@@ -2191,45 +2228,65 @@
             badge.textContent = rangeLabel || formatTime24ToRangeLabel(cleanSlot, durationMinutes || 45);
         }
 
-        // Cascade sequential slots to all subsequent services for this guest
-        if (guest0 && Array.isArray(guest0.services)) {
-            const currentIdx = guest0.services.findIndex(s => String(s.id) === String(srvId));
-            if (currentIdx >= 0) {
-                const parts = cleanSlot.split(':');
-                let nextMinutes = parseInt(parts[0], 10) * 60 + parseInt(parts[1] || '0', 10) + Number(durationMinutes || 45);
-                for (let i = currentIdx + 1; i < guest0.services.length; i++) {
-                    const nextSrv = guest0.services[i];
-                    const nextKey = String(nextSrv.id);
-                    const existingNext = bookingState.serviceTimeSlots[nextKey];
-                    let needsUpdate = true;
-                    if (existingNext) {
-                        const nextParts = existingNext.split(':');
-                        const existingM = parseInt(nextParts[0], 10) * 60 + parseInt(nextParts[1] || '0', 10);
-                        if (existingM >= nextMinutes) {
-                            needsUpdate = false;
-                            nextMinutes = existingM + Number(nextSrv.durationMinutes || 45);
-                        }
-                    }
-                    if (needsUpdate) {
-                        const h = Math.floor(nextMinutes / 60);
-                        const m = nextMinutes % 60;
-                        const nextVal = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`;
-                        const nextDur = Number(nextSrv.durationMinutes || 45);
+        // Dynamic bidirectional overlap resolution (flexible order — any service can go before or after another!)
+        const apiResponse = bookingState.lastAvailabilityResponse;
+        const servicesAvail = (apiResponse && Array.isArray(apiResponse.servicesAvailability)) ? apiResponse.servicesAvailability : [];
+        const selectedDate = document.getElementById('appointmentDate') ? document.getElementById('appointmentDate').value : '';
+        const isToday = (selectedDate === getLocalTodayDateStr());
+        const nowPlusBuffer = new Date(Date.now() + 15 * 60 * 1000);
 
-                        bookingState.serviceTimeSlots[nextKey] = nextVal;
-                        guest0.serviceTimeSlots[nextKey] = nextVal;
+        const newStart = parseSlotToMinutes(cleanSlot);
+        const newDur = Number(durationMinutes || 45);
+        const newEnd = newStart !== null ? newStart + newDur : null;
 
-                        nextMinutes += nextDur;
+        if (guest0 && Array.isArray(guest0.services) && newStart !== null && newEnd !== null) {
+            // Keep track of non-overlapping occupied intervals starting with the newly chosen service
+            const occupied = [{ srvKey, startMin: newStart, endMin: newEnd }];
+
+            // First keep all other services that do NOT overlap with the newly chosen slot
+            const overlappingOthers = [];
+            guest0.services.forEach(otherSrv => {
+                const otherKey = String(otherSrv.id);
+                if (otherKey === srvKey) return;
+                const otherSlot = (guest0.serviceTimeSlots && guest0.serviceTimeSlots[otherKey]) || bookingState.serviceTimeSlots[otherKey];
+                const oStart = parseSlotToMinutes(otherSlot);
+                const oDur = Number(otherSrv.durationMinutes || 45);
+                if (oStart !== null) {
+                    const oEnd = oStart + oDur;
+                    if (intervalsOverlap(newStart, newEnd, oStart, oEnd)) {
+                        overlappingOthers.push(otherSrv);
+                    } else {
+                        occupied.push({ srvKey: otherKey, startMin: oStart, endMin: oEnd });
                     }
                 }
-            }
+            });
+
+            // Auto-adjust any overlapping other service to its earliest non-overlapping available slot (before OR after!)
+            overlappingOthers.forEach(otherSrv => {
+                const otherKey = String(otherSrv.id);
+                const otherSeg = servicesAvail.find(seg => String(seg.serviceId) === otherKey);
+                const otherDur = Number(otherSrv.durationMinutes || 45);
+                let replacement = null;
+                if (otherSeg) {
+                    replacement = findEarliestNonOverlappingSlot(otherSeg, occupied, isToday, nowPlusBuffer);
+                }
+                if (replacement) {
+                    bookingState.serviceTimeSlots[otherKey] = replacement;
+                    if (guest0.serviceTimeSlots) guest0.serviceTimeSlots[otherKey] = replacement;
+                    const rStart = parseSlotToMinutes(replacement);
+                    if (rStart !== null) {
+                        occupied.push({ srvKey: otherKey, startMin: rStart, endMin: rStart + otherDur });
+                    }
+                } else {
+                    delete bookingState.serviceTimeSlots[otherKey];
+                    if (guest0.serviceTimeSlots) delete guest0.serviceTimeSlots[otherKey];
+                }
+            });
         }
 
         updateOverallTimeSlotFromPerService();
         updateSummaryTimeWindowDisplay();
 
-        const apiResponse = bookingState.lastAvailabilityResponse;
-        const servicesAvail = (apiResponse && Array.isArray(apiResponse.servicesAvailability)) ? apiResponse.servicesAvailability : [];
         if (servicesAvail.length >= 2 && guest0 && guest0.services) {
             renderPerServiceSlotCards(servicesAvail, guest0.services);
         }
@@ -2417,58 +2474,86 @@
         const selectedDate = document.getElementById('appointmentDate') ? document.getElementById('appointmentDate').value : '';
         const isToday = (selectedDate === getLocalTodayDateStr());
         const nowPlusBuffer = new Date(Date.now() + 15 * 60 * 1000);
+        const guest0 = getActiveDetailsGuest();
 
-        let previousServiceEndMinutes = null;
+        if (!bookingState.serviceTimeSlots) bookingState.serviceTimeSlots = {};
+        if (guest0 && !guest0.serviceTimeSlots) guest0.serviceTimeSlots = {};
 
+        // Pass 1: Ensure every service has a valid, non-overlapping initial selection (flexible order — earliest free tech can go first!)
+        const occupiedIntervals = [];
+        const assignedBySrvId = {};
+
+        // Keep existing valid non-overlapping selections first
+        servicesAvail.forEach(seg => {
+            const srvId = String(seg.serviceId);
+            const segDur = Number(seg.durationMinutes || 45);
+            let curSlot = (guest0 && guest0.serviceTimeSlots && guest0.serviceTimeSlots[srvId])
+                || bookingState.serviceTimeSlots[srvId] || '';
+            if (curSlot && (curSlot.toUpperCase().includes('AM') || curSlot.toUpperCase().includes('PM'))) {
+                curSlot = convert12To24Hour(curSlot);
+            }
+            const curStart = parseSlotToMinutes(curSlot);
+            if (curStart !== null) {
+                const curEnd = curStart + segDur;
+                const slotMatchesAvail = (seg.slots || []).some(s => s.value === curSlot && s.available && !s.isPast);
+                const overlapsExisting = occupiedIntervals.some(o => intervalsOverlap(curStart, curEnd, o.startMin, o.endMin));
+                if (slotMatchesAvail && !overlapsExisting) {
+                    assignedBySrvId[srvId] = curSlot;
+                    occupiedIntervals.push({
+                        srvId,
+                        serviceName: seg.serviceName,
+                        startMin: curStart,
+                        endMin: curEnd,
+                        startLabel: formatMinutesTo12Hour(curStart),
+                        endLabel: formatMinutesTo12Hour(curEnd)
+                    });
+                    return;
+                }
+            }
+            // Clear invalid/conflicting initial slot so Pass 2 picks the earliest non-overlapping available slot
+            delete bookingState.serviceTimeSlots[srvId];
+            if (guest0 && guest0.serviceTimeSlots) delete guest0.serviceTimeSlots[srvId];
+        });
+
+        // Pass 2: For any service without a selection yet, pick its earliest available slot that doesn't overlap already-chosen services
+        servicesAvail.forEach(seg => {
+            const srvId = String(seg.serviceId);
+            if (assignedBySrvId[srvId]) return;
+            const segDur = Number(seg.durationMinutes || 45);
+            const bestSlot = findEarliestNonOverlappingSlot(seg, occupiedIntervals, isToday, nowPlusBuffer);
+            if (bestSlot) {
+                assignedBySrvId[srvId] = bestSlot;
+                bookingState.serviceTimeSlots[srvId] = bestSlot;
+                if (guest0 && guest0.serviceTimeSlots) guest0.serviceTimeSlots[srvId] = bestSlot;
+                const sStart = parseSlotToMinutes(bestSlot);
+                if (sStart !== null) {
+                    occupiedIntervals.push({
+                        srvId,
+                        serviceName: seg.serviceName,
+                        startMin: sStart,
+                        endMin: sStart + segDur,
+                        startLabel: formatMinutesTo12Hour(sStart),
+                        endLabel: formatMinutesTo12Hour(sStart + segDur)
+                    });
+                }
+            }
+        });
+
+        // Helpful flexible-order banner
+        const flexBanner = document.createElement('div');
+        flexBanner.className = 'alert alert-light border border-info-subtle rounded-3 p-2 px-3 mb-3 small d-flex align-items-center gap-2 text-dark';
+        flexBanner.innerHTML = `
+            <i class="bi bi-shuffle text-pink fs-6"></i>
+            <span><strong>Flexible Order:</strong> Choose whichever specialist is free first &mdash; you can pick any service before or after another. Overlapping time slots automatically adjust.</span>
+        `;
+        perContainer.appendChild(flexBanner);
+
+        // Pass 3: Render each service's slot grid with dynamic overlap indicators against all OTHER services
         servicesAvail.forEach((seg, srvIdx) => {
             const srvId = String(seg.serviceId);
             const segDur = Number(seg.durationMinutes || 45);
-            let currentSelectedSlot = (bookingState.serviceTimeSlots && bookingState.serviceTimeSlots[srvId]) || '';
-            if (currentSelectedSlot) {
-                if (currentSelectedSlot.includes('AM') || currentSelectedSlot.includes('PM')) {
-                    currentSelectedSlot = convert12To24Hour(currentSelectedSlot);
-                }
-            }
-
-            const minAllowedMinutes = (srvIdx > 0 && previousServiceEndMinutes !== null) ? previousServiceEndMinutes : null;
-
-            // If current selected slot is before minAllowedMinutes, reset it to minAllowedMinutes
-            if (minAllowedMinutes !== null) {
-                let currentSlotM = -1;
-                if (currentSelectedSlot && currentSelectedSlot.includes(':')) {
-                    const p = currentSelectedSlot.split(':');
-                    currentSlotM = parseInt(p[0], 10) * 60 + parseInt(p[1] || '0', 10);
-                }
-                if (currentSlotM < minAllowedMinutes) {
-                    currentSelectedSlot = formatMinutesTo24Hour(minAllowedMinutes);
-                    bookingState.serviceTimeSlots[srvId] = currentSelectedSlot;
-                    const guest0 = getActiveDetailsGuest();
-                    if (guest0) {
-                        if (!guest0.serviceTimeSlots) guest0.serviceTimeSlots = {};
-                        guest0.serviceTimeSlots[srvId] = currentSelectedSlot;
-                    }
-                }
-            } else if (!currentSelectedSlot) {
-                // If service 0 has no selection yet, pick first available
-                const firstAvail = (seg.slots || []).find(s => s.available && !s.isPast);
-                if (firstAvail && firstAvail.value) {
-                    currentSelectedSlot = firstAvail.value;
-                    bookingState.serviceTimeSlots[srvId] = currentSelectedSlot;
-                    const guest0 = getActiveDetailsGuest();
-                    if (guest0) {
-                        if (!guest0.serviceTimeSlots) guest0.serviceTimeSlots = {};
-                        guest0.serviceTimeSlots[srvId] = currentSelectedSlot;
-                    }
-                }
-            }
-
-            // Update previousServiceEndMinutes for next service
-            let currentSlotM = 600; // default 10:00 AM
-            if (currentSelectedSlot && currentSelectedSlot.includes(':')) {
-                const p = currentSelectedSlot.split(':');
-                currentSlotM = parseInt(p[0], 10) * 60 + parseInt(p[1] || '0', 10);
-            }
-            previousServiceEndMinutes = currentSlotM + segDur;
+            const currentSelectedSlot = assignedBySrvId[srvId] || '';
+            const otherIntervals = occupiedIntervals.filter(o => o.srvId !== srvId);
 
             const cardBlock = document.createElement('div');
             cardBlock.className = 'service-timeslot-block card border rounded-4 p-3 mb-3 bg-white shadow-sm';
@@ -2487,7 +2572,7 @@
                         <span class="badge bg-light text-dark border">
                             <i class="bi bi-person-fill text-pink me-1"></i>${seg.techName || 'Anyone Available'}
                         </span>
-                        <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1" id="srvBadge_${srvId}">
+                        <span class="badge ${currentSelectedSlot ? 'bg-success-subtle text-success border border-success-subtle' : 'bg-warning-subtle text-dark border border-warning-subtle'} px-2 py-1" id="srvBadge_${srvId}">
                             ${currentSelectedSlot ? formatTime24ToRangeLabel(currentSelectedSlot, segDur) : 'Please pick a time'}
                         </span>
                     </div>
@@ -2513,12 +2598,6 @@
                         </div>
                     </div>
                 </div>
-                ${minAllowedMinutes !== null ? `
-                    <div class="alert alert-light border border-info-subtle rounded-3 p-2 px-3 mb-2 small d-flex align-items-center gap-2 text-dark">
-                        <i class="bi bi-info-circle-fill text-pink"></i>
-                        <span>Service ${srvIdx} finishes at <strong>${formatMinutesTo12Hour(minAllowedMinutes)}</strong>. Time slots before ${formatMinutesTo12Hour(minAllowedMinutes)} are locked to prevent scheduling overlap.</span>
-                    </div>
-                ` : ''}
                 <div class="small fw-semibold text-muted mb-2">Available Time Slots for ${seg.serviceName} (${seg.techName}):</div>
                 <div class="time-slots-grid" id="srvSlotsGrid_${srvId}">
                 </div>
@@ -2527,12 +2606,6 @@
             const srvGrid = cardBlock.querySelector(`#srvSlotsGrid_${srvId}`);
             const rawSegSlots = Array.isArray(seg.slots) ? seg.slots : [];
             let renderedSlotCount = 0;
-
-            // Check if exact sequential slot card should be injected
-            let sequentialCardInjected = false;
-            const seqVal24 = (minAllowedMinutes !== null) ? formatMinutesTo24Hour(minAllowedMinutes) : null;
-            const seqLbl12 = (minAllowedMinutes !== null) ? formatMinutesTo12Hour(minAllowedMinutes) : null;
-            const seqRangeLabel = (minAllowedMinutes !== null) ? formatTime24ToRangeLabel(seqVal24, segDur) : null;
 
             rawSegSlots.forEach(slot => {
                 let isAvail = Boolean(slot.available);
@@ -2547,63 +2620,17 @@
                     return;
                 }
 
-                const parts = slot.value.split(':');
-                const slotMinutes = parseInt(parts[0], 10) * 60 + parseInt(parts[1] || '0', 10);
-
-                // If minAllowedMinutes is between previous slot and this slot, inject the exact sequential card
-                if (minAllowedMinutes !== null && !sequentialCardInjected && slotMinutes >= minAllowedMinutes) {
-                    if (minAllowedMinutes % 15 !== 0 || slotMinutes === minAllowedMinutes) {
-                        const isSeqSelected = (currentSelectedSlot === seqVal24);
-                        const seqCard = document.createElement('div');
-                        seqCard.className = `time-slot-card sequential-slot ${isSeqSelected ? 'selected' : ''}`.trim();
-                        seqCard.setAttribute('data-slot-value', seqVal24);
-                        seqCard.innerHTML = `
-                            <div class="slot-start fw-bold text-pink">${seqLbl12}</div>
-                            <div class="slot-range">${seqRangeLabel}</div>
-                            <span class="slot-status-tag text-pink fw-bold"><i class="bi bi-lightning-charge-fill me-1"></i>Starts right after Service ${srvIdx}</span>
-                        `;
-                        seqCard.onclick = () => selectServiceTimeSlot(srvId, seqVal24, seqRangeLabel, segDur);
-                        srvGrid.appendChild(seqCard);
-                        renderedSlotCount++;
-                        sequentialCardInjected = true;
-                        if (slotMinutes === minAllowedMinutes) {
-                            return; // Avoid duplicate card
-                        }
-                    } else {
-                        sequentialCardInjected = true;
-                    }
-                }
+                const slotStart = parseSlotToMinutes(slot.value);
+                const slotEnd = slotStart !== null ? slotStart + segDur : null;
+                const overlappingOther = (slotStart !== null && slotEnd !== null)
+                    ? otherIntervals.find(o => intervalsOverlap(slotStart, slotEnd, o.startMin, o.endMin))
+                    : null;
 
                 renderedSlotCount++;
                 const card = document.createElement('div');
-
-                // Locked check: slot is strictly before the prior service finishes
-                if (minAllowedMinutes !== null && slotMinutes < minAllowedMinutes) {
-                    card.className = 'time-slot-card locked';
-                    card.setAttribute('data-slot-value', slot.value);
-                    card.setAttribute('title', `Service ${srvIdx} runs until ${formatMinutesTo12Hour(minAllowedMinutes)}. Service ${srvIdx + 1} cannot begin until ${formatMinutesTo12Hour(minAllowedMinutes)}.`);
-                    card.innerHTML = `
-                        <div class="slot-start text-muted">${slot.label}</div>
-                        <div class="slot-range text-muted">${slot.timeRangeLabel}</div>
-                        <span class="slot-status-tag text-muted"><i class="bi bi-hourglass-split me-1"></i>In Service ${srvIdx} until ${formatMinutesTo12Hour(minAllowedMinutes)}</span>
-                    `;
-                    card.onclick = () => showAlert(`Service ${srvIdx} is in progress until ${formatMinutesTo12Hour(minAllowedMinutes)}. Service ${srvIdx + 1} (${seg.serviceName}) cannot begin until ${formatMinutesTo12Hour(minAllowedMinutes)}.`);
-                    srvGrid.appendChild(card);
-                    return;
-                }
-
                 const isSelected = (currentSelectedSlot === slot.value);
 
-                if (isAvail) {
-                    card.className = `time-slot-card ${isSelected ? 'selected' : ''}`.trim();
-                    card.setAttribute('data-slot-value', slot.value);
-                    card.innerHTML = `
-                        <div class="slot-start">${slot.label}</div>
-                        <div class="slot-range">${slot.timeRangeLabel}</div>
-                        <span class="slot-status-tag text-success"><i class="bi bi-check-circle-fill me-1"></i>Available</span>
-                    `;
-                    card.onclick = () => selectServiceTimeSlot(srvId, slot.value, slot.timeRangeLabel, segDur);
-                } else {
+                if (!isAvail) {
                     card.className = 'time-slot-card booked';
                     card.setAttribute('data-slot-value', slot.value);
                     card.innerHTML = `
@@ -2612,6 +2639,28 @@
                         <span class="slot-status-tag text-danger"><i class="bi bi-person-x-fill me-1"></i>Booked</span>
                     `;
                     card.onclick = () => showServiceSlotConflict(srvId, slot, seg.techName);
+                } else if (overlappingOther) {
+                    // Tech IS free here, but it overlaps another selected service.
+                    // Visually show the overlap AND let the customer click it to prioritize this slot (auto-adjusting the other service).
+                    card.className = 'time-slot-card locked';
+                    card.style.cursor = 'pointer';
+                    card.setAttribute('data-slot-value', slot.value);
+                    card.setAttribute('title', `Overlaps ${overlappingOther.serviceName} (${overlappingOther.startLabel} – ${overlappingOther.endLabel}). Click to pick this time and auto-adjust ${overlappingOther.serviceName}.`);
+                    card.innerHTML = `
+                        <div class="slot-start text-muted">${slot.label}</div>
+                        <div class="slot-range text-muted">${slot.timeRangeLabel}</div>
+                        <span class="slot-status-tag text-warning-emphasis"><i class="bi bi-arrow-left-right me-1"></i>Overlaps ${overlappingOther.serviceName}</span>
+                    `;
+                    card.onclick = () => selectServiceTimeSlot(srvId, slot.value, slot.timeRangeLabel, segDur);
+                } else {
+                    card.className = `time-slot-card ${isSelected ? 'selected' : ''}`.trim();
+                    card.setAttribute('data-slot-value', slot.value);
+                    card.innerHTML = `
+                        <div class="slot-start">${slot.label}</div>
+                        <div class="slot-range">${slot.timeRangeLabel}</div>
+                        <span class="slot-status-tag text-success"><i class="bi bi-check-circle-fill me-1"></i>Available</span>
+                    `;
+                    card.onclick = () => selectServiceTimeSlot(srvId, slot.value, slot.timeRangeLabel, segDur);
                 }
                 srvGrid.appendChild(card);
             });
@@ -2623,6 +2672,8 @@
             perContainer.appendChild(cardBlock);
         });
 
+        updateOverallTimeSlotFromPerService();
+        updateSummaryTimeWindowDisplay();
         renderMultiServiceTimeLapseWidget();
     }
 
@@ -4544,9 +4595,21 @@
 
         const primaryGuest = bookingState.guests[0] || {};
 
-        // If primary guest has multiple services, make sure all services have sequential time slots assigned
+        // Preserve custom flexible-order per-service slots; only auto-populate sequentially in combined mode or if none chosen yet
         if (selectedTime && primaryGuest.services && primaryGuest.services.length > 1) {
-            autoPopulateSequentialServiceSlots(selectedTime);
+            const existingPrimarySlots = (primaryGuest.serviceTimeSlots && Object.keys(primaryGuest.serviceTimeSlots).length > 0)
+                ? primaryGuest.serviceTimeSlots
+                : (bookingState.serviceTimeSlots || {});
+            const allHaveSlots = primaryGuest.services.every(s => Boolean(existingPrimarySlots[String(s.id)]));
+            if (bookingState.slotSelectionMode === 'combined' || Object.keys(existingPrimarySlots).length === 0) {
+                autoPopulateSequentialServiceSlots(selectedTime);
+            } else if (!allHaveSlots) {
+                const missingSrv = primaryGuest.services.find(s => !existingPrimarySlots[String(s.id)]);
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalBtnHtml;
+                showAlert(`Please select an available time slot for ${missingSrv ? missingSrv.name : 'all selected services'}.`);
+                return;
+            }
         }
 
         const isAnyonePrimary = (bookingState.selectedStaff && bookingState.selectedStaff.isAnyoneAvailable)

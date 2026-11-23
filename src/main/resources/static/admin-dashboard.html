@@ -871,18 +871,22 @@
 
         try {
             const activeTenant = getActiveTenant();
+            const authToken = localStorage.getItem('accessToken') || localStorage.getItem('token') || '';
             const res = await fetch(`/api/pos/analytics?days=${encodeURIComponent(days)}`, {
                 headers: {
-                    'Authorization': 'Bearer ' + token,
+                    ...(authToken ? { 'Authorization': 'Bearer ' + authToken } : {}),
                     'X-Tenant-ID': activeTenant
                 }
             });
-            if (!res.ok) throw new Error('Failed to load analytics');
+            if (!res.ok) {
+                const errBody = await res.json().catch(() => ({}));
+                throw new Error(errBody.message || `HTTP ${res.status} while loading analytics`);
+            }
             const data = await res.json();
             renderSalonAnalytics(data);
         } catch (err) {
             console.error('Analytics load error:', err);
-            if (rangeLabel) rangeLabel.textContent = 'Unable to load analytics data right now.';
+            if (rangeLabel) rangeLabel.textContent = `Unable to load analytics data right now (${err.message || 'error'}).`;
         }
     }
 

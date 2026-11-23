@@ -1998,131 +1998,8 @@
     function renderMultiServiceTimeLapseWidget() {
         const container = document.getElementById('multiServiceTimeLapseContainer');
         if (!container) return;
-
-        const guest0 = getActiveDetailsGuest();
-        const guest0Services = expandGuestServicesForBooking((guest0 && Array.isArray(guest0.services)) ? guest0.services : []);
-        if (guest0Services.length < 2) {
-            container.style.display = 'none';
-            container.innerHTML = '';
-            return;
-        }
-
-        container.style.display = 'block';
-
-        const guestSlots = (guest0 && guest0.serviceTimeSlots && Object.keys(guest0.serviceTimeSlots).length > 0)
-            ? guest0.serviceTimeSlots
-            : (bookingState.serviceTimeSlots || {});
-
-        let totalDuration = 0;
-        const scheduledItems = guest0Services.map(srv => {
-            const dur = Number(srv.durationMinutes || 45);
-            totalDuration += dur;
-
-            const rawSlot = guestSlots[String(srv.key)] || (bookingState.serviceTimeSlots && bookingState.serviceTimeSlots[String(srv.key)]) || '';
-            const startMin = parseSlotToMinutes(rawSlot);
-            const endMin = startMin !== null ? startMin + dur : null;
-
-            let techName = 'Anyone Available';
-            const assignedTid = guest0.serviceStaffAssignments ? guest0.serviceStaffAssignments[srv.key] : undefined;
-            if (assignedTid != null && assignedTid !== 'anyone' && !isNaN(Number(assignedTid)) && Number(assignedTid) > 0) {
-                const techObj = (bookingState.staffList || []).find(t => t.id === Number(assignedTid));
-                if (techObj) techName = techObj.name || techObj.username;
-            } else if (guest0.selectedStaff && !guest0.selectedStaff.isAnyoneAvailable && guest0.selectedStaff.name) {
-                techName = guest0.selectedStaff.name;
-            }
-
-            return { srv, dur, startMin, endMin, techName };
-        });
-
-        // Sort chronologically by chosen start time (unassigned at the end)
-        scheduledItems.sort((a, b) => {
-            if (a.startMin === null && b.startMin === null) return 0;
-            if (a.startMin === null) return 1;
-            if (b.startMin === null) return -1;
-            return a.startMin - b.startMin;
-        });
-
-        const assignedOnly = scheduledItems.filter(it => it.startMin !== null);
-        const overallStartMinutes = assignedOnly.length > 0 ? assignedOnly[0].startMin : null;
-        const overallEndMinutes = assignedOnly.length > 0 ? Math.max(...assignedOnly.map(it => it.endMin)) : null;
-
-        let stepsHtml = '';
-        scheduledItems.forEach((item, idx) => {
-            const { srv, dur, startMin, endMin, techName } = item;
-            const isNextService = (idx > 0);
-            const timeBadgeHtml = startMin !== null
-                ? `<span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1 fw-bold"><i class="bi bi-clock me-1"></i>${formatMinutesTo12Hour(startMin)} – ${formatMinutesTo12Hour(endMin)}</span>`
-                : `<span class="badge bg-warning-subtle text-dark border border-warning-subtle px-2 py-1 fw-bold"><i class="bi bi-exclamation-circle me-1"></i>Pick a time below</span>`;
-
-            stepsHtml += `
-                <div class="time-lapse-step card border-0 rounded-3 p-3 shadow-sm mb-2" style="background: ${isNextService ? '#fff8fa' : '#ffffff'}; border-left: 4px solid var(--bs-primary-pink) !important;">
-                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
-                        <div class="d-flex align-items-center gap-2">
-                            <span class="badge ${isNextService ? 'bg-pink' : 'bg-dark'} text-white rounded-pill px-2 py-1">#${idx + 1}</span>
-                            <strong class="text-dark fs-6">${srv.name}</strong>
-                            <span class="badge bg-light text-muted border">${dur} mins</span>
-                        </div>
-                        <div class="d-flex align-items-center gap-2">
-                            <span class="badge bg-light text-dark border">
-                                <i class="bi bi-person-fill text-pink me-1"></i>${techName}
-                            </span>
-                            ${timeBadgeHtml}
-                        </div>
-                    </div>
-                </div>
-            `;
-
-            if (idx + 1 < scheduledItems.length) {
-                const nextItem = scheduledItems[idx + 1];
-                if (endMin !== null && nextItem.startMin !== null) {
-                    const gapMins = nextItem.startMin - endMin;
-                    const endLabel = formatMinutesTo12Hour(endMin);
-                    const nextStartLabel = formatMinutesTo12Hour(nextItem.startMin);
-                    const gapText = gapMins > 0
-                        ? `<strong>${dur} min finishes at ${endLabel}</strong> &bull; ${gapMins} min break before ${nextItem.srv.name} at <strong>${nextStartLabel}</strong>`
-                        : `<strong>${dur} min finishes at ${endLabel}</strong> &bull; ${nextItem.srv.name} starts right away at <strong>${nextStartLabel}</strong>`;
-                    stepsHtml += `
-                        <div class="time-lapse-connector d-flex align-items-center gap-2 px-3 py-1 mb-2">
-                            <div class="text-pink fw-bold fs-5"><i class="bi bi-arrow-down-short"></i></div>
-                            <div class="badge bg-white text-dark border shadow-sm px-3 py-2 rounded-pill small">
-                                <i class="bi bi-hourglass-split text-pink me-1"></i>${gapText}
-                            </div>
-                        </div>
-                    `;
-                }
-            }
-        });
-
-        const overallWindowBadge = (overallStartMinutes !== null && overallEndMinutes !== null)
-            ? `<span class="badge bg-pink text-white rounded-pill px-3 py-2 fw-bold"><i class="bi bi-calendar-check me-1"></i>${formatMinutesTo12Hour(overallStartMinutes)} – ${formatMinutesTo12Hour(overallEndMinutes)}</span>`
-            : `<span class="badge bg-secondary text-white rounded-pill px-3 py-2 fw-bold">Choose times below</span>`;
-
-        container.innerHTML = `
-            <div class="card border-0 rounded-4 shadow-sm mb-3 overflow-hidden" style="background: linear-gradient(135deg, #fff5f8 0%, #ffffff 100%); border-left: 5px solid var(--bs-primary-pink) !important;">
-                <div class="card-body p-3 p-md-4">
-                    <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 pb-2 border-bottom gap-2">
-                        <div class="d-flex align-items-center gap-2">
-                            <div class="rounded-circle p-2 d-flex align-items-center justify-content-center" style="background: #ffe3ec; width: 38px; height: 38px;">
-                                <i class="bi bi-clock-history text-pink fs-5"></i>
-                            </div>
-                            <div>
-                                <h6 class="fw-bold mb-0 text-dark">Multi-Service Schedule (Flexible Order)</h6>
-                                <small class="text-muted">Pick whichever specialist is free first &mdash; overlapping times update automatically</small>
-                            </div>
-                        </div>
-                        <div class="d-flex align-items-center gap-2">
-                            <span class="badge bg-light text-dark border px-3 py-2 rounded-pill small">
-                                <i class="bi bi-hourglass me-1"></i>Total: ${totalDuration} mins
-                            </span>
-                            ${overallWindowBadge}
-                        </div>
-                    </div>
-                    <div class="d-flex flex-column">
-                        ${stepsHtml}
-                    </div>
-                </div>
-            </div>
-        `;
+        container.style.display = 'none';
+        container.innerHTML = '';
     }
 
     function autoPopulateSequentialServiceSlots(startValue24) {
@@ -2608,14 +2485,13 @@
                     card.onclick = () => showServiceSlotConflict(srvId, slot, seg.techName);
                 } else if (overlappingOther) {
                     // Tech IS free here, but it overlaps another selected service.
-                    // Visually show the overlap AND let the customer click it to prioritize this slot (auto-adjusting the other service).
+                    // Clickable so the customer can pick this time and auto-adjust the other service.
                     card.className = 'time-slot-card locked';
                     card.style.cursor = 'pointer';
                     card.setAttribute('data-slot-value', slot.value);
-                    card.setAttribute('title', `Overlaps ${overlappingOther.serviceName} (${overlappingOther.startLabel} – ${overlappingOther.endLabel}). Click to pick this time and auto-adjust ${overlappingOther.serviceName}.`);
                     card.innerHTML = `
                         <div class="slot-start text-muted">${slot.label}</div>
-                        <span class="slot-status-tag text-warning-emphasis"><i class="bi bi-arrow-left-right me-1"></i>Overlaps ${overlappingOther.serviceName}</span>
+                        <span class="slot-status-tag text-warning-emphasis"><i class="bi bi-arrow-left-right me-1"></i>Overlaps</span>
                     `;
                     card.onclick = () => selectServiceTimeSlot(srvId, slot.value, slot.timeRangeLabel, segDur);
                 } else {

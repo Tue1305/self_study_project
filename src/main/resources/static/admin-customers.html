@@ -217,6 +217,31 @@
 
     <!-- Customers Table Card -->
     <div class="card border-0 shadow-sm rounded-4 p-3 p-md-4">
+        <!-- Search & Sort Bar -->
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+            <div class="input-group input-group-sm" style="max-width: 380px; flex: 1 1 240px;">
+                <span class="input-group-text bg-white border-end-0 text-muted"><i class="bi bi-search"></i></span>
+                <input type="text" id="customerSearchInput" class="form-control border-start-0"
+                       placeholder="Search by name, phone, or email..."
+                       oninput="renderFilteredCustomers()">
+                <button type="button" id="clearCustomerSearchBtn" class="btn btn-outline-secondary d-none"
+                        title="Clear search"
+                        onclick="document.getElementById('customerSearchInput').value=''; renderFilteredCustomers();">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <span id="customerCountBadge" class="badge bg-light text-secondary border px-2 py-2 fw-semibold">0 customers</span>
+                <select id="customerSortSelect" class="form-select form-select-sm" style="width: auto; min-width: 190px;" onchange="renderFilteredCustomers()">
+                    <option value="name_asc" selected>Sort: Name (A → Z)</option>
+                    <option value="name_desc">Sort: Name (Z → A)</option>
+                    <option value="points_desc">Sort: Loyalty Points (High → Low)</option>
+                    <option value="points_asc">Sort: Loyalty Points (Low → High)</option>
+                    <option value="birthday_asc">Sort: Birthday Month</option>
+                </select>
+            </div>
+        </div>
+
         <table class="table table-hover align-middle mb-0 customers-table">
             <thead class="table-light">
             <tr>
@@ -840,71 +865,128 @@
             if (!response.ok) throw new Error('Failed to fetch customers');
 
             const customers = await response.json();
-            customersCache = customers;
-            const tbody = document.getElementById('customerTableBody');
-            tbody.innerHTML = '';
-
-            if (customers.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-4">No customers found in the database.</td></tr>`;
-                return;
-            }
-
-            customers.forEach((customer, index) => {
-                const safeName = (customer.name || '').replace(/'/g, "\\'");
-                const safeEmail = (customer.email || '').replace(/'/g, "\\'");
-                const safePhone = (customer.phone || '').replace(/'/g, "\\'");
-                const optOut = customer.optOutMarketing === true;
-                const points = customer.loyaltyPoints || 0;
-                const pointsVal = (points * 0.10).toFixed(2);
-
-                let birthdayBadge = '<span class="text-muted small fst-italic">Not set</span>';
-                if (customer.birthDate) {
-                    const [bY, bM, bD] = customer.birthDate.split('-').map(Number);
-                    const bDate = new Date(bY, bM - 1, bD);
-                    const bMonthName = bDate.toLocaleString('en-US', { month: 'short' });
-                    const isThisMonth = (new Date().getMonth() + 1) === bM;
-                    birthdayBadge = `<span class="badge ${isThisMonth ? 'bg-warning-subtle text-dark border border-warning fw-bold' : 'bg-light text-secondary border'}">
-                        <i class="bi bi-cake2-fill text-pink me-1"></i>${bMonthName} ${bD} ${isThisMonth ? '🎉' : ''}
-                    </span>`;
-                }
-
-                tbody.innerHTML += `
-                    <tr>
-                        <td class="col-idx" data-label="#">#${index + 1}</td>
-                        <td class="fw-semibold customer-row-clickable" data-label="Full Name" onclick="openCustomerHistory(${customer.id}, '${safeName}', '${safeEmail}', '${safePhone}')" title="Click to view history and audit log">
-                            <span>
-                                <i class="bi bi-person-fill text-pink me-1"></i>${customer.name || 'N/A'}
-                                ${optOut ? '<span class="badge bg-secondary-subtle text-secondary ms-1 extra-small" title="Opted out of marketing">No Promo</span>' : ''}
-                            </span>
-                        </td>
-                        <td data-label="Email"><a href="mailto:${customer.email || ''}" class="text-decoration-none">${customer.email || 'N/A'}</a></td>
-                        <td class="col-phone" data-label="Phone"><a href="tel:${customer.phone || ''}" class="text-decoration-none">${customer.phone || 'N/A'}</a></td>
-                        <td data-label="Birthday">${birthdayBadge}</td>
-                        <td data-label="Loyalty Points">
-                            <span class="badge bg-warning-subtle text-dark border border-warning-subtle fw-bold">
-                                <i class="bi bi-star-fill text-warning me-1"></i>${points} pts <span class="fw-normal text-muted">($${pointsVal})</span>
-                            </span>
-                        </td>
-                        <td class="text-end col-actions">
-                            <div class="d-inline-flex align-items-center gap-1 flex-nowrap">
-                                <button class="btn btn-outline-info btn-sm fw-semibold" onclick="openCustomerHistory(${customer.id}, '${safeName}', '${safeEmail}', '${safePhone}')" title="View Appointment History & Audit Log">
-                                    <i class="bi bi-clock-history me-1"></i>History
-                                </button>
-                                <button class="btn btn-outline-secondary btn-sm" onclick="openEditModal(${customer.id})" title="Edit Customer">
-                                    <i class="bi bi-pencil"></i>
-                                </button>
-                                <button class="btn btn-outline-danger btn-sm" onclick="deleteCustomer(${customer.id})" title="Delete Customer">
-                                    <i class="bi bi-trash"></i>
-                                </button>
-                            </div>
-                        </td>
-                    </tr>
-                `;
-            });
+            customersCache = Array.isArray(customers) ? customers : [];
+            renderFilteredCustomers();
         } catch (error) {
             console.error('Error loading customers:', error);
             document.getElementById('customerTableBody').innerHTML = `<tr><td colspan="7" class="text-center text-danger py-4">Error loading customer data from server.</td></tr>`;
         }
+    }
+
+    function renderFilteredCustomers() {
+        const tbody = document.getElementById('customerTableBody');
+        const searchEl = document.getElementById('customerSearchInput');
+        const clearBtn = document.getElementById('clearCustomerSearchBtn');
+        const sortEl = document.getElementById('customerSortSelect');
+        const countBadge = document.getElementById('customerCountBadge');
+        if (!tbody) return;
+
+        const rawQuery = searchEl ? searchEl.value.trim() : '';
+        const query = rawQuery.toLowerCase();
+        const queryDigits = rawQuery.replace(/\D/g, '');
+        if (clearBtn) clearBtn.classList.toggle('d-none', rawQuery.length === 0);
+
+        const sortBy = sortEl ? sortEl.value : 'name_asc';
+
+        let list = customersCache.filter(c => {
+            if (!query) return true;
+            const name = String(c.name || '').toLowerCase();
+            const email = String(c.email || '').toLowerCase();
+            const phone = String(c.phone || '').toLowerCase();
+            const phoneDigits = phone.replace(/\D/g, '');
+            return name.includes(query)
+                || email.includes(query)
+                || phone.includes(query)
+                || (queryDigits.length >= 3 && phoneDigits.includes(queryDigits));
+        });
+
+        list.sort((a, b) => {
+            const nameA = String(a.name || '').trim();
+            const nameB = String(b.name || '').trim();
+            const ptsA = Number(a.loyaltyPoints || 0);
+            const ptsB = Number(b.loyaltyPoints || 0);
+            if (sortBy === 'name_desc') return nameB.localeCompare(nameA, undefined, { sensitivity: 'base' });
+            if (sortBy === 'points_desc') return ptsB - ptsA || nameA.localeCompare(nameB, undefined, { sensitivity: 'base' });
+            if (sortBy === 'points_asc') return ptsA - ptsB || nameA.localeCompare(nameB, undefined, { sensitivity: 'base' });
+            if (sortBy === 'birthday_asc') {
+                const keyOf = (bd) => {
+                    if (!bd) return 9999;
+                    const parts = bd.split('-').map(Number);
+                    return (parts[1] || 99) * 100 + (parts[2] || 99);
+                };
+                return keyOf(a.birthDate) - keyOf(b.birthDate) || nameA.localeCompare(nameB, undefined, { sensitivity: 'base' });
+            }
+            return nameA.localeCompare(nameB, undefined, { sensitivity: 'base' });
+        });
+
+        if (countBadge) {
+            countBadge.textContent = query
+                ? `Showing ${list.length} of ${customersCache.length}`
+                : `${customersCache.length} customer${customersCache.length === 1 ? '' : 's'}`;
+        }
+
+        tbody.innerHTML = '';
+        if (customersCache.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-4">No customers found in the database.</td></tr>`;
+            return;
+        }
+        if (list.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-4">No customers match "<strong>${rawQuery.replace(/</g, '&lt;')}</strong>".</td></tr>`;
+            return;
+        }
+
+        list.forEach((customer, index) => {
+            const safeName = (customer.name || '').replace(/'/g, "\\'");
+            const safeEmail = (customer.email || '').replace(/'/g, "\\'");
+            const safePhone = (customer.phone || '').replace(/'/g, "\\'");
+            const optOut = customer.optOutMarketing === true;
+            const points = customer.loyaltyPoints || 0;
+            const pointsVal = (points * 0.10).toFixed(2);
+
+            let birthdayBadge = '<span class="text-muted small fst-italic">Not set</span>';
+            if (customer.birthDate) {
+                const [bY, bM, bD] = customer.birthDate.split('-').map(Number);
+                const bDate = new Date(bY, bM - 1, bD);
+                const bMonthName = bDate.toLocaleString('en-US', { month: 'short' });
+                const isThisMonth = (new Date().getMonth() + 1) === bM;
+                birthdayBadge = `<span class="badge ${isThisMonth ? 'bg-warning-subtle text-dark border border-warning fw-bold' : 'bg-light text-secondary border'}">
+                    <i class="bi bi-cake2-fill text-pink me-1"></i>${bMonthName} ${bD} ${isThisMonth ? '🎉' : ''}
+                </span>`;
+            }
+
+            tbody.innerHTML += `
+                <tr>
+                    <td class="col-idx" data-label="#">#${index + 1}</td>
+                    <td class="fw-semibold customer-row-clickable" data-label="Full Name" onclick="openCustomerHistory(${customer.id}, '${safeName}', '${safeEmail}', '${safePhone}')" title="Click to view history and audit log">
+                        <span>
+                            <i class="bi bi-person-fill text-pink me-1"></i>${customer.name || 'N/A'}
+                            ${optOut ? '<span class="badge bg-secondary-subtle text-secondary ms-1 extra-small" title="Opted out of marketing">No Promo</span>' : ''}
+                        </span>
+                    </td>
+                    <td data-label="Email"><a href="mailto:${customer.email || ''}" class="text-decoration-none">${customer.email || 'N/A'}</a></td>
+                    <td class="col-phone" data-label="Phone"><a href="tel:${customer.phone || ''}" class="text-decoration-none">${customer.phone || 'N/A'}</a></td>
+                    <td data-label="Birthday">${birthdayBadge}</td>
+                    <td data-label="Loyalty Points">
+                        <span class="badge bg-warning-subtle text-dark border border-warning-subtle fw-bold">
+                            <i class="bi bi-star-fill text-warning me-1"></i>${points} pts <span class="fw-normal text-muted">($${pointsVal})</span>
+                        </span>
+                    </td>
+                    <td class="text-end col-actions">
+                        <div class="d-inline-flex align-items-center gap-1 flex-nowrap">
+                            <button class="btn btn-outline-info btn-sm fw-semibold" onclick="openCustomerHistory(${customer.id}, '${safeName}', '${safeEmail}', '${safePhone}')" title="View Appointment History & Audit Log">
+                                <i class="bi bi-clock-history me-1"></i>History
+                            </button>
+                            <button class="btn btn-outline-secondary btn-sm" onclick="openEditModal(${customer.id})" title="Edit Customer">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <button class="btn btn-outline-danger btn-sm" onclick="deleteCustomer(${customer.id})" title="Delete Customer">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        });
     }
 
     function appendFlag(flag) {

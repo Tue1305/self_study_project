@@ -18,6 +18,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
@@ -38,6 +39,13 @@ public class StaffPortalController {
     private final CustomerRepository customerRepository;
     private final StaffDayOffRepository staffDayOffRepository;
     private final TenantContextResolver tenantContextResolver;
+
+    @Autowired(required = false)
+    private PasswordEncoder passwordEncoder;
+
+    public void setPasswordEncoder(PasswordEncoder passwordEncoder) {
+        this.passwordEncoder = passwordEncoder;
+    }
 
     @Autowired
     public StaffPortalController(
@@ -255,6 +263,52 @@ public class StaffPortalController {
                 "medicalFlags", appt.getMedicalFlags() != null ? appt.getMedicalFlags() : "",
                 "notes", appt.getNotes() != null ? appt.getNotes() : ""
         ));
+    }
+
+    /**
+     * Allows an authenticated staff member (or admin) to change their own password
+     * (e.g., replacing the initial defaultPassword123) after verifying their current password.
+     */
+    @PostMapping("/change-password")
+    @PreAuthorize("hasAnyAuthority('ROLE_NAIL_TECH', 'NAIL_TECH', 'ROLE_STAFF', 'STAFF', 'ROLE_ADMIN', 'ADMIN')")
+    @Transactional
+    public ResponseEntity<?> changeMyPassword(
+            @RequestBody(required = false) Map<String, String> body,
+            HttpServletRequest request
+    ) {
+        String tenantId = tenantContextResolver.resolveTenantId(request);
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated() || "anonymousUser".equalsIgnoreCase(auth.getName())) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", "Authentication required."));
+        }
+
+        String currentPassword = body != null ? body.get("currentPassword") : null;
+        String newPassword = body != null ? body.get("newPassword") : null;
+
+        if (currentPassword == null || currentPassword.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Current password is required."));
+        }
+        if (newPassword == null || newPassword.trim().length() < 6) {
+            return ResponseEntity.badRequest().body(Map.of("message", "New password must be at least 6 characters."));
+        }
+
+        UserEntity user = resolveTargetTech(tenantId, auth.getName(), null);
+        if (user == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", "Account not found."));
+        }
+
+        if (passwordEncoder == null) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("message", "Password service unavailable."));
+        }
+
+        if (!passwordEncoder.matches(currentPassword, user.getPassword())) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Current password is incorrect."));
+        }
+
+        user.setPassword(passwordEncoder.encode(newPassword.trim()));
+        userRepository.save(user);
+
+        return ResponseEntity.ok(Map.of("message", "Password updated successfully!"));
     }
 
     private UserEntity resolveTargetTech(String tenantId, String username, Long requestedStaffId) {

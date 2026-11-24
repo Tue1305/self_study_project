@@ -267,6 +267,44 @@ public class NailTechController {
         return ResponseEntity.ok(Map.of("message", "Nail technician deleted successfully"));
     }
 
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ADMIN')")
+    @PatchMapping("/{id}/reset-password")
+    public ResponseEntity<?> resetNailTechPassword(
+            @PathVariable Long id,
+            @RequestBody(required = false) Map<String, Object> body,
+            HttpServletRequest request
+    ) {
+        String tenantId = tenantContextResolver.resolveTenantId(request);
+        Optional<UserEntity> existingOpt = userRepository.findByTenantIdAndId(tenantId, id);
+        if (existingOpt.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("message", "Nail technician not found"));
+        }
+
+        boolean resetToDefault = body != null && Boolean.TRUE.equals(body.get("resetToDefault"));
+        String newPassword = (body != null && body.get("newPassword") != null)
+                ? String.valueOf(body.get("newPassword")).trim()
+                : "";
+
+        if (resetToDefault) {
+            newPassword = "defaultPassword123";
+        } else if (newPassword.length() < 6) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("message", "New password must be at least 6 characters."));
+        }
+
+        UserEntity tech = existingOpt.get();
+        tech.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(tech);
+
+        String displayName = (tech.getName() != null && !tech.getName().isBlank()) ? tech.getName() : tech.getUsername();
+        return ResponseEntity.ok(Map.of(
+                "message", resetToDefault
+                        ? ("Password reset to defaultPassword123 for " + displayName + ".")
+                        : ("Password updated successfully for " + displayName + ".")
+        ));
+    }
+
     @GetMapping("/days-off")
     public List<StaffDayOff> getDaysOff(
             @RequestParam(required = false) String date,

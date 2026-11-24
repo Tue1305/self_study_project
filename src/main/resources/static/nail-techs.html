@@ -188,6 +188,45 @@
     </div>
 </div>
 
+<!-- Reset Staff Password Modal -->
+<div class="modal fade" id="resetPasswordModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow rounded-4">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title fw-bold text-dark">
+                    <i class="bi bi-key-fill text-pink me-2"></i>Reset Staff Password
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body py-3">
+                <input type="hidden" id="resetPwdTechId">
+                <p class="small text-muted mb-3">
+                    Set a new login password for <strong id="resetPwdTechName" class="text-dark">Staff</strong>.
+                </p>
+                <div class="mb-3">
+                    <label for="resetPwdInput" class="form-label fw-semibold text-secondary small">New Password (min 6 characters)</label>
+                    <input type="password" class="form-control rounded-3" id="resetPwdInput" placeholder="Enter new password">
+                </div>
+                <div class="mb-2">
+                    <label for="resetPwdConfirmInput" class="form-label fw-semibold text-secondary small">Confirm New Password</label>
+                    <input type="password" class="form-control rounded-3" id="resetPwdConfirmInput" placeholder="Re-enter new password">
+                </div>
+                <div id="resetPwdError" class="alert alert-danger py-2 px-3 small d-none mt-2 mb-0"></div>
+                <div id="resetPwdSuccess" class="alert alert-success py-2 px-3 small d-none mt-2 mb-0"></div>
+            </div>
+            <div class="modal-footer border-0 d-flex justify-content-between flex-wrap gap-2">
+                <button type="button" id="resetDefaultPwdBtn" class="btn btn-outline-warning text-dark btn-sm rounded-3 fw-semibold" onclick="submitAdminPasswordReset(true)">
+                    <i class="bi bi-arrow-counterclockwise me-1"></i>Reset to Default
+                </button>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-light rounded-3 fw-semibold" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" id="saveResetPwdBtn" class="btn btn-pink rounded-3 fw-semibold px-4" onclick="submitAdminPasswordReset(false)">Save Password</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Footer with Store Hours -->
 <footer class="bg-white border-top py-4 mt-auto">
     <div class="container text-center">
@@ -207,6 +246,7 @@
 <script>
     const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
     let techModalInstance = null;
+    let resetPwdModalInstance = null;
 
     // --- ADMIN ROUTE GUARD ---
     (function() {
@@ -492,10 +532,13 @@
                             </span>
                         </td>
                         <td class="text-end">
-                            <button class="btn btn-outline-secondary btn-sm me-1" onclick="openEditModal(${tech.id}, '${safeName}', '${safeEmail}', '${safeSpec}', ${comm})">
+                            <button class="btn btn-outline-warning text-dark btn-sm me-1" title="Reset Staff Password" onclick="openResetPasswordModal(${tech.id}, '${safeName}')">
+                                <i class="bi bi-key-fill"></i>
+                            </button>
+                            <button class="btn btn-outline-secondary btn-sm me-1" title="Edit Staff" onclick="openEditModal(${tech.id}, '${safeName}', '${safeEmail}', '${safeSpec}', ${comm})">
                                 <i class="bi bi-pencil"></i>
                             </button>
-                            <button class="btn btn-outline-danger btn-sm" onclick="deleteNailTech(${tech.id})">
+                            <button class="btn btn-outline-danger btn-sm" title="Delete Staff" onclick="deleteNailTech(${tech.id})">
                                 <i class="bi bi-trash"></i>
                             </button>
                         </td>
@@ -609,6 +652,71 @@
         } catch (error) {
             console.error('Error deleting nail tech:', error);
             alert('Server connection error.');
+        }
+    }
+
+    function openResetPasswordModal(techId, techName) {
+        if (!resetPwdModalInstance) {
+            resetPwdModalInstance = new bootstrap.Modal(document.getElementById('resetPasswordModal'));
+        }
+        document.getElementById('resetPwdTechId').value = techId;
+        document.getElementById('resetPwdTechName').textContent = techName || 'Staff';
+        document.getElementById('resetPwdInput').value = '';
+        document.getElementById('resetPwdConfirmInput').value = '';
+        document.getElementById('resetPwdError').classList.add('d-none');
+        document.getElementById('resetPwdSuccess').classList.add('d-none');
+        resetPwdModalInstance.show();
+    }
+
+    async function submitAdminPasswordReset(resetToDefault) {
+        const techId = document.getElementById('resetPwdTechId').value;
+        const newPwd = document.getElementById('resetPwdInput').value;
+        const confirmPwd = document.getElementById('resetPwdConfirmInput').value;
+        const errEl = document.getElementById('resetPwdError');
+        const okEl = document.getElementById('resetPwdSuccess');
+        const saveBtn = document.getElementById('saveResetPwdBtn');
+        const defBtn = document.getElementById('resetDefaultPwdBtn');
+
+        errEl.classList.add('d-none');
+        okEl.classList.add('d-none');
+
+        if (!resetToDefault) {
+            if (!newPwd || newPwd.trim().length < 6) {
+                errEl.textContent = 'New password must be at least 6 characters.';
+                errEl.classList.remove('d-none');
+                return;
+            }
+            if (newPwd !== confirmPwd) {
+                errEl.textContent = 'Passwords do not match.';
+                errEl.classList.remove('d-none');
+                return;
+            }
+        }
+
+        saveBtn.disabled = true;
+        defBtn.disabled = true;
+        try {
+            const res = await fetch(`/api/nail-techs/${techId}/reset-password`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + token,
+                    'X-Tenant-ID': activeTenant
+                },
+                body: JSON.stringify(resetToDefault ? { resetToDefault: true } : { newPassword: newPwd.trim() })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.message || 'Failed to reset password.');
+
+            okEl.textContent = data.message || 'Password updated successfully!';
+            okEl.classList.remove('d-none');
+            setTimeout(() => resetPwdModalInstance.hide(), 1400);
+        } catch (err) {
+            errEl.textContent = err.message || 'Server connection error.';
+            errEl.classList.remove('d-none');
+        } finally {
+            saveBtn.disabled = false;
+            defBtn.disabled = false;
         }
     }
 

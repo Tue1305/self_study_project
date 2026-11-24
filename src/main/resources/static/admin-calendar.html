@@ -3047,27 +3047,6 @@
                         h('i', { className: 'bi bi-lightning-charge-fill me-1' }),
                         'Anyone Available',
                         anyoneAvailableAppts.length > 0 && h('span', { className: 'anyone-edge-badge' }, anyoneAvailableAppts.length)
-                    ]),
-                    h('button', {
-                        type: 'button',
-                        className: 'btn btn-sm px-3 fw-bold d-flex align-items-center gap-1 shadow-sm',
-                        style: soundUnlocked
-                            ? { backgroundColor: '#ffffff', color: '#198754', border: '1.5px solid #198754' }
-                            : { backgroundColor: '#fff3cd', color: '#856404', border: '1.5px solid #ffc107' },
-                        title: soundUnlocked
-                            ? 'Booking alert sound is active — click to test volume'
-                            : 'Tap once to enable booking alert sounds on mobile/desktop',
-                        onClick: () => {
-                            playNewBookingChime();
-                            setDragToast({
-                                type: 'success',
-                                message: '🔔 Booking alert sound enabled! You will hear this chime when new bookings arrive.'
-                            });
-                            setTimeout(() => setDragToast(null), 3000);
-                        }
-                    }, [
-                        h('i', { className: soundUnlocked ? 'bi bi-volume-up-fill' : 'bi bi-volume-mute-fill' }),
-                        soundUnlocked ? 'Sound On' : 'Tap for Sound'
                     ])
                 )
             ),

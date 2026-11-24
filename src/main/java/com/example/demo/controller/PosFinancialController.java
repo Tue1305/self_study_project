@@ -352,9 +352,6 @@ public class PosFinancialController {
                 (dto.getColorFormula() != null && !dto.getColorFormula().isBlank() ? " | Formula: " + dto.getColorFormula().trim() : "")
         );
 
-        String existingNotes = appointment.getNotes() != null ? appointment.getNotes().trim() : "";
-        appointment.setNotes(existingNotes.isEmpty() ? financialSummary : existingNotes + " | " + financialSummary);
-
         Appointment savedAppointment = appointmentRepository.save(appointment);
 
         // 10. Update Customer Profile with loyalty points, color formula & safety alerts

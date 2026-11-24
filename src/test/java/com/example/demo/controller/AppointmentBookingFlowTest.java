@@ -678,11 +678,10 @@ class AppointmentBookingFlowTest {
                         .header("X-Tenant-ID", "default")
                         .param("status", "CONFIRMED"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("CONFIRMED"))
-                .andExpect(jsonPath("$.appointment.notes").value(org.hamcrest.Matchers.containsString("Customer arrived for Gel Manicure Deluxe with Tony")));
+                .andExpect(jsonPath("$.status").value("CONFIRMED"));
 
         org.junit.jupiter.api.Assertions.assertEquals(Appointment.AppointmentStatus.CONFIRMED, appt.getStatus());
-        org.junit.jupiter.api.Assertions.assertTrue(appt.getNotes().contains("Tony"));
+        org.junit.jupiter.api.Assertions.assertNull(appt.getNotes());
     }
 
     @Test
@@ -708,10 +707,10 @@ class AppointmentBookingFlowTest {
                         .param("status", "CANCELLED")
                         .param("reason", "Client called sick with fever"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("CANCELLED"))
-                .andExpect(jsonPath("$.appointment.notes").value(org.hamcrest.Matchers.containsString("Client called sick with fever")));
+                .andExpect(jsonPath("$.status").value("CANCELLED"));
 
         org.junit.jupiter.api.Assertions.assertEquals(Appointment.AppointmentStatus.CANCELLED, appt.getStatus());
+        org.junit.jupiter.api.Assertions.assertNull(appt.getNotes());
     }
 
     @Test
@@ -737,10 +736,10 @@ class AppointmentBookingFlowTest {
                         .param("status", "NO_SHOW")
                         .param("reason", "Did not arrive and no answer on phone"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("NO_SHOW"))
-                .andExpect(jsonPath("$.appointment.notes").value(org.hamcrest.Matchers.containsString("Did not arrive and no answer on phone")));
+                .andExpect(jsonPath("$.status").value("NO_SHOW"));
 
         org.junit.jupiter.api.Assertions.assertEquals(Appointment.AppointmentStatus.NO_SHOW, appt.getStatus());
+        org.junit.jupiter.api.Assertions.assertNull(appt.getNotes());
     }
 
     @Test
@@ -768,7 +767,7 @@ class AppointmentBookingFlowTest {
                 .andExpect(jsonPath("$.markedCount").value(1));
 
         org.junit.jupiter.api.Assertions.assertEquals(Appointment.AppointmentStatus.NO_SHOW, overdueAppt.getStatus());
-        org.junit.jupiter.api.Assertions.assertTrue(overdueAppt.getNotes().contains("Auto NO_SHOW: 15+ minutes past scheduled time"));
+        org.junit.jupiter.api.Assertions.assertNull(overdueAppt.getNotes());
     }
 
     @Test
@@ -851,12 +850,10 @@ class AppointmentBookingFlowTest {
                         .param("status", "COMPLETED")
                         .param("reason", staffNotes))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("COMPLETED"))
-                .andExpect(jsonPath("$.appointment.notes").value(org.hamcrest.Matchers.containsString("COMPLETED: Gel Manicure Deluxe with Tony")))
-                .andExpect(jsonPath("$.appointment.notes").value(org.hamcrest.Matchers.containsString(staffNotes)));
+                .andExpect(jsonPath("$.status").value("COMPLETED"));
 
         org.junit.jupiter.api.Assertions.assertEquals(Appointment.AppointmentStatus.COMPLETED, appt.getStatus());
-        org.junit.jupiter.api.Assertions.assertTrue(appt.getNotes().contains("OPI Bubble Bath"));
+        org.junit.jupiter.api.Assertions.assertNull(appt.getNotes());
     }
 
     @Test

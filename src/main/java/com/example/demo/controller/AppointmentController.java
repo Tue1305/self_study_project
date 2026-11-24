@@ -160,9 +160,6 @@ public class AppointmentController {
                 apt.getStatus() == Appointment.AppointmentStatus.PENDING) {
 
                 apt.setStatus(Appointment.AppointmentStatus.NO_SHOW);
-                String existingNotes = apt.getNotes() != null ? apt.getNotes().trim() : "";
-                String noShowTag = "[Auto NO_SHOW: 15+ minutes past scheduled time without arrival]";
-                apt.setNotes(existingNotes.isEmpty() ? noShowTag : existingNotes + " | " + noShowTag);
                 Appointment saved = appointmentRepository.save(apt);
                 autoMarked.add(saved);
 
@@ -1539,36 +1536,24 @@ public class AppointmentController {
                     : "Anyone Available";
 
             String auditDescription;
-            String noteTag;
 
             if (newStatus == Appointment.AppointmentStatus.CONFIRMED) {
                 auditDescription = "Customer arrived & confirmed for " + serviceName + " with " + staffName +
                         (finalReason != null && !finalReason.isBlank() ? " | " + finalReason : "");
-                noteTag = "[CONFIRMED: Customer arrived for " + serviceName + " with " + staffName +
-                        (finalReason != null && !finalReason.isBlank() ? " | " + finalReason : "") + "]";
             } else if (newStatus == Appointment.AppointmentStatus.CANCELLED) {
                 String why = (finalReason != null && !finalReason.isBlank()) ? finalReason : "Cancelled by salon administrator";
                 auditDescription = "Cancelled: " + why;
-                noteTag = "[CANCELLED Reason: " + why + "]";
             } else if (newStatus == Appointment.AppointmentStatus.NO_SHOW) {
                 String why = (finalReason != null && !finalReason.isBlank()) ? finalReason : "Customer did not show up (Marked by admin)";
                 auditDescription = "Marked NO_SHOW: " + why;
-                noteTag = "[NO_SHOW Reason: " + why + "]";
             } else if (newStatus == Appointment.AppointmentStatus.COMPLETED) {
                 auditDescription = "Service completed: " + serviceName + " with " + staffName +
                         (finalReason != null && !finalReason.isBlank() ? " | " + finalReason : "") +
                         (finalColor != null ? " | Formula: " + finalColor : "");
-                noteTag = "[COMPLETED: " + serviceName + " with " + staffName +
-                        (finalReason != null && !finalReason.isBlank() ? " | Notes: " + finalReason : "") +
-                        (finalColor != null ? " | Formula: " + finalColor : "") + "]";
             } else {
                 auditDescription = "Status changed to " + newStatus.name() +
                         (finalReason != null && !finalReason.isBlank() ? " (" + finalReason + ")" : "");
-                noteTag = "[" + newStatus.name() + " Reason: " + (finalReason != null ? finalReason : "Status updated") + "]";
             }
-
-            String existingNotes = appointment.getNotes() != null ? appointment.getNotes().trim() : "";
-            appointment.setNotes(existingNotes.isEmpty() ? noteTag : existingNotes + " | " + noteTag);
 
             Appointment updated = appointmentRepository.save(appointment);
 
@@ -1788,9 +1773,6 @@ public class AppointmentController {
         return appointmentRepository.findByCancellationToken(token.trim())
                 .map(appt -> {
                     appt.setStatus(Appointment.AppointmentStatus.CANCELLED);
-                    String existingNotes = appt.getNotes() != null ? appt.getNotes().trim() : "";
-                    String reasonTag = "[CANCELLED Reason: " + finalReason + "]";
-                    appt.setNotes(existingNotes.isEmpty() ? reasonTag : existingNotes + " | " + reasonTag);
                     Appointment updated = appointmentRepository.save(appt);
 
                     if (auditService != null) {
@@ -1920,9 +1902,6 @@ public class AppointmentController {
             appt.setReminderSentAt(null);
         }
         String reason = body.containsKey("reason") ? String.valueOf(body.get("reason")) : "Rescheduled by customer via self-service portal";
-        String existingNotes = appt.getNotes() != null ? appt.getNotes().trim() : "";
-        String reschedTag = "[RESCHEDULED: " + oldTime + " -> " + newTime + "]";
-        appt.setNotes(existingNotes.isEmpty() ? reschedTag : existingNotes + " | " + reschedTag);
 
         Appointment updated = appointmentRepository.save(appt);
 
@@ -2046,9 +2025,6 @@ public class AppointmentController {
         }
 
         String reason = body.containsKey("reason") ? String.valueOf(body.get("reason")) : "Rescheduled by admin";
-        String existingNotes = appt.getNotes() != null ? appt.getNotes().trim() : "";
-        String reschedTag = "[RESCHEDULED: " + oldTime + " -> " + newTime + "]";
-        appt.setNotes(existingNotes.isEmpty() ? reschedTag : existingNotes + " | " + reschedTag);
 
         Appointment updated = appointmentRepository.save(appt);
 
@@ -2166,12 +2142,10 @@ public class AppointmentController {
 
         appt.setNailTech(targetTech);
         String reason = (body != null && body.containsKey("reason")) ? String.valueOf(body.get("reason")) : "Reassigned from " + oldTechName + " to " + newTechName;
-        String existingNotes = appt.getNotes() != null ? appt.getNotes().trim() : "";
-        if (targetTech != null) {
-            existingNotes = existingNotes.replace("[ANYONE AVAILABLE]", "").replaceAll("\\s{2,}", " ").trim();
+        if (targetTech != null && appt.getNotes() != null && appt.getNotes().contains("[ANYONE AVAILABLE]")) {
+            String cleanedNotes = appt.getNotes().replace("[ANYONE AVAILABLE]", "").replaceAll("\\s{2,}", " ").trim();
+            appt.setNotes(cleanedNotes);
         }
-        String reassignTag = "[REASSIGNED: " + oldTechName + " -> " + newTechName + "]";
-        appt.setNotes(existingNotes.isEmpty() ? reassignTag : existingNotes + " | " + reassignTag);
 
         Appointment updated = appointmentRepository.save(appt);
 

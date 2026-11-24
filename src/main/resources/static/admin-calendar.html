@@ -1223,6 +1223,16 @@
         };
         const [loading, setLoading] = useState(true);
         const [selectedAppointment, setSelectedAppointment] = useState(null);
+        const [completedOverrideModal, setCompletedOverrideModal] = useState({
+            isOpen: false,
+            apt: null,
+            targetStatus: '',
+            step: 1,
+            reason: '',
+            password: '',
+            submitting: false,
+            error: null
+        });
         const [statusReason, setStatusReason] = useState('');
         const [notifyCustomer, setNotifyCustomer] = useState(true);
         const [customerHistoryModal, setCustomerHistoryModal] = useState({ isOpen: false, loading: false, data: null, error: null, title: '' });
@@ -2007,7 +2017,25 @@
             });
         };
 
-        const handleUpdateStatus = async (aptId, newStatus, reason = '') => {
+        const handleUpdateStatus = async (aptId, newStatus, reason = '', bypassCompletedGuard = false) => {
+            // Lock guard: checked-out (COMPLETED) appointments cannot be confirmed/cancelled/marked no-show without reason + admin password
+            const targetApt = (selectedAppointment && selectedAppointment.id === aptId)
+                ? selectedAppointment
+                : appointments.find(a => a.id === aptId);
+            if (!bypassCompletedGuard && targetApt && String(targetApt.status || '').toUpperCase() === 'COMPLETED') {
+                setCompletedOverrideModal({
+                    isOpen: true,
+                    apt: targetApt,
+                    targetStatus: newStatus,
+                    step: 1,
+                    reason: (reason || statusReason || '').trim(),
+                    password: '',
+                    submitting: false,
+                    error: null
+                });
+                return;
+            }
+
             let effectiveReason = reason || statusReason;
             if (newStatus === 'CANCELLED' && (!effectiveReason || !effectiveReason.trim())) {
                 const promptReason = prompt('Please enter the cancellation reason (e.g. Client called to cancel, Emergency, Weather, Late cancel):', 'Client requested');
@@ -2047,6 +2075,62 @@
             } catch (err) {
                 console.error('Error updating status:', err);
                 alert('Error updating status: ' + (err.message || 'Network error'));
+            }
+        };
+
+        const handleConfirmCompletedOverride = async () => {
+            const { apt, targetStatus, reason, password } = completedOverrideModal;
+            if (!apt) return;
+            if (!reason || !reason.trim()) {
+                setCompletedOverrideModal(prev => ({ ...prev, step: 1, error: 'Please enter a reason before continuing.' }));
+                return;
+            }
+            if (!password || !password.trim()) {
+                setCompletedOverrideModal(prev => ({ ...prev, error: 'Please enter the admin password to authorize this change.' }));
+                return;
+            }
+
+            setCompletedOverrideModal(prev => ({ ...prev, submitting: true, error: null }));
+            try {
+                const verifyRes = await fetch('/api/pos/verify-owner-password', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Tenant-ID': activeTenant,
+                        ...(token ? { 'Authorization': 'Bearer ' + token } : {})
+                    },
+                    body: JSON.stringify({ password })
+                });
+                const verifyData = await verifyRes.json().catch(() => ({}));
+                if (!verifyRes.ok || !verifyData.success) {
+                    setCompletedOverrideModal(prev => ({
+                        ...prev,
+                        submitting: false,
+                        password: '',
+                        error: verifyData.message || 'Incorrect admin password. Please try again.'
+                    }));
+                    return;
+                }
+
+                const verifiedBy = verifyData.verifiedBy || 'Admin';
+                const auditReason = `[ADMIN OVERRIDE by ${verifiedBy}] ${reason.trim()}`;
+                setCompletedOverrideModal({
+                    isOpen: false,
+                    apt: null,
+                    targetStatus: '',
+                    step: 1,
+                    reason: '',
+                    password: '',
+                    submitting: false,
+                    error: null
+                });
+                await handleUpdateStatus(apt.id, targetStatus, auditReason, true);
+            } catch (err) {
+                setCompletedOverrideModal(prev => ({
+                    ...prev,
+                    submitting: false,
+                    error: 'Network error verifying admin password: ' + (err.message || 'Please try again.')
+                }));
             }
         };
 
@@ -4011,38 +4095,163 @@
                                 )
                             )
                         ),
-                        h('div', { className: 'modal-footer d-flex justify-content-between' },
-                            h('div', { className: 'd-flex gap-2 flex-wrap' },
-                                selectedAppointment.status !== 'COMPLETED' && h('button', {
-                                    type: 'button',
-                                    className: 'btn btn-sm btn-primary fw-bold px-3 d-inline-flex align-items-center gap-1',
-                                    onClick: () => handleOpenCompleteModal(selectedAppointment)
-                                }, [h('i', { className: 'bi bi-cash-coin' }), ' Checkout & Complete']),
+                        h('div', { className: 'modal-footer d-flex flex-column align-items-stretch gap-2' },
+                            selectedAppointment.status === 'COMPLETED' && h('div', {
+                                className: 'alert alert-secondary py-2 px-3 mb-0 small d-flex align-items-center gap-2 rounded-3'
+                            }, [
+                                h('i', { className: 'bi bi-lock-fill text-dark' }),
+                                h('span', null, 'Checked out & locked. Changing status requires a reason and admin password.')
+                            ]),
+                            h('div', { className: 'd-flex justify-content-between align-items-center flex-wrap gap-2' },
+                                h('div', { className: 'd-flex gap-2 flex-wrap' },
+                                    selectedAppointment.status !== 'COMPLETED' && h('button', {
+                                        type: 'button',
+                                        className: 'btn btn-sm btn-primary fw-bold px-3 d-inline-flex align-items-center gap-1',
+                                        onClick: () => handleOpenCompleteModal(selectedAppointment)
+                                    }, [h('i', { className: 'bi bi-cash-coin' }), ' Checkout & Complete']),
+                                    h('button', {
+                                        type: 'button',
+                                        className: selectedAppointment.status === 'COMPLETED'
+                                            ? 'btn btn-sm btn-outline-secondary fw-semibold px-3 d-inline-flex align-items-center gap-1'
+                                            : 'btn btn-sm btn-success fw-bold px-3 d-inline-flex align-items-center gap-1',
+                                        title: selectedAppointment.status === 'COMPLETED' ? 'Locked after checkout — click to override with reason & admin password' : '',
+                                        onClick: () => handleUpdateStatus(selectedAppointment.id, 'CONFIRMED')
+                                    }, [
+                                        h('i', { className: selectedAppointment.status === 'COMPLETED' ? 'bi bi-lock-fill' : 'bi bi-check2-circle' }),
+                                        ' Confirm (Customer Arrived)'
+                                    ]),
+                                    h('button', {
+                                        type: 'button',
+                                        className: selectedAppointment.status === 'COMPLETED'
+                                            ? 'btn btn-sm btn-outline-secondary fw-semibold px-3 d-inline-flex align-items-center gap-1'
+                                            : 'btn btn-sm btn-outline-danger fw-semibold px-3 d-inline-flex align-items-center gap-1',
+                                        title: selectedAppointment.status === 'COMPLETED' ? 'Locked after checkout — click to override with reason & admin password' : '',
+                                        onClick: () => handleUpdateStatus(selectedAppointment.id, 'CANCELLED', statusReason)
+                                    }, [
+                                        h('i', { className: selectedAppointment.status === 'COMPLETED' ? 'bi bi-lock-fill' : 'bi bi-x-circle' }),
+                                        ' Cancel'
+                                    ]),
+                                    h('button', {
+                                        type: 'button',
+                                        className: selectedAppointment.status === 'COMPLETED'
+                                            ? 'btn btn-sm btn-outline-secondary fw-semibold px-3 d-inline-flex align-items-center gap-1'
+                                            : 'btn btn-sm btn-outline-warning text-dark fw-semibold px-3 d-inline-flex align-items-center gap-1',
+                                        title: selectedAppointment.status === 'COMPLETED' ? 'Locked after checkout — click to override with reason & admin password' : '',
+                                        onClick: () => handleUpdateStatus(selectedAppointment.id, 'NO_SHOW', statusReason)
+                                    }, [
+                                        h('i', { className: selectedAppointment.status === 'COMPLETED' ? 'bi bi-lock-fill' : 'bi bi-person-x' }),
+                                        ' Mark No-Show'
+                                    ])
+                                ),
                                 h('button', {
                                     type: 'button',
-                                    className: 'btn btn-sm btn-success fw-bold px-3 d-inline-flex align-items-center gap-1',
-                                    onClick: () => handleUpdateStatus(selectedAppointment.id, 'CONFIRMED')
-                                }, [h('i', { className: 'bi bi-check2-circle' }), ' Confirm (Customer Arrived)']),
-                                h('button', {
-                                    type: 'button',
-                                    className: 'btn btn-sm btn-outline-danger fw-semibold px-3 d-inline-flex align-items-center gap-1',
-                                    onClick: () => handleUpdateStatus(selectedAppointment.id, 'CANCELLED', statusReason)
-                                }, [h('i', { className: 'bi bi-x-circle' }), ' Cancel']),
-                                h('button', {
-                                    type: 'button',
-                                    className: 'btn btn-sm btn-outline-warning text-dark fw-semibold px-3 d-inline-flex align-items-center gap-1',
-                                    onClick: () => handleUpdateStatus(selectedAppointment.id, 'NO_SHOW', statusReason)
-                                }, [h('i', { className: 'bi bi-person-x' }), ' Mark No-Show'])
-                            ),
+                                    className: 'btn btn-sm btn-secondary',
+                                    onClick: () => {
+                                        setSelectedAppointment(null);
+                                        setStatusReason('');
+                                        setRescheduleBoxOpen(false);
+                                    }
+                                }, 'Close')
+                            )
+                        )
+                    )
+                )
+            ),
+
+            /* Checked-Out Appointment Override Modal (Step 1: Reason -> Step 2: Admin Password) */
+            completedOverrideModal.isOpen && completedOverrideModal.apt && h('div', {
+                className: 'modal fade show d-block',
+                style: { backgroundColor: 'rgba(15, 23, 42, 0.65)', zIndex: 1070 }
+            },
+                h('div', { className: 'modal-dialog modal-dialog-centered' },
+                    h('div', { className: 'modal-content border-0 shadow-lg rounded-4 overflow-hidden' },
+                        h('div', { className: 'modal-header bg-dark text-white py-3' },
+                            h('h5', { className: 'modal-title fw-bold d-flex align-items-center gap-2 fs-6' }, [
+                                h('i', { className: 'bi bi-shield-lock-fill text-warning' }),
+                                completedOverrideModal.step === 1
+                                    ? 'Step 1 of 2: Override Reason Required'
+                                    : 'Step 2 of 2: Admin Password Required'
+                            ]),
                             h('button', {
                                 type: 'button',
-                                className: 'btn btn-sm btn-secondary',
-                                onClick: () => {
-                                    setSelectedAppointment(null);
-                                    setStatusReason('');
-                                    setRescheduleBoxOpen(false);
-                                }
-                            }, 'Close')
+                                className: 'btn-close btn-close-white',
+                                disabled: completedOverrideModal.submitting,
+                                onClick: () => setCompletedOverrideModal(prev => ({ ...prev, isOpen: false, password: '', error: null }))
+                            })
+                        ),
+                        h('div', { className: 'modal-body p-4' },
+                            h('div', { className: 'alert alert-warning py-2 px-3 small mb-3 rounded-3' },
+                                `Appointment #${completedOverrideModal.apt.id} (${completedOverrideModal.apt.customerName || 'Guest'}) is already checked out. `,
+                                h('strong', null, `Requested change: ${completedOverrideModal.targetStatus}`)
+                            ),
+                            completedOverrideModal.error && h('div', { className: 'alert alert-danger py-2 px-3 small mb-3 rounded-3' }, [
+                                h('i', { className: 'bi bi-exclamation-triangle-fill me-1' }),
+                                completedOverrideModal.error
+                            ]),
+                            completedOverrideModal.step === 1
+                                ? h('div', null,
+                                    h('label', { className: 'form-label fw-semibold small text-dark' }, 'Reason for modifying a checked-out appointment *'),
+                                    h('textarea', {
+                                        className: 'form-control',
+                                        rows: 3,
+                                        autoFocus: true,
+                                        placeholder: 'e.g., Accidental checkout, wrong customer checked out, refund issued...',
+                                        value: completedOverrideModal.reason,
+                                        onChange: (e) => setCompletedOverrideModal(prev => ({ ...prev, reason: e.target.value, error: null }))
+                                    })
+                                )
+                                : h('div', null,
+                                    h('div', { className: 'bg-light border rounded-3 p-2 px-3 mb-3 small' },
+                                        h('div', { className: 'text-muted fw-semibold', style: { fontSize: '0.75rem' } }, 'Recorded Reason:'),
+                                        h('div', { className: 'text-dark fw-semibold' }, completedOverrideModal.reason)
+                                    ),
+                                    h('label', { className: 'form-label fw-semibold small text-dark' }, 'Enter Admin Password *'),
+                                    h('input', {
+                                        type: 'password',
+                                        className: 'form-control',
+                                        autoFocus: true,
+                                        placeholder: 'Admin password',
+                                        value: completedOverrideModal.password,
+                                        onChange: (e) => setCompletedOverrideModal(prev => ({ ...prev, password: e.target.value, error: null })),
+                                        onKeyDown: (e) => {
+                                            if (e.key === 'Enter' && !completedOverrideModal.submitting) {
+                                                handleConfirmCompletedOverride();
+                                            }
+                                        }
+                                    })
+                                )
+                        ),
+                        h('div', { className: 'modal-footer bg-light d-flex justify-content-between' },
+                            completedOverrideModal.step === 1
+                                ? h('button', {
+                                    type: 'button',
+                                    className: 'btn btn-sm btn-outline-secondary',
+                                    onClick: () => setCompletedOverrideModal(prev => ({ ...prev, isOpen: false, error: null }))
+                                }, 'Cancel')
+                                : h('button', {
+                                    type: 'button',
+                                    className: 'btn btn-sm btn-outline-secondary',
+                                    disabled: completedOverrideModal.submitting,
+                                    onClick: () => setCompletedOverrideModal(prev => ({ ...prev, step: 1, password: '', error: null }))
+                                }, '← Back to Reason'),
+                            completedOverrideModal.step === 1
+                                ? h('button', {
+                                    type: 'button',
+                                    className: 'btn btn-sm btn-dark fw-bold px-3',
+                                    onClick: () => {
+                                        if (!completedOverrideModal.reason || !completedOverrideModal.reason.trim()) {
+                                            setCompletedOverrideModal(prev => ({ ...prev, error: 'Please enter a reason to continue.' }));
+                                            return;
+                                        }
+                                        setCompletedOverrideModal(prev => ({ ...prev, step: 2, error: null }));
+                                    }
+                                }, 'Next: Admin Password →')
+                                : h('button', {
+                                    type: 'button',
+                                    className: 'btn btn-sm btn-danger fw-bold px-3',
+                                    disabled: completedOverrideModal.submitting,
+                                    onClick: handleConfirmCompletedOverride
+                                }, completedOverrideModal.submitting ? 'Verifying...' : 'Verify & Apply Override')
                         )
                     )
                 )

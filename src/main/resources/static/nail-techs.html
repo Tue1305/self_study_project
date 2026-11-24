@@ -455,7 +455,16 @@
             });
             if (!response.ok) throw new Error('Failed to fetch nail technicians');
 
-            const techs = await response.json();
+            const rawTechs = await response.json();
+            const techs = Array.isArray(rawTechs)
+                ? [...rawTechs].sort((a, b) =>
+                    String(a.name || a.username || '').trim().localeCompare(
+                        String(b.name || b.username || '').trim(),
+                        undefined,
+                        { sensitivity: 'base' }
+                    )
+                )
+                : [];
             const tbody = document.getElementById('techTableBody');
             tbody.innerHTML = '';
 

@@ -3667,7 +3667,15 @@
                 headers: getActiveTenantHeaders()
             });
             const techs = response.ok ? await response.json() : [];
-            bookingState.staffList = techs;
+            bookingState.staffList = Array.isArray(techs)
+                ? [...techs].sort((a, b) =>
+                    String(a.name || a.username || '').trim().localeCompare(
+                        String(b.name || b.username || '').trim(),
+                        undefined,
+                        { sensitivity: 'base' }
+                    )
+                )
+                : [];
 
             // Pre-fetch today's schedule conflicts and staff day-off status if not cached
             if (!bookingState.staffBookedInfo || !bookingState.staffDaysOffInfo) {

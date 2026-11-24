@@ -38,6 +38,64 @@
         .btn-pink { background-color: var(--bs-primary-pink); border-color: var(--bs-primary-pink); color: #fff; }
         .btn-pink:hover { filter: brightness(0.9); color: #fff; }
 
+        /* Dynamic no-horizontal-scroll Customers table */
+        .customers-table {
+            width: 100%;
+            table-layout: auto;
+        }
+        .customers-table th,
+        .customers-table td {
+            white-space: normal;
+            overflow-wrap: anywhere;
+            vertical-align: middle;
+        }
+        .customers-table .col-idx { width: 52px; white-space: nowrap; }
+        .customers-table .col-phone { white-space: nowrap; }
+        .customers-table .col-actions { white-space: nowrap; width: 1%; }
+        @media (max-width: 767.98px) {
+            .customers-table thead { display: none; }
+            .customers-table,
+            .customers-table tbody,
+            .customers-table tr,
+            .customers-table td {
+                display: block;
+                width: 100%;
+            }
+            .customers-table tr {
+                border: 1px solid #e9ecef;
+                border-radius: 12px;
+                padding: 10px 12px;
+                margin-bottom: 12px;
+                background: #fff;
+            }
+            .customers-table td {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                gap: 8px;
+                padding: 6px 0;
+                border: 0;
+                border-bottom: 1px dashed #f1f3f5;
+                text-align: right;
+            }
+            .customers-table td:last-child {
+                border-bottom: 0;
+                justify-content: flex-end;
+                padding-top: 10px;
+            }
+            .customers-table td::before {
+                content: attr(data-label);
+                font-weight: 600;
+                font-size: 0.78rem;
+                color: #6c757d;
+                text-align: left;
+                flex-shrink: 0;
+            }
+            .customers-table td:last-child::before {
+                display: none;
+            }
+        }
+
         /* Timeline and Audit Log Styles */
         .timeline-container {
             position: relative;
@@ -142,12 +200,12 @@
 <script>if (window.TenantTheme && TenantTheme.syncAdminElements) TenantTheme.syncAdminElements();</script>
 
 <!-- Main Container -->
-<main class="container my-5 flex-grow-1">
+<main class="container-fluid px-3 px-md-4 my-4 flex-grow-1" style="max-width: 1440px;">
     <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
         <h2 class="h3 fw-bold text-dark mb-0">
             <i class="bi bi-person-lines-fill text-pink me-2"></i><span id="customerHeading">Customer Database</span>
         </h2>
-        <div class="d-flex align-items-center gap-2">
+        <div class="d-flex align-items-center gap-2 flex-wrap">
             <button class="btn btn-outline-warning btn-sm fw-bold text-dark d-flex align-items-center gap-1 shadow-sm" onclick="openMarketingModal()">
                 <i class="bi bi-megaphone-fill text-warning"></i> Automated Marketing & Win-Back Hub
             </button>
@@ -158,28 +216,23 @@
     </div>
 
     <!-- Customers Table Card -->
-    <div class="card border-0 shadow-sm rounded-4 p-4">
-        <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
-                <thead class="table-light">
-                <tr>
-                    <th>#</th>
-                    <th>Full Name</th>
-                    <th>Email</th>
-                    <th>Phone</th>
-                    <th>Nail Style</th>
-                    <th>Birthday</th>
-                    <th>Loyalty Points</th>
-                    <th>Safety / Allergy Flags</th>
-                    <th>Color Formula</th>
-                    <th class="text-end">Actions</th>
-                </tr>
-                </thead>
-                <tbody id="customerTableBody">
-                <!-- Populated dynamically via JavaScript -->
-                </tbody>
-            </table>
-        </div>
+    <div class="card border-0 shadow-sm rounded-4 p-3 p-md-4">
+        <table class="table table-hover align-middle mb-0 customers-table">
+            <thead class="table-light">
+            <tr>
+                <th class="col-idx">#</th>
+                <th>Full Name</th>
+                <th>Email</th>
+                <th class="col-phone">Phone</th>
+                <th>Birthday</th>
+                <th>Loyalty Points</th>
+                <th class="text-end col-actions">Actions</th>
+            </tr>
+            </thead>
+            <tbody id="customerTableBody">
+            <!-- Populated dynamically via JavaScript -->
+            </tbody>
+        </table>
     </div>
 </main>
 
@@ -792,7 +845,7 @@
             tbody.innerHTML = '';
 
             if (customers.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="10" class="text-center text-muted py-4">No customers found in the database.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-4">No customers found in the database.</td></tr>`;
                 return;
             }
 
@@ -803,32 +856,6 @@
                 const optOut = customer.optOutMarketing === true;
                 const points = customer.loyaltyPoints || 0;
                 const pointsVal = (points * 0.10).toFixed(2);
-
-                let nailStyleBadge = '<span class="text-muted small fst-italic">Not specified</span>';
-                if (customer.nailShape || customer.nailSystem || customer.nailLength) {
-                    nailStyleBadge = `
-                        <div class="d-flex flex-column gap-1">
-                            <span class="badge bg-pink text-white rounded-pill px-2 py-1" style="font-size: 0.72rem; width: fit-content;">
-                                💅 ${customer.nailShape || 'Shape'} ${customer.nailLength ? '(' + customer.nailLength + ')' : ''}
-                            </span>
-                            ${customer.nailSystem ? `<span class="badge bg-light text-dark border px-2 py-1" style="font-size: 0.7rem; width: fit-content;">${customer.nailSystem}</span>` : ''}
-                        </div>
-                    `;
-                }
-
-                let flagsBadge = '<span class="text-muted small fst-italic">None</span>';
-                if (customer.medicalFlags && customer.medicalFlags.trim()) {
-                    flagsBadge = `<span class="badge bg-danger text-white border-0 shadow-sm d-inline-flex align-items-center gap-1 py-1 px-2" title="${customer.medicalFlags}">
-                        <i class="bi bi-exclamation-triangle-fill"></i> ${customer.medicalFlags}
-                    </span>`;
-                }
-
-                let formulaBadge = '<span class="text-muted small fst-italic">No shade saved</span>';
-                if (customer.colorFormula && customer.colorFormula.trim()) {
-                    formulaBadge = `<span class="badge bg-light text-dark border d-inline-flex align-items-center gap-1 py-1 px-2" title="${customer.colorFormula}">
-                        <i class="bi bi-palette text-pink"></i> ${customer.colorFormula}
-                    </span>`;
-                }
 
                 let birthdayBadge = '<span class="text-muted small fst-italic">Not set</span>';
                 if (customer.birthDate) {
@@ -843,39 +870,40 @@
 
                 tbody.innerHTML += `
                     <tr>
-                        <td>#${index + 1}</td>
-                        <td class="fw-semibold customer-row-clickable" onclick="openCustomerHistory(${customer.id}, '${safeName}', '${safeEmail}', '${safePhone}')" title="Click to view history and audit log">
-                            <i class="bi bi-person-fill text-pink me-1"></i>${customer.name || 'N/A'}
-                            ${optOut ? '<span class="badge bg-secondary-subtle text-secondary ms-1 extra-small" title="Opted out of marketing">No Promo</span>' : ''}
+                        <td class="col-idx" data-label="#">#${index + 1}</td>
+                        <td class="fw-semibold customer-row-clickable" data-label="Full Name" onclick="openCustomerHistory(${customer.id}, '${safeName}', '${safeEmail}', '${safePhone}')" title="Click to view history and audit log">
+                            <span>
+                                <i class="bi bi-person-fill text-pink me-1"></i>${customer.name || 'N/A'}
+                                ${optOut ? '<span class="badge bg-secondary-subtle text-secondary ms-1 extra-small" title="Opted out of marketing">No Promo</span>' : ''}
+                            </span>
                         </td>
-                        <td><a href="mailto:${customer.email || ''}" class="text-decoration-none">${customer.email || 'N/A'}</a></td>
-                        <td><a href="tel:${customer.phone || ''}" class="text-decoration-none">${customer.phone || 'N/A'}</a></td>
-                        <td>${nailStyleBadge}</td>
-                        <td>${birthdayBadge}</td>
-                        <td>
+                        <td data-label="Email"><a href="mailto:${customer.email || ''}" class="text-decoration-none">${customer.email || 'N/A'}</a></td>
+                        <td class="col-phone" data-label="Phone"><a href="tel:${customer.phone || ''}" class="text-decoration-none">${customer.phone || 'N/A'}</a></td>
+                        <td data-label="Birthday">${birthdayBadge}</td>
+                        <td data-label="Loyalty Points">
                             <span class="badge bg-warning-subtle text-dark border border-warning-subtle fw-bold">
                                 <i class="bi bi-star-fill text-warning me-1"></i>${points} pts <span class="fw-normal text-muted">($${pointsVal})</span>
                             </span>
                         </td>
-                        <td>${flagsBadge}</td>
-                        <td>${formulaBadge}</td>
-                        <td class="text-end">
-                            <button class="btn btn-outline-info btn-sm me-1 fw-semibold" onclick="openCustomerHistory(${customer.id}, '${safeName}', '${safeEmail}', '${safePhone}')" title="View Appointment History & Audit Log">
-                                <i class="bi bi-clock-history me-1"></i> History
-                            </button>
-                            <button class="btn btn-outline-secondary btn-sm me-1" onclick="openEditModal(${customer.id})" title="Edit Customer">
-                                <i class="bi bi-pencil"></i>
-                            </button>
-                            <button class="btn btn-outline-danger btn-sm" onclick="deleteCustomer(${customer.id})" title="Delete Customer">
-                                <i class="bi bi-trash"></i>
-                            </button>
+                        <td class="text-end col-actions">
+                            <div class="d-inline-flex align-items-center gap-1 flex-nowrap">
+                                <button class="btn btn-outline-info btn-sm fw-semibold" onclick="openCustomerHistory(${customer.id}, '${safeName}', '${safeEmail}', '${safePhone}')" title="View Appointment History & Audit Log">
+                                    <i class="bi bi-clock-history me-1"></i>History
+                                </button>
+                                <button class="btn btn-outline-secondary btn-sm" onclick="openEditModal(${customer.id})" title="Edit Customer">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <button class="btn btn-outline-danger btn-sm" onclick="deleteCustomer(${customer.id})" title="Delete Customer">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
                         </td>
                     </tr>
                 `;
             });
         } catch (error) {
             console.error('Error loading customers:', error);
-            document.getElementById('customerTableBody').innerHTML = `<tr><td colspan="10" class="text-center text-danger py-4">Error loading customer data from server.</td></tr>`;
+            document.getElementById('customerTableBody').innerHTML = `<tr><td colspan="7" class="text-center text-danger py-4">Error loading customer data from server.</td></tr>`;
         }
     }
 

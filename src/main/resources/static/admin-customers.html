@@ -52,6 +52,42 @@
         .customers-table .col-idx { width: 52px; white-space: nowrap; }
         .customers-table .col-phone { white-space: nowrap; }
         .customers-table .col-actions { white-space: nowrap; width: 1%; }
+        .customer-search-wrapper {
+            position: relative;
+            max-width: 420px;
+            flex: 1 1 260px;
+        }
+        .customer-search-suggestions {
+            position: absolute;
+            top: calc(100% + 4px);
+            left: 0;
+            right: 0;
+            z-index: 1050;
+            background: #ffffff;
+            border: 1px solid #dee2e6;
+            border-radius: 12px;
+            box-shadow: 0 10px 28px rgba(15, 23, 42, 0.12);
+            max-height: 280px;
+            overflow-y: auto;
+        }
+        .customer-suggestion-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            border-bottom: 1px solid #f1f3f5;
+            transition: background-color 0.12s ease;
+        }
+        .customer-suggestion-item:last-child { border-bottom: 0; }
+        .customer-suggestion-item:hover,
+        .customer-suggestion-item.active {
+            background-color: #fff0f6;
+        }
+        .customer-suggestion-item mark {
+            background-color: #ffe3ec;
+            color: #c2185b;
+            padding: 0 2px;
+            border-radius: 3px;
+            font-weight: 700;
+        }
         @media (max-width: 767.98px) {
             .customers-table thead { display: none; }
             .customers-table,
@@ -219,16 +255,22 @@
     <div class="card border-0 shadow-sm rounded-4 p-3 p-md-4">
         <!-- Search & Sort Bar -->
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
-            <div class="input-group input-group-sm" style="max-width: 380px; flex: 1 1 240px;">
-                <span class="input-group-text bg-white border-end-0 text-muted"><i class="bi bi-search"></i></span>
-                <input type="text" id="customerSearchInput" class="form-control border-start-0"
-                       placeholder="Search by name, phone, or email..."
-                       oninput="renderFilteredCustomers()">
-                <button type="button" id="clearCustomerSearchBtn" class="btn btn-outline-secondary d-none"
-                        title="Clear search"
-                        onclick="document.getElementById('customerSearchInput').value=''; renderFilteredCustomers();">
-                    <i class="bi bi-x-lg"></i>
-                </button>
+            <div class="customer-search-wrapper" id="customerSearchWrapper">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-white border-end-0 text-muted"><i class="bi bi-search"></i></span>
+                    <input type="text" id="customerSearchInput" class="form-control border-start-0"
+                           autocomplete="off"
+                           placeholder="Search by name, phone, or email..."
+                           oninput="renderFilteredCustomers(true)"
+                           onfocus="renderFilteredCustomers(true)"
+                           onkeydown="handleCustomerSearchKeydown(event)">
+                    <button type="button" id="clearCustomerSearchBtn" class="btn btn-outline-secondary d-none"
+                            title="Clear search"
+                            onclick="clearCustomerSearch()">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                </div>
+                <div id="customerSearchSuggestions" class="customer-search-suggestions d-none"></div>
             </div>
             <div class="d-flex align-items-center gap-2 flex-wrap">
                 <span id="customerCountBadge" class="badge bg-light text-secondary border px-2 py-2 fw-semibold">0 customers</span>
@@ -873,12 +915,79 @@
         }
     }
 
-    function renderFilteredCustomers() {
+    let activeSuggestionIdx = -1;
+    let currentSuggestionList = [];
+
+    function escapeHtml(str) {
+        return String(str || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    function highlightSearchMatch(text, query) {
+        const safe = escapeHtml(text);
+        if (!query) return safe;
+        const escapedQ = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        return safe.replace(new RegExp(`(${escapedQ})`, 'gi'), '<mark>$1</mark>');
+    }
+
+    function hideCustomerSuggestions() {
+        const box = document.getElementById('customerSearchSuggestions');
+        if (box) box.classList.add('d-none');
+        activeSuggestionIdx = -1;
+    }
+
+    function clearCustomerSearch() {
+        const input = document.getElementById('customerSearchInput');
+        if (input) input.value = '';
+        hideCustomerSuggestions();
+        renderFilteredCustomers(false);
+    }
+
+    function selectCustomerSuggestion(nameValue) {
+        const input = document.getElementById('customerSearchInput');
+        if (input) input.value = nameValue || '';
+        hideCustomerSuggestions();
+        renderFilteredCustomers(false);
+    }
+
+    function handleCustomerSearchKeydown(e) {
+        const box = document.getElementById('customerSearchSuggestions');
+        if (!box || box.classList.contains('d-none') || currentSuggestionList.length === 0) return;
+        const items = box.querySelectorAll('.customer-suggestion-item');
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            activeSuggestionIdx = (activeSuggestionIdx + 1) % items.length;
+            items.forEach((el, i) => el.classList.toggle('active', i === activeSuggestionIdx));
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            activeSuggestionIdx = (activeSuggestionIdx - 1 + items.length) % items.length;
+            items.forEach((el, i) => el.classList.toggle('active', i === activeSuggestionIdx));
+        } else if (e.key === 'Enter' && activeSuggestionIdx >= 0) {
+            e.preventDefault();
+            const chosen = currentSuggestionList[activeSuggestionIdx];
+            if (chosen) selectCustomerSuggestion(chosen.name || chosen.email || chosen.phone || '');
+        } else if (e.key === 'Escape') {
+            hideCustomerSuggestions();
+        }
+    }
+
+    document.addEventListener('click', (e) => {
+        const wrapper = document.getElementById('customerSearchWrapper');
+        if (wrapper && !wrapper.contains(e.target)) {
+            hideCustomerSuggestions();
+        }
+    });
+
+    function renderFilteredCustomers(showSuggestions = false) {
         const tbody = document.getElementById('customerTableBody');
         const searchEl = document.getElementById('customerSearchInput');
         const clearBtn = document.getElementById('clearCustomerSearchBtn');
         const sortEl = document.getElementById('customerSortSelect');
         const countBadge = document.getElementById('customerCountBadge');
+        const suggestionsBox = document.getElementById('customerSearchSuggestions');
         if (!tbody) return;
 
         const rawQuery = searchEl ? searchEl.value.trim() : '';
@@ -897,8 +1006,37 @@
             return name.includes(query)
                 || email.includes(query)
                 || phone.includes(query)
-                || (queryDigits.length >= 3 && phoneDigits.includes(queryDigits));
+                || (queryDigits.length >= 1 && phoneDigits.includes(queryDigits));
         });
+
+        // Render live autocomplete suggestions dropdown as each letter/digit is typed
+        if (suggestionsBox) {
+            if (showSuggestions && rawQuery.length > 0) {
+                currentSuggestionList = list.slice(0, 8);
+                activeSuggestionIdx = -1;
+                if (currentSuggestionList.length > 0) {
+                    suggestionsBox.innerHTML = currentSuggestionList.map(c => {
+                        const pickVal = (c.name || c.email || c.phone || '').replace(/'/g, "\\'");
+                        return `
+                            <div class="customer-suggestion-item" onclick="selectCustomerSuggestion('${pickVal}')">
+                                <div class="fw-semibold text-dark small">
+                                    <i class="bi bi-person-fill text-pink me-1"></i>${highlightSearchMatch(c.name || 'N/A', rawQuery)}
+                                </div>
+                                <div class="text-muted" style="font-size: 0.75rem;">
+                                    ${c.phone ? `<span class="me-2"><i class="bi bi-telephone me-1"></i>${highlightSearchMatch(c.phone, rawQuery)}</span>` : ''}
+                                    ${c.email ? `<span><i class="bi bi-envelope me-1"></i>${highlightSearchMatch(c.email, rawQuery)}</span>` : ''}
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                } else {
+                    suggestionsBox.innerHTML = `<div class="p-2 px-3 small text-muted">No matching customers for "${escapeHtml(rawQuery)}"</div>`;
+                }
+                suggestionsBox.classList.remove('d-none');
+            } else {
+                hideCustomerSuggestions();
+            }
+        }
 
         list.sort((a, b) => {
             const nameA = String(a.name || '').trim();

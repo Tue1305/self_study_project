@@ -1972,7 +1972,88 @@
         return startA < endB && startB < endA;
     }
 
-    function findEarliestNonOverlappingSlot(seg, occupiedIntervals, isToday, nowPlusBuffer) {
+    /**
+     * Collects all unsaved time windows already chosen by OTHER guests (idx !== activeGuestIdx)
+     * in this same booking session, so the same specialist dynamically shows as Booked right away
+     * across guests without ever blocking a guest's own previously selected slot.
+     */
+    function getOtherGuestsReservedWindows(activeGuestIdx) {
+        const windows = [];
+        const guests = Array.isArray(bookingState.guests) ? bookingState.guests : [];
+        const BUFFER_MINS = 15;
+
+        guests.forEach((g, idx) => {
+            if (idx === activeGuestIdx || !g) return;
+            const expanded = expandGuestServicesForBooking(g.services || []);
+            const gSlots = g.serviceTimeSlots || {};
+            const hasPerService = expanded.length > 0 && expanded.some(it => Boolean(gSlots[String(it.key)]));
+
+            if (hasPerService) {
+                expanded.forEach(item => {
+                    const slotVal = gSlots[String(item.key)];
+                    const startMin = parseSlotToMinutes(slotVal);
+                    if (startMin === null) return;
+                    let techId = g.serviceStaffAssignments ? g.serviceStaffAssignments[item.key] : undefined;
+                    if ((techId === undefined || techId === null) && g.selectedStaff && !g.selectedStaff.isAnyoneAvailable && g.selectedStaff.id) {
+                        techId = g.selectedStaff.id;
+                    }
+                    if (techId != null && techId !== 'anyone' && !isNaN(Number(techId)) && Number(techId) > 0) {
+                        const dur = Number(item.durationMinutes || 45);
+                        windows.push({
+                            guestNum: idx + 1,
+                            techId: Number(techId),
+                            startMin,
+                            endMin: startMin + dur + BUFFER_MINS,
+                            serviceName: item.name
+                        });
+                    }
+                });
+            } else if (g.selectedTimeSlot) {
+                const startMin = parseSlotToMinutes(g.selectedTimeSlot);
+                if (startMin === null) return;
+                const totalDur = calculateGuestTotals(g).duration || 45;
+                const techIds = new Set();
+                if (g.selectedStaff && !g.selectedStaff.isAnyoneAvailable && g.selectedStaff.id && !isNaN(Number(g.selectedStaff.id))) {
+                    techIds.add(Number(g.selectedStaff.id));
+                }
+                if (g.serviceStaffAssignments) {
+                    Object.values(g.serviceStaffAssignments).forEach(tid => {
+                        if (tid != null && tid !== 'anyone' && !isNaN(Number(tid)) && Number(tid) > 0) {
+                            techIds.add(Number(tid));
+                        }
+                    });
+                }
+                techIds.forEach(tid => {
+                    windows.push({
+                        guestNum: idx + 1,
+                        techId: tid,
+                        startMin,
+                        endMin: startMin + totalDur + BUFFER_MINS,
+                        serviceName: (g.services && g.services[0]) ? g.services[0].name : 'Service'
+                    });
+                });
+            }
+        });
+        return windows;
+    }
+
+    function findOtherGuestConflictForWindow(techIds, slotStartMin, durationMin, otherGuestWindows) {
+        if (slotStartMin === null || !Array.isArray(otherGuestWindows) || otherGuestWindows.length === 0) return null;
+        const idList = Array.isArray(techIds) ? techIds : [techIds];
+        const validIds = idList.map(Number).filter(id => !isNaN(id) && id > 0);
+        if (validIds.length === 0) return null;
+        const BUFFER_MINS = 15;
+        const candEndWithBuffer = slotStartMin + (Number(durationMin) || 45) + BUFFER_MINS;
+        for (let i = 0; i < otherGuestWindows.length; i++) {
+            const w = otherGuestWindows[i];
+            if (validIds.includes(w.techId) && intervalsOverlap(slotStartMin, candEndWithBuffer, w.startMin, w.endMin)) {
+                return w;
+            }
+        }
+        return null;
+    }
+
+    function findEarliestNonOverlappingSlot(seg, occupiedIntervals, isToday, nowPlusBuffer, segTechId = null, otherGuestWindows = []) {
         const segDur = Number(seg.durationMinutes || 45);
         const rawSlots = Array.isArray(seg.slots) ? seg.slots : [];
         for (let i = 0; i < rawSlots.length; i++) {
@@ -1988,9 +2069,9 @@
             if (sStart === null) continue;
             const sEnd = sStart + segDur;
             const hasOverlap = occupiedIntervals.some(o => intervalsOverlap(sStart, sEnd, o.startMin, o.endMin));
-            if (!hasOverlap) {
-                return s.value;
-            }
+            if (hasOverlap) continue;
+            if (segTechId && findOtherGuestConflictForWindow(segTechId, sStart, segDur, otherGuestWindows)) continue;
+            return s.value;
         }
         return null;
     }
@@ -2328,9 +2409,19 @@
         const isToday = (selectedDate === getLocalTodayDateStr());
         const nowPlusBuffer = new Date(Date.now() + 15 * 60 * 1000);
         const guest0 = getActiveDetailsGuest();
+        const otherGuestWindows = getOtherGuestsReservedWindows(bookingState.detailsGuestIndex || 0);
 
         if (!bookingState.serviceTimeSlots) bookingState.serviceTimeSlots = {};
         if (guest0 && !guest0.serviceTimeSlots) guest0.serviceTimeSlots = {};
+
+        const resolveSegTechId = (seg, srvId) => {
+            let tid = guest0 && guest0.serviceStaffAssignments ? guest0.serviceStaffAssignments[srvId] : undefined;
+            if ((tid === undefined || tid === null) && seg && seg.techId) tid = seg.techId;
+            if ((tid === undefined || tid === null) && guest0 && guest0.selectedStaff && !guest0.selectedStaff.isAnyoneAvailable && guest0.selectedStaff.id) {
+                tid = guest0.selectedStaff.id;
+            }
+            return (tid != null && tid !== 'anyone' && !isNaN(Number(tid)) && Number(tid) > 0) ? Number(tid) : null;
+        };
 
         // Pass 1: Ensure every service has a valid, non-overlapping initial selection (flexible order — earliest free tech can go first!)
         const occupiedIntervals = [];
@@ -2340,6 +2431,7 @@
         servicesAvail.forEach(seg => {
             const srvId = String(seg.slotKey || seg.serviceId);
             const segDur = Number(seg.durationMinutes || 45);
+            const segTechId = resolveSegTechId(seg, srvId);
             let curSlot = (guest0 && guest0.serviceTimeSlots && guest0.serviceTimeSlots[srvId])
                 || bookingState.serviceTimeSlots[srvId] || '';
             if (curSlot && (curSlot.toUpperCase().includes('AM') || curSlot.toUpperCase().includes('PM'))) {
@@ -2350,7 +2442,8 @@
                 const curEnd = curStart + segDur;
                 const slotMatchesAvail = (seg.slots || []).some(s => s.value === curSlot && s.available && !s.isPast);
                 const overlapsExisting = occupiedIntervals.some(o => intervalsOverlap(curStart, curEnd, o.startMin, o.endMin));
-                if (slotMatchesAvail && !overlapsExisting) {
+                const otherConflict = findOtherGuestConflictForWindow(segTechId, curStart, segDur, otherGuestWindows);
+                if (slotMatchesAvail && !overlapsExisting && !otherConflict) {
                     assignedBySrvId[srvId] = curSlot;
                     occupiedIntervals.push({
                         srvId,
@@ -2368,12 +2461,13 @@
             if (guest0 && guest0.serviceTimeSlots) delete guest0.serviceTimeSlots[srvId];
         });
 
-        // Pass 2: For any service without a selection yet, pick its earliest available slot that doesn't overlap already-chosen services
+        // Pass 2: For any service without a selection yet, pick its earliest available slot that doesn't overlap already-chosen services or other guests
         servicesAvail.forEach(seg => {
             const srvId = String(seg.slotKey || seg.serviceId);
             if (assignedBySrvId[srvId]) return;
             const segDur = Number(seg.durationMinutes || 45);
-            const bestSlot = findEarliestNonOverlappingSlot(seg, occupiedIntervals, isToday, nowPlusBuffer);
+            const segTechId = resolveSegTechId(seg, srvId);
+            const bestSlot = findEarliestNonOverlappingSlot(seg, occupiedIntervals, isToday, nowPlusBuffer, segTechId, otherGuestWindows);
             if (bestSlot) {
                 assignedBySrvId[srvId] = bestSlot;
                 bookingState.serviceTimeSlots[srvId] = bestSlot;
@@ -2467,6 +2561,13 @@
 
                 const slotStart = parseSlotToMinutes(slot.value);
                 const slotEnd = slotStart !== null ? slotStart + segDur : null;
+                const segTechId = resolveSegTechId(seg, srvId);
+                const otherGuestConflict = isAvail
+                    ? findOtherGuestConflictForWindow(segTechId, slotStart, segDur, otherGuestWindows)
+                    : null;
+                if (otherGuestConflict) {
+                    isAvail = false;
+                }
                 const overlappingOther = (slotStart !== null && slotEnd !== null)
                     ? otherIntervals.find(o => intervalsOverlap(slotStart, slotEnd, o.startMin, o.endMin))
                     : null;
@@ -2478,9 +2579,12 @@
                 if (!isAvail) {
                     card.className = 'time-slot-card booked';
                     card.setAttribute('data-slot-value', slot.value);
+                    const bookedTag = otherGuestConflict
+                        ? `Booked (Guest ${otherGuestConflict.guestNum})`
+                        : 'Booked';
                     card.innerHTML = `
                         <div class="slot-start">${slot.label}</div>
-                        <span class="slot-status-tag text-danger"><i class="bi bi-person-x-fill me-1"></i>Booked</span>
+                        <span class="slot-status-tag text-danger"><i class="bi bi-person-x-fill me-1"></i>${bookedTag}</span>
                     `;
                     card.onclick = () => showServiceSlotConflict(srvId, slot, seg.techName);
                 } else if (overlappingOther) {
@@ -2554,10 +2658,27 @@
         // 2. Render Single Service Status Notice if technician is booked at candidate slot
         renderSingleServiceStatusNotice(apiResponse, rawSlots);
 
-        // 3. Process combined slots
+        // 3. Process combined slots (also dynamically marking any slot already held by another guest for the same specialist!)
+        const otherGuestWindows = getOtherGuestsReservedWindows(bookingState.detailsGuestIndex || 0);
+        const activeGuestTechIds = [];
+        if (guest0) {
+            if (guest0.selectedStaff && !guest0.selectedStaff.isAnyoneAvailable && guest0.selectedStaff.id && !isNaN(Number(guest0.selectedStaff.id))) {
+                activeGuestTechIds.push(Number(guest0.selectedStaff.id));
+            }
+            if (guest0.serviceStaffAssignments) {
+                Object.values(guest0.serviceStaffAssignments).forEach(tid => {
+                    if (tid != null && tid !== 'anyone' && !isNaN(Number(tid)) && Number(tid) > 0 && !activeGuestTechIds.includes(Number(tid))) {
+                        activeGuestTechIds.push(Number(tid));
+                    }
+                });
+            }
+        }
+        const activeGuestDuration = guest0 ? (calculateGuestTotals(guest0).duration || totalDuration) : totalDuration;
+
         const processedSlots = rawSlots.map(slot => {
             let isAvailable = Boolean(slot.available);
             let reason = slot.reason || null;
+            let otherGuestConflict = null;
             if (isToday && slot.value) {
                 const parts = slot.value.split(':');
                 const slotDateObj = new Date();
@@ -2567,16 +2688,33 @@
                     reason = 'Passed';
                 }
             }
-            const rangeLabel = slot.timeRangeLabel || formatTime24ToRangeLabel(slot.value, totalDuration);
+            if (isAvailable && activeGuestTechIds.length > 0 && slot.value) {
+                const sMin = parseSlotToMinutes(slot.value);
+                otherGuestConflict = findOtherGuestConflictForWindow(activeGuestTechIds, sMin, activeGuestDuration, otherGuestWindows);
+                if (otherGuestConflict) {
+                    isAvailable = false;
+                    reason = `Booked (Guest ${otherGuestConflict.guestNum})`;
+                }
+            }
+            const rangeLabel = slot.timeRangeLabel || formatTime24ToRangeLabel(slot.value, activeGuestDuration);
             const endLabel = slot.endLabel || (rangeLabel.includes('–') ? rangeLabel.split('–')[1].trim() : '');
             return {
                 ...slot,
                 available: isAvailable,
                 reason: reason,
+                otherGuestConflict: otherGuestConflict,
                 timeRangeLabel: rangeLabel,
                 endLabel: endLabel
             };
         });
+
+        // Fill nextAvailable on any slot dynamically blocked by another guest so clicking it shows "Next Available at <time>"
+        for (let i = 0; i < processedSlots.length; i++) {
+            if (processedSlots[i].otherGuestConflict && !processedSlots[i].nextAvailable) {
+                const nextOpen = processedSlots.slice(i + 1).find(s => s.available);
+                if (nextOpen) processedSlots[i].nextAvailable = nextOpen.label;
+            }
+        }
 
         renderStaffAvailabilityBreakdown(apiResponse, rawSlots, processedSlots);
 
@@ -2625,9 +2763,12 @@
             } else {
                 card.className = 'time-slot-card booked';
                 card.setAttribute('data-slot-value', slot.value);
+                const bookedTag = slot.otherGuestConflict
+                    ? `Booked (Guest ${slot.otherGuestConflict.guestNum})`
+                    : 'Booked';
                 card.innerHTML = `
                     <div class="slot-start">${slot.label}</div>
-                    <span class="slot-status-tag text-danger"><i class="bi bi-person-x-fill me-1"></i>Booked</span>
+                    <span class="slot-status-tag text-danger"><i class="bi bi-person-x-fill me-1"></i>${bookedTag}</span>
                 `;
                 card.onclick = () => showSingleServiceSlotConflict(slot);
             }

@@ -1764,38 +1764,66 @@
                 <a href="#" onclick="handleLogout()" class="nav-link fw-semibold text-dark">Logout</a>
             `;
 
-            document.getElementById('customerName').value = activeUser;
-            if (bookingState.guests[0]) {
-                bookingState.guests[0].customerName = activeUser;
-            }
-            if (decodedToken.email) {
-                document.getElementById('customerEmail').value = decodedToken.email;
-                if (bookingState.guests[0]) bookingState.guests[0].customerEmail = decodedToken.email;
-            } else if (activeUser.includes('@')) {
-                document.getElementById('customerEmail').value = activeUser;
-                if (bookingState.guests[0]) bookingState.guests[0].customerEmail = activeUser;
-            }
+            const upperRole = String(userRole || '').toUpperCase();
+            const isCustomerAccount = (upperRole === 'ROLE_USER' || upperRole === 'USER');
 
-            // Asynchronously fetch rich profile info (name & phone number) for logged-in user
-            fetch('/api/users/me', {
-                headers: { 'Authorization': 'Bearer ' + token }
-            })
-            .then(res => res.ok ? res.json() : null)
-            .then(profile => {
-                if (!profile) return;
-                if (profile.name && profile.name.trim()) {
-                    const nameEl = document.getElementById('customerName');
-                    if (nameEl) nameEl.value = profile.name.trim();
-                    if (bookingState.guests[0]) bookingState.guests[0].customerName = profile.name.trim();
-                }
-                if (profile.phoneNumber && profile.phoneNumber.trim()) {
-                    const formattedPhone = formatPhoneNumber(profile.phoneNumber.trim());
-                    const phoneEl = document.getElementById('customerPhone');
-                    if (phoneEl) phoneEl.value = formattedPhone;
-                    if (bookingState.guests[0]) bookingState.guests[0].customerPhone = formattedPhone;
-                }
-            })
-            .catch(() => {});
+            if (isCustomerAccount) {
+                const applyCustomerProfileToGuest1 = (prof) => {
+                    if (!prof || !bookingState.guests[0]) return;
+                    const g0 = bookingState.guests[0];
+                    if (prof.name && !g0.customerName) g0.customerName = prof.name;
+                    if (prof.email && !g0.customerEmail) g0.customerEmail = prof.email;
+                    if (prof.phone && !g0.customerPhone) g0.customerPhone = prof.phone;
+                    if (bookingState.detailsGuestIndex === 0) {
+                        const nameEl = document.getElementById('customerName');
+                        const emailEl = document.getElementById('customerEmail');
+                        const phoneEl = document.getElementById('customerPhone');
+                        if (nameEl && !nameEl.value && g0.customerName) nameEl.value = g0.customerName;
+                        if (emailEl && !emailEl.value && g0.customerEmail) emailEl.value = g0.customerEmail;
+                        if (phoneEl && !phoneEl.value && g0.customerPhone) phoneEl.value = formatPhoneNumber(g0.customerPhone);
+                    }
+                };
+
+                const initialEmail = decodedToken.email || (activeUser.includes('@') ? activeUser : '');
+                bookingState.loggedInProfile = {
+                    name: activeUser,
+                    email: initialEmail,
+                    phone: ''
+                };
+                applyCustomerProfileToGuest1(bookingState.loggedInProfile);
+
+                // Asynchronously fetch full profile info (name, email, phone number) for logged-in customer
+                fetch('/api/users/me', {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                })
+                .then(res => res.ok ? res.json() : null)
+                .then(profile => {
+                    if (!profile) return;
+                    const resolvedName = (profile.name && profile.name.trim()) ? profile.name.trim() : (profile.username || activeUser);
+                    const resolvedEmail = (profile.email && profile.email.trim()) ? profile.email.trim() : initialEmail;
+                    const resolvedPhone = (profile.phoneNumber && profile.phoneNumber.trim()) ? formatPhoneNumber(profile.phoneNumber.trim()) : '';
+
+                    bookingState.loggedInProfile = {
+                        name: resolvedName,
+                        email: resolvedEmail,
+                        phone: resolvedPhone
+                    };
+                    if (bookingState.guests[0]) {
+                        if (resolvedName) bookingState.guests[0].customerName = resolvedName;
+                        if (resolvedEmail) bookingState.guests[0].customerEmail = resolvedEmail;
+                        if (resolvedPhone) bookingState.guests[0].customerPhone = resolvedPhone;
+                    }
+                    if (bookingState.detailsGuestIndex === 0) {
+                        const nameEl = document.getElementById('customerName');
+                        const emailEl = document.getElementById('customerEmail');
+                        const phoneEl = document.getElementById('customerPhone');
+                        if (nameEl && resolvedName) nameEl.value = resolvedName;
+                        if (emailEl && resolvedEmail) emailEl.value = resolvedEmail;
+                        if (phoneEl && resolvedPhone) phoneEl.value = resolvedPhone;
+                    }
+                })
+                .catch(() => {});
+            }
         } else {
             authNav.innerHTML = `
                 <a href="/" class="nav-link fw-semibold text-dark">Home</a>
@@ -4472,6 +4500,11 @@
         document.getElementById('guestEmailLabel').textContent = `Guest ${guestNum} Email Address`;
         document.getElementById('guestNotesLabel').textContent = `Guest ${guestNum} Notes / Special Requests`;
 
+        if (guestIdx === 0 && bookingState.loggedInProfile) {
+            if (!guest.customerName && bookingState.loggedInProfile.name) guest.customerName = bookingState.loggedInProfile.name;
+            if (!guest.customerEmail && bookingState.loggedInProfile.email) guest.customerEmail = bookingState.loggedInProfile.email;
+            if (!guest.customerPhone && bookingState.loggedInProfile.phone) guest.customerPhone = bookingState.loggedInProfile.phone;
+        }
         document.getElementById('customerName').value = guest.customerName || '';
         document.getElementById('customerPhone').value = formatPhoneNumber(guest.customerPhone || '');
         document.getElementById('customerEmail').value = guest.customerEmail || '';

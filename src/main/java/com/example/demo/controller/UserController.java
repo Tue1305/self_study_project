@@ -78,6 +78,7 @@ public class UserController {
 
         Map<String, Object> response = new HashMap<>();
         response.put("username", user.getUsername());
+        response.put("name", (user.getName() != null && !user.getName().isBlank()) ? user.getName() : user.getUsername());
         response.put("email", user.getEmail());
         response.put("phoneNumber", user.getPhoneNumber());
         response.put("role", user.getRole());

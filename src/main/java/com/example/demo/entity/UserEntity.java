@@ -47,6 +47,12 @@ public class UserEntity {
     @Column(name = "commission_rate", nullable = false, precision = 5, scale = 2)
     private BigDecimal commissionRate = new BigDecimal("60.00");
 
+    @Column(name = "shift_start_time", length = 8)
+    private String shiftStartTime;
+
+    @Column(name = "shift_end_time", length = 8)
+    private String shiftEndTime;
+
     public UserEntity() {}
 
     public UserEntity(String username, String password) {
@@ -93,6 +99,12 @@ public class UserEntity {
 
     public BigDecimal getCommissionRate() { return commissionRate != null ? commissionRate : new BigDecimal("60.00"); }
     public void setCommissionRate(BigDecimal commissionRate) { this.commissionRate = commissionRate != null ? commissionRate : new BigDecimal("60.00"); }
+
+    public String getShiftStartTime() { return shiftStartTime; }
+    public void setShiftStartTime(String shiftStartTime) { this.shiftStartTime = (shiftStartTime != null && !shiftStartTime.isBlank()) ? shiftStartTime.trim() : null; }
+
+    public String getShiftEndTime() { return shiftEndTime; }
+    public void setShiftEndTime(String shiftEndTime) { this.shiftEndTime = (shiftEndTime != null && !shiftEndTime.isBlank()) ? shiftEndTime.trim() : null; }
 
     public String getTenantId() { return tenantId; }
     public void setTenantId(String tenantId) { this.tenantId = (tenantId == null || tenantId.isBlank()) ? "default" : tenantId.trim().toLowerCase(); }

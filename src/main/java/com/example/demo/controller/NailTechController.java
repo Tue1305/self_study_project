@@ -201,6 +201,11 @@ public class NailTechController {
             tech.setCommissionRate(new java.math.BigDecimal("60.00"));
         }
 
+        String shiftErr = validateShiftHours(tech.getShiftStartTime(), tech.getShiftEndTime());
+        if (shiftErr != null) {
+            return ResponseEntity.badRequest().body(Map.of("message", shiftErr));
+        }
+
         tech.setRole("ROLE_NAIL_TECH");
 
         UserEntity savedTech = userRepository.save(tech);
@@ -238,9 +243,16 @@ public class NailTechController {
                         }
                     }
 
+                    String shiftErr = validateShiftHours(updatedTech.getShiftStartTime(), updatedTech.getShiftEndTime());
+                    if (shiftErr != null) {
+                        return ResponseEntity.badRequest().body(Map.of("message", shiftErr));
+                    }
+
                     tech.setName(updatedTech.getName());
                     tech.setEmail(newEmail);
                     tech.setSpecialty(updatedTech.getSpecialty());
+                    tech.setShiftStartTime(updatedTech.getShiftStartTime());
+                    tech.setShiftEndTime(updatedTech.getShiftEndTime());
                     if (updatedTech.getCommissionRate() != null && updatedTech.getCommissionRate().compareTo(java.math.BigDecimal.ZERO) >= 0) {
                         tech.setCommissionRate(updatedTech.getCommissionRate());
                     }
@@ -252,6 +264,26 @@ public class NailTechController {
                 })
                 .orElse(ResponseEntity.status(HttpStatus.NOT_FOUND)
                         .body(Map.of("message", "Nail technician not found")));
+    }
+
+    private String validateShiftHours(String startStr, String endStr) {
+        if ((startStr == null || startStr.isBlank()) && (endStr == null || endStr.isBlank())) {
+            return null;
+        }
+        try {
+            java.time.LocalTime start = (startStr != null && !startStr.isBlank())
+                    ? java.time.LocalTime.parse(startStr.trim())
+                    : java.time.LocalTime.of(10, 0);
+            java.time.LocalTime end = (endStr != null && !endStr.isBlank())
+                    ? java.time.LocalTime.parse(endStr.trim())
+                    : java.time.LocalTime.of(19, 0);
+            if (!start.isBefore(end)) {
+                return "Shift start time must be earlier than shift end time.";
+            }
+            return null;
+        } catch (Exception e) {
+            return "Invalid shift time format. Use HH:mm (e.g., 10:00 and 16:00).";
+        }
     }
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ADMIN')")

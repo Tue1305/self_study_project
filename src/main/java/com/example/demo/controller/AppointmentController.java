@@ -28,6 +28,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.time.LocalTime;
 import java.util.ArrayList;
@@ -288,6 +290,10 @@ public class AppointmentController {
 
         // Get active tenant technicians and non-off working technicians
         List<UserEntity> tenantTechs = userRepository.findAllByTenantIdAndRole(tenantId, "ROLE_NAIL_TECH");
+        Map<Long, UserEntity> techById = new HashMap<>();
+        for (UserEntity t : tenantTechs) {
+            if (t.getId() != null) techById.put(t.getId(), t);
+        }
         List<UserEntity> workingTenantTechs = tenantTechs.stream()
                 .filter(t -> t.getId() != null && !finalOffStaffIds.contains(t.getId()))
                 .collect(Collectors.toList());
@@ -479,6 +485,11 @@ public class AppointmentController {
 
                     if (seg.techId != null && seg.techId > 0) {
                         final long targetTid = seg.techId;
+                        UserEntity targetTechObj = techById.get(targetTid);
+                        if (targetTechObj == null) {
+                            targetTechObj = userRepository.findByTenantIdAndId(tenantId, targetTid).orElse(null);
+                            if (targetTechObj != null) techById.put(targetTid, targetTechObj);
+                        }
                         if (finalOffStaffIds.contains(targetTid)) {
                             segAvailable = false;
                             isAvailable = false;
@@ -488,6 +499,16 @@ public class AppointmentController {
                             conflictMessages.add(segMessage);
                             if (staffBookedDesc == null) {
                                 staffBookedDesc = seg.techName + " is OFF on this date";
+                            }
+                        } else if (!isWithinTechShift(targetTechObj, segStart, segEnd)) {
+                            segAvailable = false;
+                            isAvailable = false;
+                            String shiftLbl = formatShiftRange(targetTechObj);
+                            segBusyWindow = "Outside shift (" + shiftLbl + ")";
+                            segMessage = seg.serviceName + " — " + seg.techName + " works " + shiftLbl;
+                            conflictMessages.add(segMessage);
+                            if (staffBookedDesc == null) {
+                                staffBookedDesc = seg.techName + " works " + shiftLbl;
                             }
                         } else {
                             Optional<Appointment> conflictOpt = dayAppointments.stream()
@@ -546,8 +567,9 @@ public class AppointmentController {
                         }
                     }
                 } else {
-                    // "Anyone Available": check if at least one qualified non-off technician is free
+                    // "Anyone Available": check if at least one qualified non-off technician is within shift and free
                     boolean atLeastOneFree = !workingTenantTechs.isEmpty() && workingTenantTechs.stream().anyMatch(t ->
+                            isWithinTechShift(t, segStart, segEnd) &&
                             dayAppointments.stream().noneMatch(a ->
                                     a.getNailTech() != null &&
                                     a.getNailTech().getId() != null &&
@@ -677,7 +699,7 @@ public class AppointmentController {
 
                     // Check which specialists are free at this exact slot (excluding off specialists)
                     for (UserEntity tech : workingTenantTechs) {
-                        boolean techFree = dayAppointments.stream().noneMatch(a ->
+                        boolean techFree = isWithinTechShift(tech, segStart, segEnd) && dayAppointments.stream().noneMatch(a ->
                                 a.getNailTech() != null &&
                                 a.getNailTech().getId() != null &&
                                 a.getNailTech().getId().equals(tech.getId()) &&
@@ -693,6 +715,11 @@ public class AppointmentController {
 
                     if (seg.techId != null && seg.techId > 0) {
                         final long targetTid = seg.techId;
+                        UserEntity targetTechObj = techById.get(targetTid);
+                        if (targetTechObj == null) {
+                            targetTechObj = userRepository.findByTenantIdAndId(tenantId, targetTid).orElse(null);
+                            if (targetTechObj != null) techById.put(targetTid, targetTechObj);
+                        }
                         if (finalOffStaffIds.contains(targetTid)) {
                             segAvailable = false;
                             busyWindow = "Off on this date";
@@ -702,6 +729,11 @@ public class AppointmentController {
                             } else {
                                 statusMessage = seg.techName + " is OFF on this date.";
                             }
+                        } else if (!isWithinTechShift(targetTechObj, segStart, segEnd)) {
+                            segAvailable = false;
+                            String shiftLbl = formatShiftRange(targetTechObj);
+                            busyWindow = "Outside shift (" + shiftLbl + ")";
+                            statusMessage = seg.techName + " works " + shiftLbl + ".";
                         } else {
                             Optional<Appointment> conflictOpt = dayAppointments.stream()
                                     .filter(a -> a.getNailTech() != null &&
@@ -844,6 +876,38 @@ public class AppointmentController {
         }
 
         return false;
+    }
+
+    private boolean isWithinTechShift(UserEntity tech, LocalDateTime slotStart, LocalDateTime slotEnd) {
+        if (tech == null || slotStart == null || slotEnd == null) return true;
+        String startStr = tech.getShiftStartTime();
+        String endStr = tech.getShiftEndTime();
+        if ((startStr == null || startStr.isBlank()) && (endStr == null || endStr.isBlank())) {
+            return true;
+        }
+        try {
+            LocalTime shiftStart = (startStr != null && !startStr.isBlank()) ? LocalTime.parse(startStr.trim()) : LocalTime.of(10, 0);
+            LocalTime shiftEnd = (endStr != null && !endStr.isBlank()) ? LocalTime.parse(endStr.trim()) : LocalTime.of(19, 0);
+            LocalTime reqStart = slotStart.toLocalTime();
+            LocalTime reqEnd = slotEnd.toLocalTime();
+            return !reqStart.isBefore(shiftStart) && !reqEnd.isAfter(shiftEnd);
+        } catch (Exception ignored) {
+            return true;
+        }
+    }
+
+    private String formatShiftRange(UserEntity tech) {
+        if (tech == null) return "10:00 AM – 7:00 PM";
+        try {
+            LocalTime s = (tech.getShiftStartTime() != null && !tech.getShiftStartTime().isBlank())
+                    ? LocalTime.parse(tech.getShiftStartTime().trim()) : LocalTime.of(10, 0);
+            LocalTime e = (tech.getShiftEndTime() != null && !tech.getShiftEndTime().isBlank())
+                    ? LocalTime.parse(tech.getShiftEndTime().trim()) : LocalTime.of(19, 0);
+            DateTimeFormatter fmt = DateTimeFormatter.ofPattern("h:mm a");
+            return s.format(fmt) + " – " + e.format(fmt);
+        } catch (Exception ignored) {
+            return "10:00 AM – 7:00 PM";
+        }
     }
 
     private boolean isTechBusyAtWindow(
@@ -1149,6 +1213,10 @@ public class AppointmentController {
                                     String tName = (serviceSpecificTech.getName() != null && !serviceSpecificTech.getName().isBlank()) ? serviceSpecificTech.getName() : "Selected specialist";
                                     return ResponseEntity.badRequest().body(Map.of("message", tName + " is off on this date. Please choose another specialist or Anyone Available."));
                                 }
+                                if (!isWithinTechShift(serviceSpecificTech, serviceApptTime, serviceSlotEnd)) {
+                                    String tName = (serviceSpecificTech.getName() != null && !serviceSpecificTech.getName().isBlank()) ? serviceSpecificTech.getName() : "Selected specialist";
+                                    return ResponseEntity.badRequest().body(Map.of("message", tName + " works " + formatShiftRange(serviceSpecificTech) + ". Please choose a time inside their shift or Anyone Available."));
+                                }
                                 boolean hasConf = isTechBusyAtWindow(checkTechId, serviceApptTime, serviceSlotEnd, 15, dayAppts, savedAppointments);
                                 if (hasConf) {
                                     String tName = serviceSpecificTech.getName() != null ? serviceSpecificTech.getName() : "Selected specialist";
@@ -1156,11 +1224,14 @@ public class AppointmentController {
                                             .body(Map.of("message", tName + " is already booked at " + formatTime12Hour(serviceApptTime) + ". Please choose another time or specialist."));
                                 }
                             } else if (!tenantTechs.isEmpty()) {
-                                // Anyone Available mode: find a free specialist who is not booked at this window and NOT off
+                                // Anyone Available mode: find a free specialist who is within shift, not booked, and NOT off
                                 UserEntity freeTech = null;
                                 for (UserEntity tech : tenantTechs) {
                                     if (tech.getId() == null) continue;
                                     if (staffDayOffRepository != null && staffDayOffRepository.existsByTenantIdAndStaffIdAndOffDate(tenantId, tech.getId(), serviceApptTime.toLocalDate())) {
+                                        continue;
+                                    }
+                                    if (!isWithinTechShift(tech, serviceApptTime, serviceSlotEnd)) {
                                         continue;
                                     }
                                     boolean busy = isTechBusyAtWindow(tech.getId(), serviceApptTime, serviceSlotEnd, 15, dayAppts, savedAppointments);

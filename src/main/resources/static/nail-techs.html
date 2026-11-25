@@ -109,6 +109,7 @@
                     <th>Name</th>
                     <th>Email / Username</th>
                     <th>Specialty</th>
+                    <th>Shift Hours</th>
                     <th>Commission Split</th>
                     <th class="text-end">Actions</th>
                 </tr>
@@ -163,6 +164,25 @@
                     </div>
                     <div id="selectedSpecialtyBadges" class="d-flex flex-wrap gap-1 mt-2"></div>
                     <div class="form-text">Choose one or more specialties from the dropdown menu.</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold text-secondary small">Daily Working Shift Hours</label>
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <label for="techShiftStart" class="form-label extra-small text-muted mb-1">Start Time</label>
+                            <input type="time" class="form-control rounded-3" id="techShiftStart" value="10:00">
+                        </div>
+                        <div class="col-6">
+                            <label for="techShiftEnd" class="form-label extra-small text-muted mb-1">End Time</label>
+                            <input type="time" class="form-control rounded-3" id="techShiftEnd" value="19:00">
+                        </div>
+                    </div>
+                    <div class="d-flex flex-wrap gap-1 mt-2">
+                        <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2 rounded-pill" onclick="setShiftPreset('10:00', '19:00')">Full Day (10–7)</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2 rounded-pill" onclick="setShiftPreset('10:00', '16:00')">Morning (10–4)</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2 rounded-pill" onclick="setShiftPreset('12:00', '19:00')">Afternoon (12–7)</button>
+                    </div>
+                    <div class="form-text">Online booking only offers time slots within this technician's shift.</div>
                 </div>
                 <div class="mb-3">
                     <label for="techCommissionRate" class="form-label fw-semibold text-secondary small">Service Commission Rate (%)</label>
@@ -519,6 +539,12 @@
                 const safeName = (tech.name || tech.username || '').replace(/'/g, "\\'");
                 const safeEmail = (tech.email || tech.username || '').replace(/'/g, "\\'");
                 const safeSpec = (tech.specialty || '').replace(/'/g, "\\'");
+                const shiftStart = tech.shiftStartTime || '10:00';
+                const shiftEnd = tech.shiftEndTime || '19:00';
+                const isCustomShift = Boolean(tech.shiftStartTime || tech.shiftEndTime) && (shiftStart !== '10:00' || shiftEnd !== '19:00');
+                const shiftBadgeHtml = `<span class="badge ${isCustomShift ? 'bg-info-subtle text-dark border border-info-subtle' : 'bg-light text-secondary border'} fw-semibold">
+                    <i class="bi bi-clock me-1 text-pink"></i>${formatTime24To12(shiftStart)} – ${formatTime24To12(shiftEnd)}
+                </span>`;
 
                 tbody.innerHTML += `
                     <tr>
@@ -526,6 +552,7 @@
                         <td class="fw-semibold">${tech.name || tech.username}</td>
                         <td>${tech.email || tech.username}</td>
                         <td>${renderSpecialtyBadgesHtml(tech.specialty)}</td>
+                        <td>${shiftBadgeHtml}</td>
                         <td>
                             <span class="badge bg-primary-subtle text-primary border border-primary-subtle fw-bold">
                                 ${comm}% Tech / ${salonCut}% House
@@ -535,7 +562,7 @@
                             <button class="btn btn-outline-warning text-dark btn-sm me-1" title="Reset Staff Password" onclick="openResetPasswordModal(${tech.id}, '${safeName}')">
                                 <i class="bi bi-key-fill"></i>
                             </button>
-                            <button class="btn btn-outline-secondary btn-sm me-1" title="Edit Staff" onclick="openEditModal(${tech.id}, '${safeName}', '${safeEmail}', '${safeSpec}', ${comm})">
+                            <button class="btn btn-outline-secondary btn-sm me-1" title="Edit Staff" onclick="openEditModal(${tech.id}, '${safeName}', '${safeEmail}', '${safeSpec}', ${comm}, '${shiftStart}', '${shiftEnd}')">
                                 <i class="bi bi-pencil"></i>
                             </button>
                             <button class="btn btn-outline-danger btn-sm" title="Delete Staff" onclick="deleteNailTech(${tech.id})">
@@ -547,8 +574,23 @@
             });
         } catch (error) {
             console.error('Error loading nail techs:', error);
-            document.getElementById('techTableBody').innerHTML = `<tr><td colspan="6" class="text-center text-danger py-4">Error loading data from server.</td></tr>`;
+            document.getElementById('techTableBody').innerHTML = `<tr><td colspan="7" class="text-center text-danger py-4">Error loading data from server.</td></tr>`;
         }
+    }
+
+    function formatTime24To12(hhmm) {
+        if (!hhmm || !hhmm.includes(':')) return hhmm || '';
+        const [hRaw, mRaw] = hhmm.split(':');
+        const h = parseInt(hRaw, 10);
+        const m = parseInt(mRaw || '0', 10);
+        const period = h >= 12 ? 'PM' : 'AM';
+        const h12 = h % 12 === 0 ? 12 : h % 12;
+        return `${h12}:${String(m).padStart(2, '0')} ${period}`;
+    }
+
+    function setShiftPreset(startVal, endVal) {
+        document.getElementById('techShiftStart').value = startVal;
+        document.getElementById('techShiftEnd').value = endVal;
     }
 
     function setCommissionChip(rate) {
@@ -560,16 +602,20 @@
         document.getElementById('techName').value = '';
         document.getElementById('techEmail').value = '';
         setSelectedSpecialties([]);
+        document.getElementById('techShiftStart').value = '10:00';
+        document.getElementById('techShiftEnd').value = '19:00';
         document.getElementById('techCommissionRate').value = '60';
         document.getElementById('modalTitle').innerText = 'Add New Nail Technician';
         techModalInstance.show();
     }
 
-    function openEditModal(id, name, email, specialty, commissionRate) {
+    function openEditModal(id, name, email, specialty, commissionRate, shiftStartTime, shiftEndTime) {
         document.getElementById('techId').value = id;
         document.getElementById('techName').value = name;
         document.getElementById('techEmail').value = email;
         setSelectedSpecialties(parseSpecialtyString(specialty));
+        document.getElementById('techShiftStart').value = shiftStartTime || '10:00';
+        document.getElementById('techShiftEnd').value = shiftEndTime || '19:00';
         document.getElementById('techCommissionRate').value = (commissionRate != null) ? commissionRate : '60';
         document.getElementById('modalTitle').innerText = 'Edit Nail Technician';
         techModalInstance.show();
@@ -580,10 +626,16 @@
         const name = document.getElementById('techName').value;
         const email = document.getElementById('techEmail').value;
         const specialty = document.getElementById('techSpecialty').value;
+        const shiftStartTime = document.getElementById('techShiftStart').value || '10:00';
+        const shiftEndTime = document.getElementById('techShiftEnd').value || '19:00';
         const commissionRate = parseFloat(document.getElementById('techCommissionRate').value) || 60.0;
 
         if (!name || !email) {
             alert('Please fill in all required fields.');
+            return;
+        }
+        if (shiftStartTime >= shiftEndTime) {
+            alert('Shift start time must be earlier than shift end time.');
             return;
         }
 
@@ -595,6 +647,8 @@
             email: email,
             username: email,
             specialty: specialty,
+            shiftStartTime: shiftStartTime,
+            shiftEndTime: shiftEndTime,
             commissionRate: commissionRate
         };
 

@@ -2282,6 +2282,7 @@
     function selectServiceTimeSlot(srvId, slotValue, rangeLabel, durationMinutes) {
         hideAlert();
         hideSlotRaceConflictBanner();
+        bookingState.slotSelectionMode = 'per-service';
         if (!bookingState.serviceTimeSlots) bookingState.serviceTimeSlots = {};
         let cleanSlot = slotValue ? String(slotValue).trim() : '';
         if (cleanSlot.toUpperCase().includes('AM') || cleanSlot.toUpperCase().includes('PM')) {
@@ -2410,20 +2411,51 @@
         }
     }
 
+    function switchBookingDateToTomorrow() {
+        const dateInput = document.getElementById('appointmentDate');
+        if (!dateInput) return;
+        const base = dateInput.value ? new Date(dateInput.value + 'T12:00:00') : new Date();
+        base.setDate(base.getDate() + 1);
+        // Skip Sunday (salon closed) -> jump to Monday
+        if (base.getDay() === 0) {
+            base.setDate(base.getDate() + 1);
+        }
+        const nextStr = `${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, '0')}-${String(base.getDate()).padStart(2, '0')}`;
+        dateInput.value = nextStr;
+        handleDateChange(nextStr);
+    }
+
+    function buildNextAvailableButtonHtml(nextAvail, onClickSameDayExpr) {
+        if (!nextAvail || nextAvail === 'later' || nextAvail === 'N/A') return '';
+        const isTomorrow = String(nextAvail).toLowerCase() === 'tomorrow' || /7:00\s*PM/i.test(String(nextAvail));
+        if (isTomorrow) {
+            return `
+                <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1 fw-semibold">Fully Booked Today</span>
+                <button type="button" class="btn btn-sm btn-outline-pink rounded-pill px-3 fw-bold" onclick="switchBookingDateToTomorrow()">
+                    <i class="bi bi-calendar-event me-1"></i>Next Available: Tomorrow
+                </button>`;
+        }
+        return `
+            <button type="button" class="btn btn-sm btn-outline-pink rounded-pill px-3 fw-bold" onclick="${onClickSameDayExpr}">
+                <i class="bi bi-check-circle me-1"></i>Next Available at ${nextAvail}
+            </button>`;
+    }
+
     function showServiceSlotConflict(srvId, slot, techName) {
         const banner = document.getElementById(`srvStatusBanner_${srvId}`);
         const btnsEl = document.getElementById(`srvActionButtons_${srvId}`);
         if (!banner || !btnsEl) return;
 
         const slotValue = slot.value || slot.time;
+        const nextBtnHtml = buildNextAvailableButtonHtml(
+            slot.nextAvailable,
+            `selectServiceTimeSlotByLabel('${srvId}', '${slot.nextAvailable}')`
+        );
         btnsEl.innerHTML = `
             <button type="button" class="btn btn-sm btn-pink rounded-pill px-3 fw-bold" onclick="switchTechToAnyoneAndSelect('${srvId}', '${slotValue}')">
                 <i class="bi bi-lightning-charge-fill me-1"></i>Anyone Available
             </button>
-            ${slot.nextAvailable ? `
-            <button type="button" class="btn btn-sm btn-outline-pink rounded-pill px-3 fw-bold" onclick="selectServiceTimeSlotByLabel('${srvId}', '${slot.nextAvailable}')">
-                <i class="bi bi-check-circle me-1"></i>Next Available at ${slot.nextAvailable}
-            </button>` : ''}
+            ${nextBtnHtml}
         `;
         banner.classList.remove('d-none');
         banner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -2435,16 +2467,17 @@
 
         const nextAvail = slot.nextAvailable || (slot.staffBreakdown && slot.staffBreakdown[0] ? slot.staffBreakdown[0].nextAvailable : null);
         const slotValue = slot.value || slot.time;
+        const nextBtnHtml = buildNextAvailableButtonHtml(
+            nextAvail,
+            `selectTimeSlotCardByLabel('${nextAvail}')`
+        );
 
         banner.innerHTML = `
             <div class="d-flex flex-wrap align-items-center gap-2">
                 <button type="button" class="btn btn-sm btn-pink rounded-pill px-3 fw-bold" onclick="switchSingleTechToAnyone('${slotValue}')">
                     <i class="bi bi-lightning-charge-fill me-1"></i>Anyone Available
                 </button>
-                ${nextAvail && nextAvail !== 'later' ? `
-                <button type="button" class="btn btn-sm btn-outline-pink rounded-pill px-3 fw-bold" onclick="selectTimeSlotCardByLabel('${nextAvail}')">
-                    <i class="bi bi-check-circle me-1"></i>Next Available at ${nextAvail}
-                </button>` : ''}
+                ${nextBtnHtml}
             </div>
         `;
         banner.classList.remove('d-none');
@@ -2492,18 +2525,20 @@
         if (conflicts.length > 0) {
             const firstConf = conflicts[0];
             const b0 = (firstConf.breakdown && firstConf.breakdown[0]) ? firstConf.breakdown[0] : {};
-            const nextAvail = b0.nextAvailable || null;
+            const hasAnyOpenToday = Array.isArray(rawSlots) && rawSlots.some(s => s && s.available && !s.isPast);
+            const nextAvail = hasAnyOpenToday ? (b0.nextAvailable || null) : 'Tomorrow';
             const slotVal = firstConf.value || firstConf.time;
+            const nextBtnHtml = buildNextAvailableButtonHtml(
+                nextAvail,
+                `selectTimeSlotCardByLabel('${nextAvail}')`
+            );
 
             banner.innerHTML = `
                 <div class="d-flex flex-wrap align-items-center gap-2">
                     <button type="button" class="btn btn-sm btn-pink rounded-pill px-3 fw-bold" onclick="switchSingleTechToAnyone('${slotVal}')">
                         <i class="bi bi-lightning-charge-fill me-1"></i>Anyone Available
                     </button>
-                    ${nextAvail && nextAvail !== 'later' ? `
-                    <button type="button" class="btn btn-sm btn-outline-pink rounded-pill px-3 fw-bold" onclick="selectTimeSlotCardByLabel('${nextAvail}')">
-                        <i class="bi bi-check-circle me-1"></i>Next Available at ${nextAvail}
-                    </button>` : ''}
+                    ${nextBtnHtml}
                 </div>
             `;
             banner.classList.remove('d-none');
@@ -2845,9 +2880,17 @@
         if (visibleSlots.length === 0) {
             grid.innerHTML = `
                 <div class="alert alert-light border text-center py-4 rounded-4" style="grid-column: 1 / -1;">
-                    <i class="bi bi-calendar-x text-muted fs-3 d-block mb-2"></i>
-                    <div class="fw-bold text-dark">No Available Time Slots For This Date</div>
-                    <div class="small text-muted mt-1">All remaining slots for this technician/schedule are booked or have passed. Please choose another date or select "Anyone Available".</div>
+                    <i class="bi bi-calendar-x text-danger fs-3 d-block mb-2"></i>
+                    <div class="fw-bold text-dark">Fully Booked for This Day</div>
+                    <div class="small text-muted mt-1 mb-3">Next available is tomorrow, or choose Anyone Available.</div>
+                    <div class="d-flex justify-content-center gap-2 flex-wrap">
+                        <button type="button" class="btn btn-sm btn-pink rounded-pill px-3 fw-bold" onclick="switchBookingDateToTomorrow()">
+                            <i class="bi bi-calendar-event me-1"></i>Check Tomorrow
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-pink rounded-pill px-3 fw-bold" onclick="switchSingleTechToAnyone('')">
+                            <i class="bi bi-lightning-charge-fill me-1"></i>Anyone Available
+                        </button>
+                    </div>
                 </div>
             `;
             updateSummaryTimeWindowDisplay();

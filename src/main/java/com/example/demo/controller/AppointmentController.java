@@ -554,10 +554,17 @@ public class AppointmentController {
                             }
 
                             segBusyWindow = formatTime12Hour(caStart) + " – " + formatTime12Hour(caBusyEnd);
-                            segNextAvailable = formatTime12Hour(nextOpen);
+                            LocalDateTime nextOpenEnd = nextOpen.plusMinutes(segDur);
+                            boolean fitsToday = nextOpen.toLocalDate().equals(targetDate)
+                                    && !nextOpenEnd.toLocalTime().isAfter(LocalTime.of(19, 0))
+                                    && !nextOpen.toLocalTime().isAfter(LocalTime.of(18, 45))
+                                    && isWithinTechShift(targetTechObj, nextOpen, nextOpenEnd);
+                            segNextAvailable = fitsToday ? formatTime12Hour(nextOpen) : "Tomorrow";
 
                             // Format: "Pedicure — Staff A: Booked 3:00 PM – 4:15 PM (Next available: 4:15 PM)"
-                            segMessage = seg.serviceName + " — " + seg.techName + ": Booked " + segBusyWindow + " (Next available: " + segNextAvailable + ")";
+                            segMessage = fitsToday
+                                    ? (seg.serviceName + " — " + seg.techName + ": Booked " + segBusyWindow + " (Next available: " + segNextAvailable + ")")
+                                    : (seg.serviceName + " — " + seg.techName + " is fully booked today (Next available: Tomorrow)");
                             conflictMessages.add(segMessage);
                             if (staffBookedDesc == null) {
                                 staffBookedDesc = seg.techName + " booked " + segBusyWindow;
@@ -776,9 +783,16 @@ public class AppointmentController {
                                 }
 
                                 busyWindow = formatTime12Hour(caStart) + " – " + formatTime12Hour(caBusyEnd);
-                                nextAvail = formatTime12Hour(nextOpen);
+                                LocalDateTime nextOpenEnd = nextOpen.plusMinutes(segDur);
+                                boolean fitsToday = nextOpen.toLocalDate().equals(targetDate)
+                                        && !nextOpenEnd.toLocalTime().isAfter(LocalTime.of(19, 0))
+                                        && !nextOpen.toLocalTime().isAfter(LocalTime.of(18, 45))
+                                        && isWithinTechShift(targetTechObj, nextOpen, nextOpenEnd);
+                                nextAvail = fitsToday ? formatTime12Hour(nextOpen) : "Tomorrow";
 
-                                if (anyoneAvailableAtSlot) {
+                                if (!fitsToday) {
+                                    statusMessage = seg.techName + " is fully booked today. Next available is Tomorrow.";
+                                } else if (anyoneAvailableAtSlot) {
                                     statusMessage = seg.techName + " is booked at this time. The next available is " + nextAvail + ", or choose Anyone Available at " + lbl12;
                                 } else {
                                     statusMessage = seg.techName + " is booked at this time. The next available is " + nextAvail + " (all specialists booked at " + lbl12 + ")";
@@ -815,6 +829,22 @@ public class AppointmentController {
                 }
             }
 
+            // Reconcile nextAvailable on every booked slot to the exact next real available slot card (or "Tomorrow")
+            for (int i = 0; i < segSlots.size(); i++) {
+                Map<String, Object> cur = segSlots.get(i);
+                if (!Boolean.TRUE.equals(cur.get("available")) && !Boolean.TRUE.equals(cur.get("isPast"))) {
+                    String realNext = "Tomorrow";
+                    for (int j = i + 1; j < segSlots.size(); j++) {
+                        Map<String, Object> cand = segSlots.get(j);
+                        if (Boolean.TRUE.equals(cand.get("available")) && !Boolean.TRUE.equals(cand.get("isPast"))) {
+                            realNext = String.valueOf(cand.get("label"));
+                            break;
+                        }
+                    }
+                    cur.put("nextAvailable", realNext);
+                }
+            }
+
             Map<String, Object> segRes = new LinkedHashMap<>();
             segRes.put("serviceId", seg.serviceId);
             segRes.put("serviceName", seg.serviceName);
@@ -824,6 +854,34 @@ public class AppointmentController {
             segRes.put("slots", segSlots);
             segRes.put("availableSlots", segSlots.stream().filter(s -> Boolean.TRUE.equals(s.get("available"))).toList());
             servicesAvailability.add(segRes);
+        }
+
+        // Also reconcile nextAvailable on combined slotResults and staffConflicts to exact next real available slot card (or "Tomorrow")
+        for (int i = 0; i < slotResults.size(); i++) {
+            Map<String, Object> cur = slotResults.get(i);
+            if (!Boolean.TRUE.equals(cur.get("available")) && !Boolean.TRUE.equals(cur.get("isPast"))) {
+                String realNext = "Tomorrow";
+                for (int j = i + 1; j < slotResults.size(); j++) {
+                    Map<String, Object> cand = slotResults.get(j);
+                    if (Boolean.TRUE.equals(cand.get("available")) && !Boolean.TRUE.equals(cand.get("isPast"))) {
+                        realNext = String.valueOf(cand.get("label"));
+                        break;
+                    }
+                }
+                cur.put("nextAvailable", realNext);
+                Object breakdownObj = cur.get("staffBreakdown");
+                if (breakdownObj instanceof List<?> bList) {
+                    for (Object bItem : bList) {
+                        if (bItem instanceof Map<?, ?> bMap) {
+                            @SuppressWarnings("unchecked")
+                            Map<String, Object> bm = (Map<String, Object>) bMap;
+                            if (!Boolean.TRUE.equals(bm.get("available"))) {
+                                bm.put("nextAvailable", realNext);
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         Map<String, Object> responseBody = new LinkedHashMap<>();
@@ -879,17 +937,15 @@ public class AppointmentController {
     }
 
     private boolean isWithinTechShift(UserEntity tech, LocalDateTime slotStart, LocalDateTime slotEnd) {
-        if (tech == null || slotStart == null || slotEnd == null) return true;
-        String startStr = tech.getShiftStartTime();
-        String endStr = tech.getShiftEndTime();
-        if ((startStr == null || startStr.isBlank()) && (endStr == null || endStr.isBlank())) {
-            return true;
-        }
+        if (slotStart == null || slotEnd == null) return true;
+        String startStr = tech != null ? tech.getShiftStartTime() : null;
+        String endStr = tech != null ? tech.getShiftEndTime() : null;
         try {
             LocalTime shiftStart = (startStr != null && !startStr.isBlank()) ? LocalTime.parse(startStr.trim()) : LocalTime.of(10, 0);
             LocalTime shiftEnd = (endStr != null && !endStr.isBlank()) ? LocalTime.parse(endStr.trim()) : LocalTime.of(19, 0);
             LocalTime reqStart = slotStart.toLocalTime();
             LocalTime reqEnd = slotEnd.toLocalTime();
+            if (!slotEnd.toLocalDate().equals(slotStart.toLocalDate())) return false;
             return !reqStart.isBefore(shiftStart) && !reqEnd.isAfter(shiftEnd);
         } catch (Exception ignored) {
             return true;

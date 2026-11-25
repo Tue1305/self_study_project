@@ -959,11 +959,24 @@
                                     <div>
                                         <div class="fw-bold text-dark fs-6 mb-1">Complimentary Cancellation &amp; In-Salon Payment</div>
                                         <div class="mb-1 text-secondary">
-                                            <strong>Cancellation Policy:</strong> Free cancellations and reschedules up to 24 hours prior to appointment time via your self-service portal link.
+                                            <strong>Cancellation &amp; Late-Arrival Policy:</strong> Free cancellations and reschedules up to 24 hours prior to appointment time. Arrivals more than 15 minutes late may be marked as a No-Show or rescheduled.
                                         </div>
                                         <div class="text-secondary">
                                             <strong>Payment:</strong> Pay in salon upon service completion (Credit Card, Debit, Apple Pay, or Cash). Taxes and tips calculated at checkout.
                                         </div>
+                                    </div>
+                                </div>
+                                <div id="policyConsentWrapper" class="mt-3 pt-3 border-top">
+                                    <div class="form-check d-flex align-items-start gap-2 mb-0">
+                                        <input class="form-check-input mt-1" type="checkbox" id="policyAgreeCheckbox"
+                                               style="cursor: pointer; width: 1.15em; height: 1.15em; flex-shrink: 0;"
+                                               onchange="clearPolicyConsentError()">
+                                        <label class="form-check-label small fw-semibold text-dark" for="policyAgreeCheckbox" id="policyAgreeLabel" style="cursor: pointer;">
+                                            I agree to the 24-hour cancellation &amp; 15-minute late arrival policy. <span class="text-danger">*</span>
+                                        </label>
+                                    </div>
+                                    <div id="policyConsentError" class="text-danger small fw-semibold mt-1 d-none">
+                                        <i class="bi bi-exclamation-circle-fill me-1"></i>Please agree to the cancellation &amp; late-arrival policy before confirming your booking.
                                     </div>
                                 </div>
                             </div>
@@ -4592,6 +4605,11 @@
         }
 
         const submitBtn = document.getElementById('confirmSubmitBtn');
+        const policyWrapper = document.getElementById('policyConsentWrapper');
+        const isFinalGuestStep = (guestIdx + 1 >= totalGuests);
+        if (policyWrapper) {
+            policyWrapper.classList.toggle('d-none', !isFinalGuestStep);
+        }
         if (submitBtn) {
             if (guestIdx + 1 < totalGuests) {
                 submitBtn.innerHTML = `Next: Guest ${guestNum + 1} Details <i class="bi bi-arrow-right ms-1"></i>`;
@@ -4735,6 +4753,18 @@
             return;
         }
 
+        // Require Cancellation & Late-Arrival Policy consent before confirming final booking
+        const policyCheckbox = document.getElementById('policyAgreeCheckbox');
+        const policyErr = document.getElementById('policyConsentError');
+        const policyWrapper = document.getElementById('policyConsentWrapper');
+        if (policyCheckbox && !policyCheckbox.checked) {
+            if (policyErr) policyErr.classList.remove('d-none');
+            if (policyWrapper) policyWrapper.classList.add('border', 'border-danger', 'rounded-3', 'p-2', 'bg-danger-subtle');
+            policyCheckbox.focus();
+            policyCheckbox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            return;
+        }
+
         const submitBtn = document.getElementById('confirmSubmitBtn');
         const originalBtnHtml = submitBtn.innerHTML;
         submitBtn.disabled = true;
@@ -4870,6 +4900,13 @@
             submitBtn.innerHTML = originalBtnHtml;
         }
     });
+
+    function clearPolicyConsentError() {
+        const policyErr = document.getElementById('policyConsentError');
+        const policyWrapper = document.getElementById('policyConsentWrapper');
+        if (policyErr) policyErr.classList.add('d-none');
+        if (policyWrapper) policyWrapper.classList.remove('border', 'border-danger', 'rounded-3', 'p-2', 'bg-danger-subtle');
+    }
 
     function showConfirmationScreen(payload, savedBooking) {
         Object.values(STEP_META).forEach(meta => {

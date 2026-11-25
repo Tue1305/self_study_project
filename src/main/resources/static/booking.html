@@ -890,6 +890,20 @@
                                 <div id="multiServiceTimeLapseContainer" class="col-12" style="display: none;">
                                     <!-- Dynamic Multi-Service Time Lapse & Sequential Schedule -->
                                 </div>
+                                <div id="slotRaceConflictBanner" class="col-12 d-none">
+                                    <div class="alert alert-warning border border-warning rounded-4 p-3 mb-2 shadow-sm d-flex flex-wrap align-items-center justify-content-between gap-2">
+                                        <div class="d-flex align-items-start gap-2">
+                                            <i class="bi bi-exclamation-triangle-fill text-warning fs-5 mt-1"></i>
+                                            <div>
+                                                <div class="fw-bold text-dark small">Time Slot Just Taken</div>
+                                                <div id="slotRaceConflictMessage" class="small text-dark">Someone just booked that time slot. Refresh below to see the latest open times.</div>
+                                            </div>
+                                        </div>
+                                        <button type="button" id="btnRefreshAvailableSlots" class="btn btn-sm btn-pink rounded-pill px-3 fw-bold d-inline-flex align-items-center gap-1" onclick="refreshSlotsAfterConflict()">
+                                            <i class="bi bi-arrow-clockwise"></i> Refresh Available Slots
+                                        </button>
+                                    </div>
+                                </div>
                                 <div class="col-12" id="slotModeSelectorContainer" style="display: none;">
                                     <div class="d-flex flex-wrap justify-content-between align-items-center mb-2">
                                         <label class="form-label fw-bold mb-0 text-dark">
@@ -2156,8 +2170,65 @@
         updateSummaryTimeWindowDisplay();
     }
 
+    function showSlotRaceConflictBanner(message) {
+        hideAlert();
+        const banner = document.getElementById('slotRaceConflictBanner');
+        const msgEl = document.getElementById('slotRaceConflictMessage');
+        if (!banner || !msgEl) {
+            showAlert(message);
+            return;
+        }
+        msgEl.textContent = message || 'That time slot was just booked by another guest. Refresh to see the latest available times.';
+        banner.classList.remove('d-none');
+        banner.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    function hideSlotRaceConflictBanner() {
+        const banner = document.getElementById('slotRaceConflictBanner');
+        if (banner) banner.classList.add('d-none');
+    }
+
+    async function refreshSlotsAfterConflict() {
+        const btn = document.getElementById('btnRefreshAvailableSlots');
+        const origHtml = btn ? btn.innerHTML : '';
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Refreshing...';
+        }
+        try {
+            // Clear stale selected slot(s) for active guest so user picks a fresh open time
+            const activeGuest = getActiveDetailsGuest();
+            bookingState.selectedTimeSlot = null;
+            bookingState.selectedTimeRangeLabel = null;
+            bookingState.serviceTimeSlots = {};
+            if (activeGuest) {
+                activeGuest.selectedTimeSlot = null;
+                activeGuest.selectedTimeRangeLabel = null;
+                activeGuest.serviceTimeSlots = {};
+            }
+            const hiddenSlot = document.getElementById('appointmentTimeSlot');
+            if (hiddenSlot) hiddenSlot.value = '';
+
+            const dateInput = document.getElementById('appointmentDate');
+            if (dateInput && dateInput.value) {
+                await handleDateChange(dateInput.value);
+            }
+            hideSlotRaceConflictBanner();
+            const targetGrid = (bookingState.slotSelectionMode === 'per-service')
+                ? document.getElementById('perServiceSlotsContainer')
+                : document.getElementById('timeSlotsGrid');
+            if (targetGrid) targetGrid.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = origHtml;
+            }
+        }
+    }
+
     function selectTimeSlotCard(value24, rangeLabel) {
         hideAlert();
+        hideSlotRaceConflictBanner();
         let cleanVal = value24 ? String(value24).trim() : '';
         if (cleanVal.toUpperCase().includes('AM') || cleanVal.toUpperCase().includes('PM')) {
             cleanVal = convert12To24Hour(cleanVal);
@@ -2197,6 +2268,7 @@
 
     function selectServiceTimeSlot(srvId, slotValue, rangeLabel, durationMinutes) {
         hideAlert();
+        hideSlotRaceConflictBanner();
         if (!bookingState.serviceTimeSlots) bookingState.serviceTimeSlots = {};
         let cleanSlot = slotValue ? String(slotValue).trim() : '';
         if (cleanSlot.toUpperCase().includes('AM') || cleanSlot.toUpperCase().includes('PM')) {
@@ -4782,7 +4854,13 @@
                     const errText = await response.text();
                     if (errText) errorMsg = errText;
                 }
-                showAlert(errorMsg);
+                const isSlotConflict = response.status === 409
+                    || /already booked|conflicts with an existing booking|all specialists are booked|is off on this date/i.test(errorMsg);
+                if (isSlotConflict) {
+                    showSlotRaceConflictBanner(errorMsg);
+                } else {
+                    showAlert(errorMsg);
+                }
             }
         } catch (err) {
             console.error('Error submitting booking:', err);

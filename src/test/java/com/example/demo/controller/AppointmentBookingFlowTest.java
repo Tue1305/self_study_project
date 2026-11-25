@@ -278,19 +278,24 @@ class AppointmentBookingFlowTest {
                 .andExpect(jsonPath("$.customerName").value("Token User"))
                 .andExpect(jsonPath("$.serviceName").value("Gel Nails"));
 
-        // 2. Reschedule
+        // 2. Reschedule to a guaranteed future non-Sunday date (timezone-safe in Docker UTC builds)
+        java.time.LocalDate futureDate = java.time.LocalDate.now().plusDays(7);
+        if (futureDate.getDayOfWeek() == java.time.DayOfWeek.SUNDAY) {
+            futureDate = futureDate.plusDays(1);
+        }
+        String futureDateStr = futureDate.toString();
         String rescheduleBody = """
                 {
-                  "date": "2026-11-25",
+                  "date": "%s",
                   "startTime": "14:30:00"
                 }
-                """;
+                """.formatted(futureDateStr);
 
         mockMvc.perform(post("/api/appointments/by-token/valid-test-token/reschedule")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(rescheduleBody))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.newAppointmentTime").value(org.hamcrest.Matchers.startsWith("2026-11-25T14:30")));
+                .andExpect(jsonPath("$.newAppointmentTime").value(org.hamcrest.Matchers.startsWith(futureDateStr + "T14:30")));
 
         // 3. Cancel
         String cancelBody = """

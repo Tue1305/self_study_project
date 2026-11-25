@@ -353,7 +353,7 @@
         /* Responsive Time Slot Grid Cards */
         .time-slots-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(155px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
             gap: 0.6rem;
             max-height: 340px;
             overflow-y: auto;
@@ -3979,7 +3979,7 @@
                 try {
                     const todayStr = getLocalTodayDateStr();
                     const [preResp, daysOffResp] = await Promise.all([
-                        fetch(`/api/appointments/available-slots?date=${todayStr}&durationMinutes=45`, { headers: getActiveTenantHeaders() }),
+                        fetch(`/api/appointments/available-slots?date=${todayStr}&durationMinutes=45&clientNow=${encodeURIComponent(getLocalNowIsoStr())}`, { headers: getActiveTenantHeaders() }),
                         fetch(`/api/nail-techs/days-off?date=${todayStr}`, { headers: getActiveTenantHeaders() })
                     ]);
                     if (preResp.ok) {

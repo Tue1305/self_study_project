@@ -252,6 +252,36 @@
         </div>
     </div>
 
+    <!-- Customer Visit History Card -->
+    <div class="card border-0 shadow-sm rounded-4 p-4 mb-4 profile-card">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <div>
+                <h2 class="h5 fw-bold text-dark mb-0">
+                    <i class="bi bi-clock-history text-pink me-2"></i>My Visit History
+                </h2>
+                <small class="text-muted">View your upcoming appointments and past salon visits</small>
+            </div>
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <span class="badge bg-light text-dark border rounded-pill px-3 py-1" id="visitTotalBadge">0 Visits</span>
+                <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3 py-1" id="visitCompletedBadge">0 Completed</span>
+                <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-3 py-1" id="visitUpcomingBadge">0 Upcoming</span>
+            </div>
+        </div>
+
+        <div class="btn-group btn-group-sm mb-3" role="group" aria-label="Filter visits">
+            <button type="button" class="btn btn-pink fw-semibold" id="visitFilterAll" onclick="setVisitFilter('ALL')">All</button>
+            <button type="button" class="btn btn-outline-secondary fw-semibold" id="visitFilterUpcoming" onclick="setVisitFilter('UPCOMING')">Upcoming</button>
+            <button type="button" class="btn btn-outline-secondary fw-semibold" id="visitFilterCompleted" onclick="setVisitFilter('COMPLETED')">Completed</button>
+            <button type="button" class="btn btn-outline-secondary fw-semibold" id="visitFilterCancelled" onclick="setVisitFilter('CANCELLED')">Cancelled</button>
+        </div>
+
+        <div id="visitHistoryList">
+            <div class="text-center text-muted py-4 small">
+                <span class="spinner-border spinner-border-sm text-pink me-2"></span>Loading your visit history...
+            </div>
+        </div>
+    </div>
+
     <!-- Security & Password Adjustment Form -->
     <div class="card border-0 shadow-sm rounded-4 p-4 mb-4 profile-card">
         <h2 class="h5 fw-bold text-dark mb-3"><i class="bi bi-shield-lock text-pink me-2"></i>Security &amp; Password</h2>
@@ -384,6 +414,7 @@
                 localStorage.setItem('username', username);
                 showAlert('Profile updated successfully!');
                 loadUserProfile();
+                loadVisitHistory();
             } else {
                 const rawError = await response.text();
                 let cleanMsg = rawError || 'Server error';
@@ -533,6 +564,126 @@
         }
     }
 
+    let cachedVisits = [];
+    let activeVisitFilter = 'ALL';
+
+    function setVisitFilter(filter) {
+        activeVisitFilter = filter;
+        ['ALL', 'UPCOMING', 'COMPLETED', 'CANCELLED'].forEach(key => {
+            const btn = document.getElementById('visitFilter' + key.charAt(0) + key.slice(1).toLowerCase());
+            if (!btn) return;
+            if (key === filter) {
+                btn.classList.add('btn-pink');
+                btn.classList.remove('btn-outline-secondary');
+            } else {
+                btn.classList.remove('btn-pink');
+                btn.classList.add('btn-outline-secondary');
+            }
+        });
+        renderVisitHistory();
+    }
+
+    async function loadVisitHistory() {
+        const listEl = document.getElementById('visitHistoryList');
+        if (!listEl) return;
+        try {
+            const resp = await fetch('/api/users/me/visit-history', {
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+            if (!resp.ok) {
+                listEl.innerHTML = '<div class="text-muted small text-center py-3">Unable to load visit history right now.</div>';
+                return;
+            }
+            const data = await resp.json();
+            cachedVisits = Array.isArray(data.visits) ? data.visits : [];
+            const totalBadge = document.getElementById('visitTotalBadge');
+            const compBadge = document.getElementById('visitCompletedBadge');
+            const upBadge = document.getElementById('visitUpcomingBadge');
+            if (totalBadge) totalBadge.textContent = `${data.totalVisits || 0} Visit${(data.totalVisits || 0) === 1 ? '' : 's'}`;
+            if (compBadge) compBadge.textContent = `${data.completedVisits || 0} Completed`;
+            if (upBadge) upBadge.textContent = `${data.upcomingVisits || 0} Upcoming`;
+            renderVisitHistory();
+        } catch (err) {
+            console.error('Error loading visit history:', err);
+            listEl.innerHTML = '<div class="text-muted small text-center py-3">Unable to load visit history right now.</div>';
+        }
+    }
+
+    function renderVisitHistory() {
+        const listEl = document.getElementById('visitHistoryList');
+        if (!listEl) return;
+
+        const now = new Date();
+        const filtered = cachedVisits.filter(v => {
+            const st = String(v.status || 'PENDING').toUpperCase();
+            const dt = v.appointmentTime ? new Date(v.appointmentTime) : null;
+            if (activeVisitFilter === 'UPCOMING') {
+                return (st === 'PENDING' || st === 'CONFIRMED') && dt && dt > now;
+            }
+            if (activeVisitFilter === 'COMPLETED') return st === 'COMPLETED';
+            if (activeVisitFilter === 'CANCELLED') return st === 'CANCELLED' || st === 'NO_SHOW';
+            return true;
+        });
+
+        if (filtered.length === 0) {
+            listEl.innerHTML = `
+                <div class="text-center py-4 bg-light rounded-3 border">
+                    <i class="bi bi-calendar2-heart text-pink fs-3 d-block mb-1"></i>
+                    <div class="fw-semibold text-dark small">No visits found in this category yet.</div>
+                    <a href="/booking" class="btn btn-sm btn-pink rounded-pill px-3 mt-2 fw-semibold">
+                        <i class="bi bi-plus-circle me-1"></i>Book an Appointment
+                    </a>
+                </div>
+            `;
+            return;
+        }
+
+        const badgeForStatus = (st) => {
+            switch (st) {
+                case 'COMPLETED': return '<span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2">Completed</span>';
+                case 'CONFIRMED': return '<span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-2">Confirmed</span>';
+                case 'PENDING': return '<span class="badge bg-warning-subtle text-dark border border-warning-subtle rounded-pill px-2">Pending</span>';
+                case 'CANCELLED': return '<span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-2">Cancelled</span>';
+                case 'NO_SHOW': return '<span class="badge bg-secondary-subtle text-secondary border rounded-pill px-2">No-Show</span>';
+                default: return `<span class="badge bg-light text-dark border rounded-pill px-2">${st}</span>`;
+            }
+        };
+
+        listEl.innerHTML = filtered.map(v => {
+            const st = String(v.status || 'PENDING').toUpperCase();
+            const dt = v.appointmentTime ? new Date(v.appointmentTime) : null;
+            const dateStr = dt && !isNaN(dt)
+                ? dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
+                : 'Date TBD';
+            const timeStr = dt && !isNaN(dt)
+                ? dt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+                : '';
+            const priceStr = v.servicePrice != null ? `$${Number(v.servicePrice).toFixed(2)}` : '';
+            const isUpcoming = (st === 'PENDING' || st === 'CONFIRMED') && dt && dt > now;
+            const actionBtn = isUpcoming && v.cancellationToken
+                ? `<a href="/manage-booking?token=${encodeURIComponent(v.cancellationToken)}&action=manage" class="btn btn-sm btn-outline-pink rounded-pill px-3 fw-semibold">Manage</a>`
+                : `<a href="/booking" class="btn btn-sm btn-outline-secondary rounded-pill px-3 fw-semibold">Book Again</a>`;
+
+            return `
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 p-3 mb-2 bg-light rounded-3 border">
+                    <div>
+                        <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
+                            <span class="fw-bold text-dark">${v.serviceName || 'Nail Service'}</span>
+                            ${priceStr ? `<span class="badge bg-white text-pink border fw-semibold">${priceStr}</span>` : ''}
+                            ${badgeForStatus(st)}
+                        </div>
+                        <div class="small text-muted d-flex flex-wrap align-items-center gap-3">
+                            <span><i class="bi bi-calendar3 text-pink me-1"></i>${dateStr}${timeStr ? ' • ' + timeStr : ''}</span>
+                            <span><i class="bi bi-person-fill text-pink me-1"></i>${v.staffName || 'Anyone Available'}</span>
+                            ${v.colorFormula ? `<span><i class="bi bi-palette-fill text-pink me-1"></i>${v.colorFormula}</span>` : ''}
+                        </div>
+                    </div>
+                    <div>${actionBtn}</div>
+                </div>
+            `;
+        }).join('');
+    }
+
     function handleLogout() {
         localStorage.removeItem('accessToken');
         localStorage.removeItem('token');
@@ -543,6 +694,7 @@
 
     loadUserProfile();
     loadClientNailProfile();
+    loadVisitHistory();
 </script>
 </body>
 </html>

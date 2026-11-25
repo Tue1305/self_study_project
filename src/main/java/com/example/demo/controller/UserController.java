@@ -2,9 +2,11 @@ package com.example.demo.controller;
 
 import com.example.demo.dto.PasswordChangeDto;
 import com.example.demo.dto.UserUpdateDto;
+import com.example.demo.entity.Appointment;
 import com.example.demo.entity.Customer;
 import com.example.demo.entity.CustomerNailNote;
 import com.example.demo.entity.UserEntity;
+import com.example.demo.repository.AppointmentRepository;
 import com.example.demo.repository.CustomerNailNoteRepository;
 import com.example.demo.repository.CustomerRepository;
 import com.example.demo.repository.UserRepository;
@@ -28,6 +30,9 @@ public class UserController {
     private final CustomerService customerService;
     private final CustomerRepository customerRepository;
     private final CustomerNailNoteRepository nailNoteRepository;
+
+    @Autowired(required = false)
+    private AppointmentRepository appointmentRepository;
 
     public UserController(UserRepository userRepository,
                           PasswordEncoder passwordEncoder,
@@ -192,6 +197,99 @@ public class UserController {
         }
 
         return ResponseEntity.ok(resp);
+    }
+
+    // Get current client's appointment visit history (upcoming + past visits)
+    @GetMapping("/me/visit-history")
+    public ResponseEntity<?> getMyVisitHistory(@AuthenticationPrincipal UserDetails userDetails) {
+        if (userDetails == null) {
+            return ResponseEntity.status(401).body(Map.of("message", "Unauthorized"));
+        }
+
+        UserEntity user = resolveCurrentUser(userDetails);
+        String tenantId = (user.getTenantId() != null && !user.getTenantId().isBlank())
+                ? user.getTenantId().trim().toLowerCase()
+                : "default";
+
+        if (appointmentRepository == null) {
+            return ResponseEntity.ok(Map.of(
+                    "totalVisits", 0,
+                    "completedVisits", 0,
+                    "upcomingVisits", 0,
+                    "visits", Collections.emptyList()
+            ));
+        }
+
+        String userEmail = user.getEmail() != null ? user.getEmail().trim().toLowerCase() : "";
+        String userUsername = user.getUsername() != null ? user.getUsername().trim().toLowerCase() : "";
+        String userName = user.getName() != null ? user.getName().trim().toLowerCase() : "";
+        String userPhoneDigits = user.getPhoneNumber() != null ? user.getPhoneNumber().replaceAll("\\D", "") : "";
+
+        List<Appointment> allTenantAppts = appointmentRepository.findAllByTenantId(tenantId);
+        List<Appointment> matched = new ArrayList<>();
+        if (allTenantAppts != null) {
+            for (Appointment apt : allTenantAppts) {
+                if (apt == null) continue;
+                String aptEmail = apt.getCustomerEmail() != null ? apt.getCustomerEmail().trim().toLowerCase() : "";
+                String aptName = apt.getCustomerName() != null ? apt.getCustomerName().trim().toLowerCase() : "";
+                String aptPhoneDigits = apt.getCustomerPhone() != null ? apt.getCustomerPhone().replaceAll("\\D", "") : "";
+
+                boolean emailMatch = !aptEmail.isEmpty() && (aptEmail.equals(userEmail) || aptEmail.equals(userUsername));
+                boolean phoneMatch = userPhoneDigits.length() >= 7 && aptPhoneDigits.equals(userPhoneDigits);
+                boolean nameMatch = !aptName.isEmpty() && ((!userName.isEmpty() && aptName.equals(userName)) || aptName.equals(userUsername));
+
+                if (emailMatch || phoneMatch || nameMatch) {
+                    matched.add(apt);
+                }
+            }
+        }
+
+        matched.sort((a, b) -> {
+            if (a.getAppointmentTime() == null && b.getAppointmentTime() == null) return 0;
+            if (a.getAppointmentTime() == null) return 1;
+            if (b.getAppointmentTime() == null) return -1;
+            return b.getAppointmentTime().compareTo(a.getAppointmentTime());
+        });
+
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        int completedCount = 0;
+        int upcomingCount = 0;
+        List<Map<String, Object>> visits = new ArrayList<>();
+
+        for (Appointment apt : matched) {
+            Appointment.AppointmentStatus st = apt.getStatus() != null ? apt.getStatus() : Appointment.AppointmentStatus.PENDING;
+            if (st == Appointment.AppointmentStatus.COMPLETED) {
+                completedCount++;
+            } else if ((st == Appointment.AppointmentStatus.PENDING || st == Appointment.AppointmentStatus.CONFIRMED)
+                    && apt.getAppointmentTime() != null && apt.getAppointmentTime().isAfter(now)) {
+                upcomingCount++;
+            }
+
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("id", apt.getId());
+            item.put("appointmentTime", apt.getAppointmentTime() != null ? apt.getAppointmentTime().toString() : null);
+            item.put("status", st.name());
+            item.put("serviceName", apt.getService() != null ? apt.getService().getName() : "Nail Service");
+            item.put("servicePrice", apt.getService() != null ? apt.getService().getPrice() : null);
+            item.put("durationMinutes", apt.getService() != null ? apt.getService().getDurationMinutes() : 45);
+            String staffName = "Anyone Available";
+            if (apt.getNailTech() != null) {
+                staffName = (apt.getNailTech().getName() != null && !apt.getNailTech().getName().isBlank())
+                        ? apt.getNailTech().getName()
+                        : apt.getNailTech().getUsername();
+            }
+            item.put("staffName", staffName);
+            item.put("colorFormula", apt.getColorFormula());
+            item.put("cancellationToken", apt.getCancellationToken());
+            visits.add(item);
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("totalVisits", visits.size());
+        result.put("completedVisits", completedCount);
+        result.put("upcomingVisits", upcomingCount);
+        result.put("visits", visits);
+        return ResponseEntity.ok(result);
     }
 
     // Update current client's nail style preferences

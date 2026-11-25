@@ -896,8 +896,8 @@
                                             <i class="bi bi-clock-history text-pink me-1"></i>Select Time Slot for Each Specialist &amp; Service
                                         </label>
                                         <div class="btn-group btn-group-sm" role="group">
-                                            <button type="button" class="btn btn-outline-pink active" id="btnModePerService" onclick="toggleSlotSelectionMode('per-service')">Each Staff Time Slot</button>
-                                            <button type="button" class="btn btn-outline-secondary" id="btnModeCombined" onclick="toggleSlotSelectionMode('combined')">Combined Window</button>
+                                            <button type="button" class="btn btn-pink active" id="btnModeCombined" onclick="toggleSlotSelectionMode('combined')">Combined Window</button>
+                                            <button type="button" class="btn btn-outline-pink" id="btnModePerService" onclick="toggleSlotSelectionMode('per-service')">Each Staff Time Slot</button>
                                         </div>
                                     </div>
                                     <div class="small text-muted mb-3">Choose an individual appointment slot for each technician, or switch to a combined window.</div>
@@ -1049,7 +1049,7 @@
         staffList: [],
         staffDaysOffInfo: {},
         serviceTimeSlots: {}, // { [serviceId]: '15:00:00' }
-        slotSelectionMode: 'per-service' // 'per-service' or 'combined'
+        slotSelectionMode: 'combined' // 'combined' (default) or 'per-service'
     };
 
     const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
@@ -2544,7 +2544,7 @@
         if (isMultiService && servicesAvail.length >= 2) {
             if (modeSelector) modeSelector.style.display = 'block';
             renderPerServiceSlotCards(servicesAvail, guest0Services);
-            toggleSlotSelectionMode(bookingState.slotSelectionMode || 'per-service');
+            toggleSlotSelectionMode(bookingState.slotSelectionMode || 'combined');
         } else {
             if (modeSelector) modeSelector.style.display = 'none';
             if (perContainer) perContainer.style.display = 'none';

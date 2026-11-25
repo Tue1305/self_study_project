@@ -88,15 +88,37 @@ public class UserController {
         }
 
         UserEntity user = resolveCurrentUser(userDetails);
+        String tenantId = (user.getTenantId() != null && !user.getTenantId().isBlank())
+                ? user.getTenantId().trim().toLowerCase()
+                : "default";
 
         if (updateDto.getUsername() != null && !updateDto.getUsername().trim().isEmpty()) {
-            user.setUsername(updateDto.getUsername());
+            String newUsername = updateDto.getUsername().trim();
+            var existingByUsername = userRepository.findByTenantIdAndUsernameIgnoreCase(tenantId, newUsername);
+            if (existingByUsername.isPresent() && !existingByUsername.get().getId().equals(user.getId())) {
+                return ResponseEntity.status(409)
+                        .body(Map.of("message", "That username is already taken. Please choose another."));
+            }
+            user.setUsername(newUsername);
         }
+
         if (updateDto.getEmail() != null) {
-            user.setEmail(updateDto.getEmail());
+            String newEmail = updateDto.getEmail().trim();
+            if (newEmail.isEmpty()) {
+                user.setEmail(null);
+            } else {
+                var existingByEmail = userRepository.findByTenantIdAndEmailIgnoreCase(tenantId, newEmail);
+                if (existingByEmail.isPresent() && !existingByEmail.get().getId().equals(user.getId())) {
+                    return ResponseEntity.status(409)
+                            .body(Map.of("message", "That email address is already in use by another account."));
+                }
+                user.setEmail(newEmail);
+            }
         }
+
         if (updateDto.getPhoneNumber() != null) {
-            user.setPhoneNumber(updateDto.getPhoneNumber());
+            String newPhone = updateDto.getPhoneNumber().trim();
+            user.setPhoneNumber(newPhone.isEmpty() ? null : newPhone);
         }
 
         UserEntity savedUser = userRepository.save(user);
@@ -104,7 +126,7 @@ public class UserController {
         // Sync updated email/phone/username to the Customer database as well
         customerService.syncUserToCustomer(savedUser);
 
-        return ResponseEntity.ok().body("Profile updated successfully");
+        return ResponseEntity.ok(Map.of("message", "Profile updated successfully!"));
     }
 
     // Change password

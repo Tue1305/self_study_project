@@ -385,8 +385,13 @@
                 showAlert('Profile updated successfully!');
                 loadUserProfile();
             } else {
-                const errorText = await response.text();
-                showAlert('Failed to update profile: ' + (errorText || 'Server error'), 'danger');
+                const rawError = await response.text();
+                let cleanMsg = rawError || 'Server error';
+                try {
+                    const parsed = JSON.parse(rawError);
+                    if (parsed && parsed.message) cleanMsg = parsed.message;
+                } catch (_) {}
+                showAlert(cleanMsg, 'danger');
             }
         } catch (err) {
             console.error(err);

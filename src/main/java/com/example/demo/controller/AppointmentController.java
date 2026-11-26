@@ -2318,6 +2318,12 @@ public class AppointmentController {
 
         // Conflict check
         if (appt.getNailTech() != null && appt.getNailTech().getId() != null) {
+            if (staffDayOffRepository != null && staffDayOffRepository.existsByTenantIdAndStaffIdAndOffDate(tenantId, appt.getNailTech().getId(), newTime.toLocalDate())) {
+                String techName = appt.getNailTech().getName() != null ? appt.getNailTech().getName() : appt.getNailTech().getUsername();
+                return ResponseEntity.badRequest()
+                        .body(Map.of("message", techName + " is off on this date. Please choose another specialist."));
+            }
+
             int duration = (appt.getService() != null && appt.getService().getDurationMinutes() != null)
                     ? appt.getService().getDurationMinutes() : 45;
             LocalDateTime newSlotEnd = newTime.plusMinutes(duration);
@@ -2343,6 +2349,11 @@ public class AppointmentController {
         LocalDateTime oldTime = appt.getAppointmentTime();
         appt.setAppointmentTime(newTime);
         appt.setStatus(Appointment.AppointmentStatus.CONFIRMED);
+        if (appt.getNailTech() != null && appt.getNailTech().getId() != null
+                && appt.getNotes() != null && appt.getNotes().contains("[ANYONE AVAILABLE]")) {
+            String cleanedNotes = appt.getNotes().replace("[ANYONE AVAILABLE]", "").replaceAll("\\s{2,}", " ").trim();
+            appt.setNotes(cleanedNotes);
+        }
         if (newTime.isAfter(LocalDateTime.now().plusHours(24))) {
             appt.setReminderSentAt(null);
         }

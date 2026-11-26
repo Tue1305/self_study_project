@@ -181,6 +181,13 @@
             display: flex;
             flex-direction: column;
             overflow: hidden;
+            transition: opacity 0.18s ease, transform 0.18s ease;
+        }
+
+        .anyone-queue-popup.drag-passthrough {
+            pointer-events: none;
+            opacity: 0.25;
+            transform: scale(0.98);
         }
 
         .anyone-queue-header {
@@ -206,8 +213,19 @@
             border-radius: 12px;
             padding: 12px;
             margin-bottom: 10px;
-            cursor: pointer;
-            transition: border-color 0.15s ease, box-shadow 0.15s ease;
+            cursor: grab;
+            user-select: none;
+            -webkit-user-drag: element;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+        }
+
+        .anyone-queue-card:active {
+            cursor: grabbing;
+        }
+
+        .anyone-queue-card.is-dragging {
+            opacity: 0.45;
+            border: 2px dashed #0d6efd;
         }
 
         .anyone-queue-card:hover,
@@ -1461,7 +1479,8 @@
                 newTimeStr = dragTarget.timeStr;
             }
 
-            if (targetTechId === currentTechId && newTimeStr === currentTimeStr) {
+            const isAnyoneMarked = String(apt.notes || '').includes('[ANYONE AVAILABLE]');
+            if (targetTechId === currentTechId && newTimeStr === currentTimeStr && !isAnyoneMarked) {
                 return;
             }
 
@@ -3313,7 +3332,7 @@
                         h('i', { className: 'bi bi-chevron-up ms-1' }),
                         h('span', { className: 'anyone-edge-badge' }, anyoneAvailableAppts.length)
                     )
-                    : h('div', { className: 'anyone-queue-popup' },
+                    : h('div', { className: `anyone-queue-popup ${isDragMoving ? 'drag-passthrough' : ''}` },
                         /* Popup Header */
                         h('div', {
                             className: 'anyone-queue-header',
@@ -3326,7 +3345,7 @@
                                         `Anyone Available (${anyoneAvailableAppts.length})`
                                     ),
                                     h('div', { style: { fontSize: '0.72rem', opacity: 0.9 } },
-                                        'Click a booking below to assign a free specialist'
+                                        'Drag onto any specialist column or click Assign'
                                     )
                                 )
                             ),
@@ -3348,6 +3367,7 @@
                             anyoneAvailableAppts.map(apt => {
                                 const isActive = anyonePopup.activeAptId === apt.id || anyoneAvailableAppts.length === 1;
                                 const isPickingStaff = isActive && anyonePopup.showStaffPicker;
+                                const isBeingDragged = draggingApt && draggingApt.id === apt.id;
                                 const dt = new Date(apt.appointmentTime);
                                 const dateStr = String(apt.appointmentTime).split('T')[0];
                                 const startMins = dt.getHours() * 60 + dt.getMinutes();
@@ -3362,8 +3382,13 @@
 
                                 return h('div', {
                                     key: `anyone-apt-${apt.id}`,
-                                    className: `anyone-queue-card ${isActive ? 'active' : ''}`,
+                                    draggable: true,
+                                    onDragStart: (e) => handleDragStart(e, apt),
+                                    onDragEnd: handleDragEnd,
+                                    title: 'Drag and drop onto any staff column or header on the calendar',
+                                    className: `anyone-queue-card ${isActive ? 'active' : ''} ${isBeingDragged ? 'is-dragging' : ''}`,
                                     onClick: () => {
+                                        if (dragJustEndedRef.current) return;
                                         if (anyonePopup.activeAptId !== apt.id) {
                                             setAnyonePopup(prev => ({
                                                 ...prev,
@@ -3378,8 +3403,9 @@
                                     /* Card Summary Row */
                                     h('div', { className: 'd-flex justify-content-between align-items-start gap-2' },
                                         h('div', { className: 'overflow-hidden' },
-                                            h('div', { className: 'fw-bold text-dark text-truncate', style: { fontSize: '0.92rem' } },
-                                                apt.customerName || 'Walk-In Guest'
+                                            h('div', { className: 'fw-bold text-dark text-truncate d-flex align-items-center gap-1', style: { fontSize: '0.92rem' } },
+                                                h('i', { className: 'bi bi-grip-vertical text-muted', style: { fontSize: '0.85rem' } }),
+                                                h('span', { className: 'text-truncate' }, apt.customerName || 'Walk-In Guest')
                                             ),
                                             h('div', { className: 'small text-secondary text-truncate' }, srvName),
                                             h('div', { className: 'd-flex align-items-center flex-wrap gap-1 mt-1' },

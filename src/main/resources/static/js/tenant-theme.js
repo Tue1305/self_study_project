@@ -141,6 +141,7 @@ const TenantTheme = (function() {
         }
 
         syncAdminElements(tenant, theme);
+        syncDynamicStoreHours();
 
         // Cache in localStorage for subsequent page navigation
         try {
@@ -240,6 +241,71 @@ const TenantTheme = (function() {
         }
     }
 
+    function getTodayStoreHoursInfo(nowDate) {
+        const now = nowDate instanceof Date ? nowDate : new Date();
+        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const dayIndex = now.getDay();
+        const dayName = dayNames[dayIndex];
+        const currentMins = now.getHours() * 60 + now.getMinutes();
+
+        // Store schedule: Monday–Saturday 10:00 AM – 7:00 PM, Sunday Closed
+        if (dayIndex === 0) {
+            return {
+                dayName,
+                isOpenDay: false,
+                isOpenNow: false,
+                hoursText: 'Closed',
+                statusText: 'Opens Monday at 10:00 AM',
+                label: `${dayName} Store Hours: Closed • Opens Monday at 10:00 AM`,
+                weeklyTooltip: 'Weekly Hours: Monday – Saturday: 10:00 AM – 7:00 PM | Sunday: Closed'
+            };
+        }
+
+        const openMins = 10 * 60;  // 10:00 AM
+        const closeMins = 19 * 60; // 7:00 PM
+        const isOpenNow = currentMins >= openMins && currentMins < closeMins;
+        let statusText = 'Closed Now';
+        if (isOpenNow) {
+            statusText = 'Open Now';
+        } else if (currentMins < openMins) {
+            statusText = 'Opens at 10:00 AM';
+        }
+
+        return {
+            dayName,
+            isOpenDay: true,
+            isOpenNow,
+            hoursText: '10:00 AM – 7:00 PM',
+            statusText,
+            label: `${dayName} Store Hours: 10:00 AM – 7:00 PM • ${statusText}`,
+            weeklyTooltip: 'Weekly Hours: Monday – Saturday: 10:00 AM – 7:00 PM | Sunday: Closed'
+        };
+    }
+
+    function syncDynamicStoreHours() {
+        if (typeof document === 'undefined') return;
+        const info = getTodayStoreHoursInfo(new Date());
+
+        const targets = new Set();
+        document.querySelectorAll('[data-dynamic-store-hours="true"], #footerHours').forEach(el => targets.add(el));
+        document.querySelectorAll('footer span, .rounded-pill span').forEach(span => {
+            const text = (span.textContent || '').trim();
+            if (text.startsWith('Store Hours:') || text.includes('Store Hours:')) {
+                targets.add(span);
+            }
+        });
+
+        targets.forEach(el => {
+            el.setAttribute('data-dynamic-store-hours', 'true');
+            const badgeColor = info.isOpenNow ? '#198754' : '#6c757d';
+            el.innerHTML = `${info.dayName} Store Hours: <strong>${info.hoursText}</strong> <span style="color:${badgeColor};font-weight:700;">• ${info.statusText}</span>`;
+            const pill = el.closest('.rounded-pill') || el.parentElement;
+            if (pill && !pill.getAttribute('title')) {
+                pill.setAttribute('title', info.weeklyTooltip);
+            }
+        });
+    }
+
     return {
         resolveTenantId,
         darkenHex,
@@ -250,16 +316,24 @@ const TenantTheme = (function() {
         getAuthHeaders,
         cleanPath,
         getTenantDisplayName,
-        syncAdminElements
+        syncAdminElements,
+        getTodayStoreHoursInfo,
+        syncDynamicStoreHours
     };
 })();
 
 // Immediately trigger synchronous pre-load and navigation sync if executing in browser
 if (typeof window !== 'undefined' && typeof document !== 'undefined') {
     TenantTheme.syncPreload();
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => TenantTheme.syncAdminElements());
-    } else {
+    const initDomSync = () => {
         TenantTheme.syncAdminElements();
+        TenantTheme.syncDynamicStoreHours();
+    };
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initDomSync);
+    } else {
+        initDomSync();
     }
+    // Refresh live Open/Closed status and weekday automatically every 60 seconds
+    setInterval(() => TenantTheme.syncDynamicStoreHours(), 60000);
 }

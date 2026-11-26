@@ -2977,7 +2977,12 @@
                             isSelectedDateToday && h('span', { className: 'badge rounded-pill live-today-badge' }, 'Today • Live')
                         ),
                         h('p', { className: 'text-muted small mb-0 mt-1' },
-                            `Daily Staff Timeline • Store Hours: 10:00 AM – 7:00 PM (${dayAppointments.length} booking${dayAppointments.length === 1 ? '' : 's'}) • Click empty slots to add Walk-In`
+                            (() => {
+                                const dayName = selectedDate.toLocaleDateString('en-US', { weekday: 'long' });
+                                const isSun = selectedDate.getDay() === 0;
+                                const hoursSummary = isSun ? `${dayName} Store Hours: Closed` : `${dayName} Store Hours: 10:00 AM – 7:00 PM`;
+                                return `Daily Staff Timeline • ${hoursSummary} (${dayAppointments.length} booking${dayAppointments.length === 1 ? '' : 's'}) • Click empty slots to add Walk-In`;
+                            })()
                         )
                     )
                 ),

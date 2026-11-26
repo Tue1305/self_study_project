@@ -2427,17 +2427,19 @@
 
     function buildNextAvailableButtonHtml(nextAvail, onClickSameDayExpr) {
         if (!nextAvail || nextAvail === 'later' || nextAvail === 'N/A') return '';
-        const isTomorrow = String(nextAvail).toLowerCase() === 'tomorrow' || /7:00\s*PM/i.test(String(nextAvail));
-        if (isTomorrow) {
+        const text = String(nextAvail).trim();
+        const isFutureDay = text.toLowerCase() === 'tomorrow'
+            || /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+at\s+/i.test(text);
+        if (isFutureDay) {
             return `
                 <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1 fw-semibold">Fully Booked Today</span>
                 <button type="button" class="btn btn-sm btn-outline-pink rounded-pill px-3 fw-bold" onclick="switchBookingDateToTomorrow()">
-                    <i class="bi bi-calendar-event me-1"></i>Next Available: Tomorrow
+                    <i class="bi bi-calendar-event me-1"></i>Next Available: ${text}
                 </button>`;
         }
         return `
             <button type="button" class="btn btn-sm btn-outline-pink rounded-pill px-3 fw-bold" onclick="${onClickSameDayExpr}">
-                <i class="bi bi-check-circle me-1"></i>Next Available at ${nextAvail}
+                <i class="bi bi-check-circle me-1"></i>Next Available at ${text}
             </button>`;
     }
 
@@ -3974,38 +3976,38 @@
                 )
                 : [];
 
-            // Pre-fetch today's schedule conflicts and staff day-off status if not cached
-            if (!bookingState.staffBookedInfo || !bookingState.staffDaysOffInfo) {
-                try {
-                    const todayStr = getLocalTodayDateStr();
-                    const [preResp, daysOffResp] = await Promise.all([
-                        fetch(`/api/appointments/available-slots?date=${todayStr}&durationMinutes=45&clientNow=${encodeURIComponent(getLocalNowIsoStr())}`, { headers: getActiveTenantHeaders() }),
-                        fetch(`/api/nail-techs/days-off?date=${todayStr}`, { headers: getActiveTenantHeaders() })
-                    ]);
-                    if (preResp.ok) {
-                        const preData = await preResp.json();
-                        bookingState.staffBookedInfo = {};
-                        (preData.staffConflicts || []).forEach(c => {
-                            (c.breakdown || []).forEach(b => {
-                                if (b.techId && !b.available) {
-                                    bookingState.staffBookedInfo[b.techId] = b.busyWindow || 'Booked';
-                                }
-                            });
+            // Always fetch real per-staff Next Available & day-off status from PostgreSQL for the selected service duration
+            try {
+                const todayStr = getLocalTodayDateStr();
+                const guestDur = Math.max(15, calculateGuestTotals(currentGuest).duration || 45);
+                const [preResp, daysOffResp] = await Promise.all([
+                    fetch(`/api/appointments/available-slots?date=${todayStr}&durationMinutes=${guestDur}&clientNow=${encodeURIComponent(getLocalNowIsoStr())}`, { headers: getActiveTenantHeaders() }),
+                    fetch(`/api/nail-techs/days-off?date=${todayStr}`, { headers: getActiveTenantHeaders() })
+                ]);
+                if (preResp.ok) {
+                    const preData = await preResp.json();
+                    bookingState.staffNextAvailable = preData.staffNextAvailable || {};
+                    bookingState.staffBookedInfo = {};
+                    (preData.staffConflicts || []).forEach(c => {
+                        (c.breakdown || []).forEach(b => {
+                            if (b.techId && !b.available) {
+                                bookingState.staffBookedInfo[b.techId] = b.busyWindow || 'Booked';
+                            }
+                        });
+                    });
+                }
+                if (daysOffResp.ok) {
+                    const daysOffData = await daysOffResp.json();
+                    bookingState.staffDaysOffInfo = {};
+                    if (Array.isArray(daysOffData)) {
+                        daysOffData.forEach(item => {
+                            if (item.staffId) {
+                                bookingState.staffDaysOffInfo[item.staffId] = item.reason || 'Day Off';
+                            }
                         });
                     }
-                    if (daysOffResp.ok) {
-                        const daysOffData = await daysOffResp.json();
-                        bookingState.staffDaysOffInfo = {};
-                        if (Array.isArray(daysOffData)) {
-                            daysOffData.forEach(item => {
-                                if (item.staffId) {
-                                    bookingState.staffDaysOffInfo[item.staffId] = item.reason || 'Day Off';
-                                }
-                            });
-                        }
-                    }
-                } catch (ignored) {}
-            }
+                }
+            } catch (ignored) {}
 
             renderStaffSelectionUI(currentGuest);
 
@@ -4074,18 +4076,25 @@
             `;
             singleGrid.appendChild(anyoneCol);
 
+            const buildStep2StaffStatusBadge = (tech, isOff) => {
+                if (isOff) {
+                    return `<span class="badge bg-secondary-subtle text-secondary border ms-2 small"><i class="bi bi-moon-stars me-1"></i>Off Today</span>`;
+                }
+                const nextInfo = bookingState.staffNextAvailable && bookingState.staffNextAvailable[String(tech.id)];
+                if (nextInfo && nextInfo.nextAvailableText) {
+                    if (nextInfo.availableToday) {
+                        return `<span class="badge bg-success-subtle text-success border border-success-subtle ms-2 small"><i class="bi bi-clock me-1"></i>${nextInfo.nextAvailableText}</span>`;
+                    }
+                    return `<span class="badge bg-warning-subtle text-dark border border-warning-subtle ms-2 small"><i class="bi bi-calendar-event me-1"></i>${nextInfo.nextAvailableText}</span>`;
+                }
+                return '';
+            };
+
             // 2. Qualified staff cards
             qualifiedTechs.forEach(tech => {
                 const isSel = (assignedTechId === tech.id);
                 const isOff = bookingState.staffDaysOffInfo && bookingState.staffDaysOffInfo[tech.id];
-                const isBooked = bookingState.staffBookedInfo && bookingState.staffBookedInfo[tech.id];
-
-                let statusBadge = '';
-                if (isOff) {
-                    statusBadge = `<span class="badge bg-secondary-subtle text-secondary border ms-2 small"><i class="bi bi-moon-stars me-1"></i>Off Today</span>`;
-                } else if (isBooked) {
-                    statusBadge = `<span class="badge bg-warning-subtle text-dark border border-warning-subtle ms-2 small"><i class="bi bi-clock-history me-1"></i>Staff booked</span>`;
-                }
+                const statusBadge = buildStep2StaffStatusBadge(tech, isOff);
 
                 const safeName = (tech.name || tech.username).replace(/'/g, "\\'");
                 const clickHandler = isOff
@@ -4171,13 +4180,15 @@
                 qualifiedTechs.forEach(tech => {
                     const isTechAssigned = (assignedVal === tech.id);
                     const isOff = bookingState.staffDaysOffInfo && bookingState.staffDaysOffInfo[tech.id];
-                    const isBooked = bookingState.staffBookedInfo && bookingState.staffBookedInfo[tech.id];
+                    const nextInfo = bookingState.staffNextAvailable && bookingState.staffNextAvailable[String(tech.id)];
 
                     let statusBadge = '';
                     if (isOff) {
                         statusBadge = `<span class="badge bg-secondary-subtle text-secondary border ms-2 small"><i class="bi bi-moon-stars me-1"></i>Off Today</span>`;
-                    } else if (isBooked) {
-                        statusBadge = `<span class="badge bg-warning-subtle text-dark border border-warning-subtle ms-2 small"><i class="bi bi-clock-history me-1"></i>Staff booked</span>`;
+                    } else if (nextInfo && nextInfo.nextAvailableText) {
+                        statusBadge = nextInfo.availableToday
+                            ? `<span class="badge bg-success-subtle text-success border border-success-subtle ms-2 small"><i class="bi bi-clock me-1"></i>${nextInfo.nextAvailableText}</span>`
+                            : `<span class="badge bg-warning-subtle text-dark border border-warning-subtle ms-2 small"><i class="bi bi-calendar-event me-1"></i>${nextInfo.nextAvailableText}</span>`;
                     }
 
                     const safeName = (tech.name || tech.username).replace(/'/g, "\\'");

@@ -270,13 +270,14 @@ public class AppointmentController {
         LocalDateTime dayEnd = targetDate.atTime(19, 0);
         int effectiveBuffer = Math.max(0, bufferMinutes);
 
-        // Fetch all non-cancelled appointments for this tenant on this date
+        // Fetch all active appointments (exclude CANCELLED and NO_SHOW) for this tenant on this date
         List<Appointment> dayAppointments = appointmentRepository.findByTenantIdAndAppointmentTimeBetween(
                 tenantId,
                 targetDate.atStartOfDay(),
                 targetDate.plusDays(1).atStartOfDay()
         ).stream()
-         .filter(a -> a.getStatus() != Appointment.AppointmentStatus.CANCELLED)
+         .filter(a -> a.getStatus() != Appointment.AppointmentStatus.CANCELLED
+                 && a.getStatus() != Appointment.AppointmentStatus.NO_SHOW)
          .toList();
 
         // Query technicians who have a marked day-off on this date
@@ -434,18 +435,37 @@ public class AppointmentController {
             }
         }
 
-        // Generate all standard 15-minute slots between 10:00 AM and 7:00 PM
+        // Generate candidate 15-minute slots from 10:00 AM up to Last Intake (6:30 PM),
+        // enforcing dynamic Closing Grace Window: slotEnd <= 7:00 PM + 30m grace (7:30 PM hard finish).
+        LocalDateTime lastIntakeDateTime = targetDate.atTime(18, 30);
+        LocalDateTime hardFinishDateTime = dayEnd.plusMinutes(30); // 7:30 PM hard finish
         List<Map<String, Object>> slotResults = new ArrayList<>();
 
-        for (int hour = 10; hour <= 19; hour++) {
-            int maxMin = (hour == 19) ? 0 : 45;
+        for (int hour = 10; hour <= 18; hour++) {
+            int maxMin = (hour == 18) ? 30 : 45;
             for (int min = 0; min <= maxMin; min += 15) {
                 LocalDateTime slotStart = targetDate.atTime(hour, min);
                 LocalDateTime slotEnd = slotStart.plusMinutes(effectiveDuration);
 
-                // Skip slots that exceed store closing time (19:00 / 7:00 PM + 15m grace)
-                if (slotEnd.isAfter(dayEnd.plusMinutes(15))) {
+                // Dynamic Closing Grace Window & Last-Intake Rule:
+                // 1) Never allow brand-new arrivals after 6:30 PM
+                // 2) Total service duration must finish by 7:30 PM (7:00 PM closing + 30m grace)
+                if (slotStart.isAfter(lastIntakeDateTime) || slotEnd.isAfter(hardFinishDateTime)) {
                     continue;
+                }
+
+                // If a single specific non-off technician is selected and this slot falls outside their shift,
+                // hide the slot dynamically instead of falsely labeling it "Booked".
+                if (segments.size() == 1 && segments.get(0).techId != null && segments.get(0).techId > 0) {
+                    long onlyTid = segments.get(0).techId;
+                    UserEntity onlyTech = techById.get(onlyTid);
+                    if (onlyTech == null) {
+                        onlyTech = userRepository.findByTenantIdAndId(tenantId, onlyTid).orElse(null);
+                        if (onlyTech != null) techById.put(onlyTid, onlyTech);
+                    }
+                    if (!finalOffStaffIds.contains(onlyTid) && !isWithinTechShift(onlyTech, slotStart, slotEnd)) {
+                        continue;
+                    }
                 }
 
                 // Real-Time Today Filter: if date is today, slot must be at least 15 minutes after current local time
@@ -672,14 +692,28 @@ public class AppointmentController {
             List<Map<String, Object>> segSlots = new ArrayList<>();
             int segDur = seg.durationMinutes;
 
-            for (int hour = 10; hour <= 19; hour++) {
-                int maxMin = (hour == 19) ? 0 : 45;
+            for (int hour = 10; hour <= 18; hour++) {
+                int maxMin = (hour == 18) ? 30 : 45;
                 for (int min = 0; min <= maxMin; min += 15) {
                     LocalDateTime segStart = targetDate.atTime(hour, min);
                     LocalDateTime segEnd = segStart.plusMinutes(segDur);
 
-                    if (segEnd.isAfter(dayEnd.plusMinutes(15))) {
+                    // Dynamic Closing Grace Window (7:00 PM + 30m = 7:30 PM hard finish) & Last Intake (6:30 PM)
+                    if (segStart.isAfter(lastIntakeDateTime) || segEnd.isAfter(hardFinishDateTime)) {
                         continue;
+                    }
+
+                    // If a specific non-off technician is assigned to this segment and slot is outside their shift,
+                    // omit the slot instead of falsely marking it "Booked".
+                    if (seg.techId != null && seg.techId > 0 && !finalOffStaffIds.contains(seg.techId)) {
+                        UserEntity segTechObj = techById.get(seg.techId);
+                        if (segTechObj == null) {
+                            segTechObj = userRepository.findByTenantIdAndId(tenantId, seg.techId).orElse(null);
+                            if (segTechObj != null) techById.put(seg.techId, segTechObj);
+                        }
+                        if (!isWithinTechShift(segTechObj, segStart, segEnd)) {
+                            continue;
+                        }
                     }
 
                     boolean isPast = false;
@@ -856,11 +890,28 @@ public class AppointmentController {
             servicesAvailability.add(segRes);
         }
 
-        // Also reconcile nextAvailable on combined slotResults and staffConflicts to exact next real available slot card (or "Tomorrow")
+        // Compute real per-technician Next Available slot from actual PostgreSQL appointments (today first, then upcoming open days)
+        Map<String, Map<String, Object>> staffNextAvailable = new LinkedHashMap<>();
+        for (UserEntity tech : tenantTechs) {
+            if (tech.getId() == null) continue;
+            Map<String, Object> nextInfo = computeRealNextAvailableForTech(
+                    tenantId, tech, effectiveDuration, effectiveBuffer, now, targetDate, dayAppointments, finalOffStaffIds
+            );
+            staffNextAvailable.put(String.valueOf(tech.getId()), nextInfo);
+        }
+
+        // Also reconcile nextAvailable on combined slotResults and staffConflicts to exact next real available slot card (or real future open day)
+        String fallbackNextLabel = "Tomorrow";
+        if (segments.size() == 1 && segments.get(0).techId != null && segments.get(0).techId > 0) {
+            Map<String, Object> tInfo = staffNextAvailable.get(String.valueOf(segments.get(0).techId));
+            if (tInfo != null && tInfo.get("nextAvailableShort") != null) {
+                fallbackNextLabel = String.valueOf(tInfo.get("nextAvailableShort"));
+            }
+        }
         for (int i = 0; i < slotResults.size(); i++) {
             Map<String, Object> cur = slotResults.get(i);
             if (!Boolean.TRUE.equals(cur.get("available")) && !Boolean.TRUE.equals(cur.get("isPast"))) {
-                String realNext = "Tomorrow";
+                String realNext = fallbackNextLabel;
                 for (int j = i + 1; j < slotResults.size(); j++) {
                     Map<String, Object> cand = slotResults.get(j);
                     if (Boolean.TRUE.equals(cand.get("available")) && !Boolean.TRUE.equals(cand.get("isPast"))) {
@@ -889,9 +940,13 @@ public class AppointmentController {
         responseBody.put("isClosed", false);
         responseBody.put("durationMinutes", effectiveDuration);
         responseBody.put("bufferMinutes", effectiveBuffer);
+        responseBody.put("closingTime", "19:00");
+        responseBody.put("closingGraceMinutes", 30);
+        responseBody.put("lastIntakeTime", "18:30");
         if (earliestSlot != null) {
             responseBody.put("earliestAvailableSlot", earliestSlot);
         }
+        responseBody.put("staffNextAvailable", staffNextAvailable);
         responseBody.put("staffConflicts", staffConflicts);
         responseBody.put("servicesAvailability", servicesAvailability);
         responseBody.put("availableSlots", slotResults);
@@ -936,17 +991,118 @@ public class AppointmentController {
         return false;
     }
 
+    private Map<String, Object> computeRealNextAvailableForTech(
+            String tenantId,
+            UserEntity tech,
+            int serviceDurationMinutes,
+            int effectiveBuffer,
+            LocalDateTime now,
+            LocalDate baseDate,
+            List<Appointment> baseDateAppointments,
+            Set<Long> baseDateOffStaffIds
+    ) {
+        Map<String, Object> info = new LinkedHashMap<>();
+        info.put("techId", tech.getId());
+        info.put("availableToday", false);
+        info.put("nextAvailableDate", null);
+        info.put("nextAvailableTime", null);
+        info.put("nextAvailableText", "No openings in next 14 days");
+        info.put("nextAvailableShort", "Tomorrow");
+
+        LocalDate today = now.toLocalDate();
+        LocalDate startScanDate = baseDate.isBefore(today) ? today : baseDate;
+
+        for (int dayOffset = 0; dayOffset < 14; dayOffset++) {
+            LocalDate scanDate = startScanDate.plusDays(dayOffset);
+            if (scanDate.getDayOfWeek() == java.time.DayOfWeek.SUNDAY) {
+                continue;
+            }
+
+            boolean isOff;
+            if (scanDate.equals(baseDate)) {
+                isOff = baseDateOffStaffIds != null && baseDateOffStaffIds.contains(tech.getId());
+            } else {
+                isOff = staffDayOffRepository != null
+                        && staffDayOffRepository.existsByTenantIdAndStaffIdAndOffDate(tenantId, tech.getId(), scanDate);
+            }
+            if (isOff) {
+                continue;
+            }
+
+            List<Appointment> scanDayAppts;
+            if (scanDate.equals(baseDate)) {
+                scanDayAppts = baseDateAppointments;
+            } else {
+                List<Appointment> raw = appointmentRepository.findByTenantIdAndAppointmentTimeBetween(
+                        tenantId,
+                        scanDate.atStartOfDay(),
+                        scanDate.plusDays(1).atStartOfDay()
+                );
+                scanDayAppts = (raw == null ? Collections.<Appointment>emptyList() : raw).stream()
+                        .filter(a -> a.getStatus() != Appointment.AppointmentStatus.CANCELLED
+                                && a.getStatus() != Appointment.AppointmentStatus.NO_SHOW)
+                        .toList();
+            }
+
+            LocalDateTime lastIntake = scanDate.atTime(18, 30);
+            LocalDateTime hardFinish = scanDate.atTime(19, 30); // 7:00 PM closing + 30m grace
+
+            for (int hour = 10; hour <= 18; hour++) {
+                int maxMin = (hour == 18) ? 30 : 45;
+                for (int min = 0; min <= maxMin; min += 15) {
+                    LocalDateTime candStart = scanDate.atTime(hour, min);
+                    LocalDateTime candEnd = candStart.plusMinutes(serviceDurationMinutes);
+
+                    if (candStart.isAfter(lastIntake) || candEnd.isAfter(hardFinish)) {
+                        continue;
+                    }
+                    if (scanDate.isEqual(today) && !candStart.isAfter(now.plusMinutes(15))) {
+                        continue;
+                    }
+                    if (!isWithinTechShift(tech, candStart, candEnd)) {
+                        continue;
+                    }
+
+                    boolean hasConflict = scanDayAppts.stream().anyMatch(a ->
+                            a.getNailTech() != null &&
+                            tech.getId().equals(a.getNailTech().getId()) &&
+                            hasOverlapWithBuffer(a, candStart, candEnd, effectiveBuffer)
+                    );
+                    if (!hasConflict) {
+                        String timeLbl = formatTime12Hour(candStart);
+                        boolean isToday = scanDate.isEqual(today);
+                        String dayShort = scanDate.format(DateTimeFormatter.ofPattern("EEE"));
+                        info.put("availableToday", isToday);
+                        info.put("nextAvailableDate", scanDate.toString());
+                        info.put("nextAvailableTime", timeLbl);
+                        info.put("nextAvailableText", isToday
+                                ? ("Next available today at " + timeLbl)
+                                : ("Next available " + dayShort + " at " + timeLbl));
+                        info.put("nextAvailableShort", isToday ? timeLbl : (dayShort + " at " + timeLbl));
+                        return info;
+                    }
+                }
+            }
+        }
+
+        return info;
+    }
+
     private boolean isWithinTechShift(UserEntity tech, LocalDateTime slotStart, LocalDateTime slotEnd) {
         if (slotStart == null || slotEnd == null) return true;
         String startStr = tech != null ? tech.getShiftStartTime() : null;
         String endStr = tech != null ? tech.getShiftEndTime() : null;
         try {
             LocalTime shiftStart = (startStr != null && !startStr.isBlank()) ? LocalTime.parse(startStr.trim()) : LocalTime.of(10, 0);
-            LocalTime shiftEnd = (endStr != null && !endStr.isBlank()) ? LocalTime.parse(endStr.trim()) : LocalTime.of(19, 0);
+            // Default salon closing is 7:00 PM + 30m grace = 7:30 PM hard finish (last intake 6:30 PM).
+            // Explicit earlier custom shift end (e.g., 16:00 / 4:00 PM) is honored strictly.
+            LocalTime parsedEnd = (endStr != null && !endStr.isBlank()) ? LocalTime.parse(endStr.trim()) : LocalTime.of(19, 0);
+            LocalTime hardEnd = parsedEnd.equals(LocalTime.of(19, 0)) ? LocalTime.of(19, 30) : parsedEnd;
             LocalTime reqStart = slotStart.toLocalTime();
             LocalTime reqEnd = slotEnd.toLocalTime();
             if (!slotEnd.toLocalDate().equals(slotStart.toLocalDate())) return false;
-            return !reqStart.isBefore(shiftStart) && !reqEnd.isAfter(shiftEnd);
+            if (reqStart.isAfter(LocalTime.of(18, 30))) return false;
+            return !reqStart.isBefore(shiftStart) && !reqEnd.isAfter(hardEnd);
         } catch (Exception ignored) {
             return true;
         }

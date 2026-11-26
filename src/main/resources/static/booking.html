@@ -1791,7 +1791,8 @@
                 <a href="#" onclick="handleLogout()" class="nav-link fw-semibold text-dark">Logout</a>
             `;
 
-            const upperRole = String(userRole || '').toUpperCase();
+            const normalizedRole = Array.isArray(role) ? (role[0] || '') : (role || '');
+            const upperRole = String(normalizedRole).toUpperCase();
             const isCustomerAccount = (upperRole === 'ROLE_USER' || upperRole === 'USER');
 
             if (isCustomerAccount) {

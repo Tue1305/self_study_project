@@ -10,6 +10,8 @@ public class TenantConfigDto {
     private String layoutVariant;
     private ThemeConfig theme;
     private WizardLayoutConfig wizard;
+    private Integer closingGraceMinutes = 30;
+    private Integer lastIntakeBeforeCloseMinutes = 30;
 
     public TenantConfigDto() {
     }
@@ -76,6 +78,22 @@ public class TenantConfigDto {
 
     public void setWizard(WizardLayoutConfig wizard) {
         this.wizard = wizard;
+    }
+
+    public Integer getClosingGraceMinutes() {
+        return closingGraceMinutes;
+    }
+
+    public void setClosingGraceMinutes(Integer closingGraceMinutes) {
+        this.closingGraceMinutes = closingGraceMinutes;
+    }
+
+    public Integer getLastIntakeBeforeCloseMinutes() {
+        return lastIntakeBeforeCloseMinutes;
+    }
+
+    public void setLastIntakeBeforeCloseMinutes(Integer lastIntakeBeforeCloseMinutes) {
+        this.lastIntakeBeforeCloseMinutes = lastIntakeBeforeCloseMinutes;
     }
 
     public static class ThemeConfig {

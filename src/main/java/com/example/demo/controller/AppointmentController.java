@@ -57,6 +57,12 @@ public class AppointmentController {
     private final com.example.demo.repository.AppointmentTransactionRepository transactionRepository;
     private com.example.demo.service.AppointmentReminderService reminderService;
     private StaffDayOffRepository staffDayOffRepository;
+    private com.example.demo.repository.TenantConfigRepository tenantConfigRepository;
+
+    @Autowired(required = false)
+    public void setTenantConfigRepository(com.example.demo.repository.TenantConfigRepository tenantConfigRepository) {
+        this.tenantConfigRepository = tenantConfigRepository;
+    }
 
     @Autowired(required = false)
     public void setReminderService(com.example.demo.service.AppointmentReminderService reminderService) {
@@ -435,21 +441,26 @@ public class AppointmentController {
             }
         }
 
-        // Generate candidate 15-minute slots from 10:00 AM up to Last Intake (6:30 PM),
-        // enforcing dynamic Closing Grace Window: slotEnd <= 7:00 PM + 30m grace (7:30 PM hard finish).
-        LocalDateTime lastIntakeDateTime = targetDate.atTime(18, 30);
-        LocalDateTime hardFinishDateTime = dayEnd.plusMinutes(30); // 7:30 PM hard finish
+        // Load per-tenant configurable closing cutoffs (defaults: 30m grace, 30m last intake before close)
+        int[] tenantCutoffs = resolveClosingCutoffs(tenantId);
+        int closingGraceMins = tenantCutoffs[0];
+        int lastIntakeBeforeCloseMins = tenantCutoffs[1];
+        LocalDateTime lastIntakeDateTime = dayEnd.minusMinutes(lastIntakeBeforeCloseMins);
+        LocalDateTime hardFinishDateTime = dayEnd.plusMinutes(closingGraceMins);
+
+        // Generate candidate 15-minute slots from 10:00 AM up to latestAllowedStartTime,
+        // enforcing dynamic Closing Grace Window: slotEnd <= closingTime + closingGraceMinutes.
         List<Map<String, Object>> slotResults = new ArrayList<>();
 
-        for (int hour = 10; hour <= 18; hour++) {
-            int maxMin = (hour == 18) ? 30 : 45;
+        for (int hour = 10; hour <= 19; hour++) {
+            int maxMin = (hour == 19) ? 0 : 45;
             for (int min = 0; min <= maxMin; min += 15) {
                 LocalDateTime slotStart = targetDate.atTime(hour, min);
                 LocalDateTime slotEnd = slotStart.plusMinutes(effectiveDuration);
 
-                // Dynamic Closing Grace Window & Last-Intake Rule:
-                // 1) Never allow brand-new arrivals after 6:30 PM
-                // 2) Total service duration must finish by 7:30 PM (7:00 PM closing + 30m grace)
+                // Dynamic Closing Grace Window & Last-Intake Rule (driven by TenantConfig):
+                // 1) !slotStart.isAfter(closingTime - lastIntakeBeforeCloseMinutes)
+                // 2) !slotEnd.isAfter(closingTime + closingGraceMinutes)
                 if (slotStart.isAfter(lastIntakeDateTime) || slotEnd.isAfter(hardFinishDateTime)) {
                     continue;
                 }
@@ -463,7 +474,7 @@ public class AppointmentController {
                         onlyTech = userRepository.findByTenantIdAndId(tenantId, onlyTid).orElse(null);
                         if (onlyTech != null) techById.put(onlyTid, onlyTech);
                     }
-                    if (!finalOffStaffIds.contains(onlyTid) && !isWithinTechShift(onlyTech, slotStart, slotEnd)) {
+                    if (!finalOffStaffIds.contains(onlyTid) && !isWithinTechShift(onlyTech, slotStart, slotEnd, closingGraceMins, lastIntakeBeforeCloseMins)) {
                         continue;
                     }
                 }
@@ -692,13 +703,13 @@ public class AppointmentController {
             List<Map<String, Object>> segSlots = new ArrayList<>();
             int segDur = seg.durationMinutes;
 
-            for (int hour = 10; hour <= 18; hour++) {
-                int maxMin = (hour == 18) ? 30 : 45;
+            for (int hour = 10; hour <= 19; hour++) {
+                int maxMin = (hour == 19) ? 0 : 45;
                 for (int min = 0; min <= maxMin; min += 15) {
                     LocalDateTime segStart = targetDate.atTime(hour, min);
                     LocalDateTime segEnd = segStart.plusMinutes(segDur);
 
-                    // Dynamic Closing Grace Window (7:00 PM + 30m = 7:30 PM hard finish) & Last Intake (6:30 PM)
+                    // Dynamic Closing Grace Window & Last Intake (driven by TenantConfig)
                     if (segStart.isAfter(lastIntakeDateTime) || segEnd.isAfter(hardFinishDateTime)) {
                         continue;
                     }
@@ -711,7 +722,7 @@ public class AppointmentController {
                             segTechObj = userRepository.findByTenantIdAndId(tenantId, seg.techId).orElse(null);
                             if (segTechObj != null) techById.put(seg.techId, segTechObj);
                         }
-                        if (!isWithinTechShift(segTechObj, segStart, segEnd)) {
+                        if (!isWithinTechShift(segTechObj, segStart, segEnd, closingGraceMins, lastIntakeBeforeCloseMins)) {
                             continue;
                         }
                     }
@@ -941,8 +952,9 @@ public class AppointmentController {
         responseBody.put("durationMinutes", effectiveDuration);
         responseBody.put("bufferMinutes", effectiveBuffer);
         responseBody.put("closingTime", "19:00");
-        responseBody.put("closingGraceMinutes", 30);
-        responseBody.put("lastIntakeTime", "18:30");
+        responseBody.put("closingGraceMinutes", closingGraceMins);
+        responseBody.put("lastIntakeBeforeCloseMinutes", lastIntakeBeforeCloseMins);
+        responseBody.put("lastIntakeTime", lastIntakeDateTime.toLocalTime().toString());
         if (earliestSlot != null) {
             responseBody.put("earliestAvailableSlot", earliestSlot);
         }
@@ -1044,11 +1056,14 @@ public class AppointmentController {
                         .toList();
             }
 
-            LocalDateTime lastIntake = scanDate.atTime(18, 30);
-            LocalDateTime hardFinish = scanDate.atTime(19, 30); // 7:00 PM closing + 30m grace
+            int[] cutoffs = resolveClosingCutoffs(tenantId);
+            int graceMins = cutoffs[0];
+            int lastIntakeMins = cutoffs[1];
+            LocalDateTime lastIntake = scanDate.atTime(19, 0).minusMinutes(lastIntakeMins);
+            LocalDateTime hardFinish = scanDate.atTime(19, 0).plusMinutes(graceMins);
 
-            for (int hour = 10; hour <= 18; hour++) {
-                int maxMin = (hour == 18) ? 30 : 45;
+            for (int hour = 10; hour <= 19; hour++) {
+                int maxMin = (hour == 19) ? 0 : 45;
                 for (int min = 0; min <= maxMin; min += 15) {
                     LocalDateTime candStart = scanDate.atTime(hour, min);
                     LocalDateTime candEnd = candStart.plusMinutes(serviceDurationMinutes);
@@ -1059,7 +1074,7 @@ public class AppointmentController {
                     if (scanDate.isEqual(today) && !candStart.isAfter(now.plusMinutes(15))) {
                         continue;
                     }
-                    if (!isWithinTechShift(tech, candStart, candEnd)) {
+                    if (!isWithinTechShift(tech, candStart, candEnd, graceMins, lastIntakeMins)) {
                         continue;
                     }
 
@@ -1088,20 +1103,45 @@ public class AppointmentController {
         return info;
     }
 
+    private int[] resolveClosingCutoffs(String tenantId) {
+        int grace = 30;
+        int lastIntake = 30;
+        if (tenantConfigRepository != null && tenantId != null && !tenantId.isBlank()) {
+            try {
+                Optional<TenantConfig> cfgOpt = tenantConfigRepository.findByTenantKeyIgnoreCase(tenantId.trim());
+                if (cfgOpt.isPresent()) {
+                    TenantConfig cfg = cfgOpt.get();
+                    grace = Math.max(0, Math.min(180, cfg.getClosingGraceMinutes()));
+                    lastIntake = Math.max(0, Math.min(180, cfg.getLastIntakeBeforeCloseMinutes()));
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        return new int[]{grace, lastIntake};
+    }
+
     private boolean isWithinTechShift(UserEntity tech, LocalDateTime slotStart, LocalDateTime slotEnd) {
+        String tid = (tech != null && tech.getTenantId() != null) ? tech.getTenantId() : "default";
+        int[] cutoffs = resolveClosingCutoffs(tid);
+        return isWithinTechShift(tech, slotStart, slotEnd, cutoffs[0], cutoffs[1]);
+    }
+
+    private boolean isWithinTechShift(UserEntity tech, LocalDateTime slotStart, LocalDateTime slotEnd, int closingGraceMinutes, int lastIntakeBeforeCloseMinutes) {
         if (slotStart == null || slotEnd == null) return true;
         String startStr = tech != null ? tech.getShiftStartTime() : null;
         String endStr = tech != null ? tech.getShiftEndTime() : null;
         try {
             LocalTime shiftStart = (startStr != null && !startStr.isBlank()) ? LocalTime.parse(startStr.trim()) : LocalTime.of(10, 0);
-            // Default salon closing is 7:00 PM + 30m grace = 7:30 PM hard finish (last intake 6:30 PM).
-            // Explicit earlier custom shift end (e.g., 16:00 / 4:00 PM) is honored strictly.
-            LocalTime parsedEnd = (endStr != null && !endStr.isBlank()) ? LocalTime.parse(endStr.trim()) : LocalTime.of(19, 0);
-            LocalTime hardEnd = parsedEnd.equals(LocalTime.of(19, 0)) ? LocalTime.of(19, 30) : parsedEnd;
+            LocalTime officialClose = LocalTime.of(19, 0);
+            LocalTime latestIntake = officialClose.minusMinutes(Math.max(0, lastIntakeBeforeCloseMinutes));
+            LocalTime parsedEnd = (endStr != null && !endStr.isBlank()) ? LocalTime.parse(endStr.trim()) : officialClose;
+            LocalTime hardEnd = parsedEnd.equals(officialClose)
+                    ? officialClose.plusMinutes(Math.max(0, closingGraceMinutes))
+                    : parsedEnd;
             LocalTime reqStart = slotStart.toLocalTime();
             LocalTime reqEnd = slotEnd.toLocalTime();
             if (!slotEnd.toLocalDate().equals(slotStart.toLocalDate())) return false;
-            if (reqStart.isAfter(LocalTime.of(18, 30))) return false;
+            if (reqStart.isAfter(latestIntake)) return false;
             return !reqStart.isBefore(shiftStart) && !reqEnd.isAfter(hardEnd);
         } catch (Exception ignored) {
             return true;

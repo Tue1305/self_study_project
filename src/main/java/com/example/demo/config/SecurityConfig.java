@@ -119,7 +119,8 @@ public class SecurityConfig {
                                 "/*.png",
                                 "/*.jpg",
                                 "/*.jpeg",
-                                "/api/public/**"
+                                "/api/public/**",
+                                "/api/tenant/config"
                         ).permitAll()
                         // Appointments & Bookings: public booking creation, availability lookup, and token-gated self-service portal
                         .requestMatchers(HttpMethod.POST, "/api/appointments", "/api/bookings").permitAll()

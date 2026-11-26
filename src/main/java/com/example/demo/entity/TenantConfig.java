@@ -58,6 +58,12 @@ public class TenantConfig {
     @Column(nullable = false)
     private boolean defaultTenant = false;
 
+    @Column(name = "closing_grace_minutes", nullable = false)
+    private int closingGraceMinutes = 30;
+
+    @Column(name = "last_intake_before_close_minutes", nullable = false)
+    private int lastIntakeBeforeCloseMinutes = 30;
+
     public TenantConfig() {
     }
 
@@ -195,5 +201,21 @@ public class TenantConfig {
 
     public void setDefaultTenant(boolean defaultTenant) {
         this.defaultTenant = defaultTenant;
+    }
+
+    public int getClosingGraceMinutes() {
+        return closingGraceMinutes;
+    }
+
+    public void setClosingGraceMinutes(int closingGraceMinutes) {
+        this.closingGraceMinutes = closingGraceMinutes;
+    }
+
+    public int getLastIntakeBeforeCloseMinutes() {
+        return lastIntakeBeforeCloseMinutes;
+    }
+
+    public void setLastIntakeBeforeCloseMinutes(int lastIntakeBeforeCloseMinutes) {
+        this.lastIntakeBeforeCloseMinutes = lastIntakeBeforeCloseMinutes;
     }
 }

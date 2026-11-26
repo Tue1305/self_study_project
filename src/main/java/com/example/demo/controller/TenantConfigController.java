@@ -27,7 +27,7 @@ public class TenantConfigController {
         this.tenantConfigRepository = tenantConfigRepository;
     }
 
-    @GetMapping("/api/public/tenant-config")
+    @GetMapping({"/api/public/tenant-config", "/api/tenant/config"})
     public ResponseEntity<TenantConfigDto> getPublicTenantConfig(
             @RequestHeader(value = "X-Tenant-ID", required = false) String tenantHeader,
             @RequestParam(value = "tenant", required = false) String tenantParam,
@@ -50,6 +50,17 @@ public class TenantConfigController {
                 .map(cfg -> toDto(cfg, false))
                 .toList();
         return ResponseEntity.ok(configs);
+    }
+
+    @PutMapping("/api/admin/tenant/config")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ADMIN')")
+    public ResponseEntity<TenantConfigDto> updateCurrentTenantConfig(
+            @RequestHeader(value = "X-Tenant-ID", required = false) String tenantHeader,
+            @RequestBody TenantConfigDto payload,
+            HttpServletRequest request
+    ) {
+        String key = (tenantHeader != null && !tenantHeader.isBlank()) ? tenantHeader : "default";
+        return upsertTenantConfig(key, payload);
     }
 
     @PutMapping("/api/admin/tenant-config/{tenantKey}")
@@ -178,6 +189,28 @@ public class TenantConfigController {
                 entity.setEnabledCategories(String.join(",", cleanedCategories));
             }
         }
+
+        if (payload.getClosingGraceMinutes() != null) {
+            int grace = payload.getClosingGraceMinutes();
+            if (grace < 0 || grace > 180) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "closingGraceMinutes must be an integer between 0 and 180"
+                );
+            }
+            entity.setClosingGraceMinutes(grace);
+        }
+
+        if (payload.getLastIntakeBeforeCloseMinutes() != null) {
+            int lastIntake = payload.getLastIntakeBeforeCloseMinutes();
+            if (lastIntake < 0 || lastIntake > 180) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "lastIntakeBeforeCloseMinutes must be an integer between 0 and 180"
+                );
+            }
+            entity.setLastIntakeBeforeCloseMinutes(lastIntake);
+        }
     }
 
     private List<String> validateStepOrder(List<String> rawSteps) {
@@ -244,7 +277,7 @@ public class TenantConfigController {
                 showTags
         );
 
-        return new TenantConfigDto(
+        TenantConfigDto dto = new TenantConfigDto(
                 entity.getTenantKey(),
                 entity.getCustomDomain(),
                 entity.getSalonName(),
@@ -252,6 +285,9 @@ public class TenantConfigController {
                 theme,
                 wizard
         );
+        dto.setClosingGraceMinutes(entity.getClosingGraceMinutes());
+        dto.setLastIntakeBeforeCloseMinutes(entity.getLastIntakeBeforeCloseMinutes());
+        return dto;
     }
 
     private TenantConfig buildFallbackDefaultConfig() {

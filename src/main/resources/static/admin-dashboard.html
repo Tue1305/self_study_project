@@ -252,6 +252,46 @@
         </div>
     </div>
 
+    <!-- Salon Hours & Booking Cutoff Rules Card -->
+    <div class="card border-0 shadow-sm rounded-4 mt-4 bg-white">
+        <div class="card-body p-4">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="rounded-circle bg-light p-2 text-pink">
+                        <i class="bi bi-clock-history fs-5"></i>
+                    </div>
+                    <div>
+                        <h4 class="h5 fw-bold text-dark mb-0">Salon Hours &amp; Booking Cutoff Rules</h4>
+                        <small class="text-muted">Control latest guest intake and post-closing finish grace window (official closing: 7:00 PM)</small>
+                    </div>
+                </div>
+                <span id="bookingRulesSavedBadge" class="badge bg-success-subtle text-success border border-success-subtle d-none">Saved!</span>
+            </div>
+            <div class="row g-3 align-items-end">
+                <div class="col-12 col-md-4">
+                    <label for="inputLastIntakeMins" class="form-label small fw-semibold text-secondary">
+                        Last Intake Before Closing (minutes)
+                    </label>
+                    <input type="number" min="0" max="180" step="5" class="form-control rounded-3" id="inputLastIntakeMins" value="30" oninput="updateCutoffPreview()">
+                    <div id="lastIntakePreview" class="form-text text-dark fw-semibold">Latest new booking start: 6:30 PM</div>
+                </div>
+                <div class="col-12 col-md-4">
+                    <label for="inputClosingGraceMins" class="form-label small fw-semibold text-secondary">
+                        Post-Closing Grace Window (minutes)
+                    </label>
+                    <input type="number" min="0" max="180" step="5" class="form-control rounded-3" id="inputClosingGraceMins" value="30" oninput="updateCutoffPreview()">
+                    <div id="closingGracePreview" class="form-text text-dark fw-semibold">Hard service finish deadline: 7:30 PM</div>
+                </div>
+                <div class="col-12 col-md-4 d-flex flex-column align-items-md-end">
+                    <button type="button" id="btnSaveBookingRules" class="btn btn-pink fw-semibold px-4 rounded-3" onclick="saveBookingCutoffRules()">
+                        <i class="bi bi-check2-circle me-1"></i>Save Cutoff Rules
+                    </button>
+                    <div id="bookingRulesError" class="text-danger small fw-semibold mt-1 d-none"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- ==================== REVENUE & ANALYTICS DASHBOARD ==================== -->
     <section class="mt-5" id="analyticsDashboardSection">
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
@@ -1106,8 +1146,102 @@
         }
     }
 
+    function formatMinutesFromMidnight12(totalMins) {
+        const clamped = Math.max(0, Math.min(23 * 60 + 59, totalMins));
+        const h24 = Math.floor(clamped / 60);
+        const m = clamped % 60;
+        const period = h24 >= 12 ? 'PM' : 'AM';
+        const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+        return `${h12}:${String(m).padStart(2, '0')} ${period}`;
+    }
+
+    function updateCutoffPreview() {
+        const closeMins = 19 * 60; // 7:00 PM official closing
+        const lastIntake = parseInt(document.getElementById('inputLastIntakeMins')?.value || '30', 10);
+        const grace = parseInt(document.getElementById('inputClosingGraceMins')?.value || '30', 10);
+        const intakeEl = document.getElementById('lastIntakePreview');
+        const graceEl = document.getElementById('closingGracePreview');
+        if (intakeEl && !isNaN(lastIntake)) {
+            intakeEl.textContent = `Latest new booking start: ${formatMinutesFromMidnight12(closeMins - Math.max(0, lastIntake))}`;
+        }
+        if (graceEl && !isNaN(grace)) {
+            graceEl.textContent = `Hard service finish deadline: ${formatMinutesFromMidnight12(closeMins + Math.max(0, grace))}`;
+        }
+    }
+
+    async function loadBookingCutoffRules() {
+        try {
+            const resp = await fetch('/api/tenant/config', {
+                headers: { 'X-Tenant-ID': activeTenant }
+            });
+            if (!resp.ok) return;
+            const cfg = await resp.json();
+            const intakeInput = document.getElementById('inputLastIntakeMins');
+            const graceInput = document.getElementById('inputClosingGraceMins');
+            if (intakeInput && cfg.lastIntakeBeforeCloseMinutes != null) {
+                intakeInput.value = cfg.lastIntakeBeforeCloseMinutes;
+            }
+            if (graceInput && cfg.closingGraceMinutes != null) {
+                graceInput.value = cfg.closingGraceMinutes;
+            }
+            updateCutoffPreview();
+        } catch (_) {}
+    }
+
+    async function saveBookingCutoffRules() {
+        const intakeVal = parseInt(document.getElementById('inputLastIntakeMins').value, 10);
+        const graceVal = parseInt(document.getElementById('inputClosingGraceMins').value, 10);
+        const errEl = document.getElementById('bookingRulesError');
+        const savedBadge = document.getElementById('bookingRulesSavedBadge');
+        const btn = document.getElementById('btnSaveBookingRules');
+
+        if (errEl) errEl.classList.add('d-none');
+        if (savedBadge) savedBadge.classList.add('d-none');
+
+        if (isNaN(intakeVal) || intakeVal < 0 || intakeVal > 180 || isNaN(graceVal) || graceVal < 0 || graceVal > 180) {
+            if (errEl) {
+                errEl.textContent = 'Both values must be between 0 and 180 minutes.';
+                errEl.classList.remove('d-none');
+            }
+            return;
+        }
+
+        btn.disabled = true;
+        try {
+            const resp = await fetch('/api/admin/tenant/config', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + token,
+                    'X-Tenant-ID': activeTenant
+                },
+                body: JSON.stringify({
+                    lastIntakeBeforeCloseMinutes: intakeVal,
+                    closingGraceMinutes: graceVal
+                })
+            });
+            if (!resp.ok) {
+                const errData = await resp.json().catch(() => ({}));
+                throw new Error(errData.message || 'Unable to save cutoff rules.');
+            }
+            updateCutoffPreview();
+            if (savedBadge) {
+                savedBadge.classList.remove('d-none');
+                setTimeout(() => savedBadge.classList.add('d-none'), 3000);
+            }
+        } catch (err) {
+            if (errEl) {
+                errEl.textContent = err.message || 'Failed to save rules.';
+                errEl.classList.remove('d-none');
+            }
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
         initializeTenantContext();
+        loadBookingCutoffRules();
         loadSalonAnalytics(30);
     });
 </script>

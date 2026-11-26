@@ -1674,7 +1674,13 @@
                     }
                 }
 
-                setStaffList(staffArr);
+                const sortedStaffArr = [...staffArr].sort((a, b) => {
+                    const nameA = (a && (a.name || a.username) || '').trim();
+                    const nameB = (b && (b.name || b.username) || '').trim();
+                    return nameA.localeCompare(nameB, undefined, { sensitivity: 'base' });
+                });
+
+                setStaffList(sortedStaffArr);
                 setAppointments(apptArr);
                 setServicesCatalog(srvArr);
                 setDaysOffList(daysOffArr);

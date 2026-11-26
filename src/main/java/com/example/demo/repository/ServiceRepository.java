@@ -11,6 +11,8 @@ import java.util.Optional;
 public interface ServiceRepository extends JpaRepository<ServiceEntity, Long> {
     List<ServiceEntity> findAllByTenantId(String tenantId);
 
+    List<ServiceEntity> findAllByTenantIdOrderByIdAsc(String tenantId);
+
     Optional<ServiceEntity> findByTenantIdAndId(String tenantId, Long id);
 
     long countByTenantId(String tenantId);

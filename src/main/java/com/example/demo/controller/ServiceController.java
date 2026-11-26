@@ -30,7 +30,7 @@ public class ServiceController {
     @GetMapping
     public List<ServiceEntity> getAllServices(HttpServletRequest request) {
         String tenantId = tenantContextResolver.resolveTenantId(request);
-        return serviceRepository.findAllByTenantId(tenantId);
+        return serviceRepository.findAllByTenantIdOrderByIdAsc(tenantId);
     }
 
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ADMIN')")

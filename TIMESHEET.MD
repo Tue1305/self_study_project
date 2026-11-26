@@ -137,3 +137,4 @@
 * 11/20/2026 Multi-Booking Demo Part 8 [Multi-Tenant Booking Demo Preview](https://youtu.be/XL2bIJkfTdA)
 * 11/23/2026 Multi-Booking Demo Part 9 [Multi-Tenant Booking Demo Preview](https://youtu.be/DqE4jW8H1_M)
 * 11/24/2026 Multi-Booking Demo Part 10 [Multi-Tenant Booking Demo Preview](https://youtu.be/GOrMwrNC6-Y)
+* 11/26/2026 Multi-Booking Demo Part 11 [Multi-Tenant Booking Demo Preview](https://youtu.be/Ck_-rlk1OgE)

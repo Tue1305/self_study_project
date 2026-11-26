@@ -4,6 +4,7 @@ import com.example.demo.entity.ServiceEntity;
 import com.example.demo.repository.ServiceRepository;
 import com.example.demo.service.TenantContextResolver;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -83,7 +84,13 @@ public class ServiceController {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(Map.of("message", "Service not found."));
         }
-        serviceRepository.delete(existing.get());
-        return ResponseEntity.ok(Map.of("message", "Service deleted successfully."));
+        try {
+            serviceRepository.delete(existing.get());
+            serviceRepository.flush();
+            return ResponseEntity.ok(Map.of("message", "Service deleted successfully."));
+        } catch (DataIntegrityViolationException ex) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(Map.of("message", "Cannot delete this service because existing appointments reference it."));
+        }
     }
 }

@@ -112,10 +112,31 @@
         .service-item-row {
             padding: 1rem 1.4rem;
             border-top: 1px solid #f1f3f5;
-            transition: background-color 0.2s ease;
+            transition: background-color 0.2s ease, border-color 0.2s ease;
         }
         .service-item-row:hover {
             background-color: #fff9fb;
+        }
+        .service-item-row.admin-editable {
+            cursor: pointer;
+        }
+        .service-item-row.admin-editable:hover {
+            background-color: #fce4ec55;
+        }
+        .admin-edit-pill {
+            font-size: 0.72rem;
+            font-weight: 600;
+            color: var(--bs-primary-pink);
+            background: rgba(233, 30, 99, 0.08);
+            border: 1px solid rgba(233, 30, 99, 0.2);
+            border-radius: 999px;
+            padding: 0.15rem 0.55rem;
+            opacity: 0.85;
+            transition: opacity 0.15s ease;
+        }
+        .service-item-row.admin-editable:hover .admin-edit-pill {
+            opacity: 1;
+            background: rgba(233, 30, 99, 0.14);
         }
         .service-price-tag {
             font-size: 1.15rem;
@@ -185,51 +206,65 @@
         <!-- Admin Controls (Only visible when logged in as ROLE_ADMIN) -->
         <div id="adminServiceControls" class="d-none mt-3">
             <button class="btn btn-pink rounded-pill px-4 py-2 fw-semibold shadow-sm" onclick="openAddServiceModal()">
-                <i class="bi bi-plus-circle me-1"></i> Add Custom Service to Database
+                <i class="bi bi-plus-circle me-1"></i> Add Custom Service
             </button>
+            <div class="small text-muted mt-2">
+                <i class="bi bi-pencil-square text-pink me-1"></i>Admin Mode: Click any service card below to edit or delete it.
+            </div>
         </div>
     </div>
 
+    <!-- Status Toast/Banner -->
+    <div id="servicesStatusBanner" class="alert d-none rounded-4 shadow-sm mb-4" role="alert"></div>
+
     <!-- Category Dropdown Cards Container (Compact Grid that expands) -->
     <div class="row g-3" id="categoriesContainer">
-        <!-- Rendered dynamically via JavaScript -->
+        <div class="col-12 text-center py-5 text-muted">
+            <div class="spinner-border text-pink mb-2" role="status"></div>
+            <div>Loading studio services...</div>
+        </div>
     </div>
 </main>
 
 <!-- Admin Add/Edit Service Modal -->
-<div class="modal fade" id="serviceModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow rounded-4">
-            <div class="modal-header border-0 pb-0">
-                <h5 class="modal-title fw-bold text-dark" id="serviceModalTitle">Add New Service</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+<div class="modal fade" id="serviceModal" tabindex="-1" aria-labelledby="serviceModalTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 460px;">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header border-0 pb-1">
+                <h5 class="modal-title fw-bold text-dark" id="serviceModalTitle">Edit Service</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body py-4">
-                <form id="serviceForm">
+            <div class="modal-body pt-2 pb-3">
+                <div id="serviceModalError" class="alert alert-danger py-2 px-3 small d-none mb-3" role="alert"></div>
+                <form id="serviceForm" onsubmit="event.preventDefault(); saveService();">
                     <input type="hidden" id="serviceId">
                     <div class="mb-3">
-                        <label for="serviceName" class="form-label fw-semibold">Service Name</label>
+                        <label for="serviceName" class="form-label fw-semibold small">Service Name</label>
                         <input type="text" class="form-control" id="serviceName" required placeholder="e.g., Gel Manicure">
                     </div>
                     <div class="row g-2 mb-3">
                         <div class="col-6">
-                            <label for="servicePrice" class="form-label fw-semibold">Price ($)</label>
-                            <input type="number" step="0.01" min="0" class="form-control" id="servicePrice" required placeholder="45.00">
-                        </div>
-                        <div class="col-6">
-                            <label for="serviceDuration" class="form-label fw-semibold">Duration (Minutes)</label>
+                            <label for="serviceDuration" class="form-label fw-semibold small">Duration (mins)</label>
                             <input type="number" min="5" step="5" class="form-control" id="serviceDuration" required placeholder="45">
                         </div>
+                        <div class="col-6">
+                            <label for="servicePrice" class="form-label fw-semibold small">Cost ($)</label>
+                            <input type="number" step="0.01" min="0" class="form-control" id="servicePrice" required placeholder="45.00">
+                        </div>
                     </div>
-                    <div class="mb-3">
-                        <label for="serviceDescription" class="form-label fw-semibold">Description</label>
+                    <div class="mb-1">
+                        <label for="serviceDescription" class="form-label fw-semibold small">Description</label>
                         <textarea class="form-control" id="serviceDescription" rows="3" placeholder="Describe what is included in this service..."></textarea>
                     </div>
                 </form>
             </div>
-            <div class="modal-footer border-0 pt-0">
-                <button type="button" class="btn btn-light btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-pink btn-sm px-4 fw-semibold" onclick="saveService()">Save Service</button>
+            <div class="modal-footer border-0 pt-0 d-flex justify-content-end gap-2">
+                <button type="button" class="btn btn-outline-danger btn-sm px-3 fw-semibold d-none" id="deleteServiceBtn" onclick="deleteCurrentService()">
+                    <i class="bi bi-trash3 me-1"></i>Delete
+                </button>
+                <button type="button" class="btn btn-pink btn-sm px-4 fw-semibold" id="saveServiceBtn" onclick="saveService()">
+                    Update
+                </button>
             </div>
         </div>
     </div>
@@ -255,564 +290,142 @@
     let isAdminUser = false;
     let serviceModalInstance = null;
     let backendServices = [];
+    let openCategoryIds = new Set(['manicures', 'pedicures']);
+    let statusBannerTimeout = null;
 
-    // Comprehensive Service Menu Organized by Categories
-    const serviceCategories = [
+    // Category grouping rules matching booking.html
+    const serviceCategoryConfigs = [
         {
             id: 'manicures',
             title: 'Manicures',
             subtitle: 'Express, Essential & Deluxe hand treatments & shellac',
             icon: 'bi-hand-index-thumb-fill',
-            services: [
-                {
-                    name: 'Express Manicure',
-                    duration: 'Approx. 25 mins',
-                    price: '$23',
-                    priceNum: 23,
-                    durationMins: 25,
-                    description: 'Warm hand soak, nail trim, shape, buff, cuticle clean, follow by polish application.'
-                },
-                {
-                    name: 'Express Manicure with Shellac',
-                    duration: 'Approx. 35 mins',
-                    price: '$38',
-                    priceNum: 38,
-                    durationMins: 35,
-                    description: 'Express manicure with long-lasting Shellac polish application. ($5 extra for shellac removal)'
-                },
-                {
-                    name: 'Essential Manicure',
-                    duration: 'Approx. 30 mins',
-                    price: '$28',
-                    priceNum: 28,
-                    durationMins: 30,
-                    description: 'Warm hand soak, nail trim, shape, buff, cuticle clean, sugar scrub hand massage follow by polish application.'
-                },
-                {
-                    name: 'Essential Manicure with Shellac',
-                    duration: 'Approx. 40 mins',
-                    price: '$43',
-                    priceNum: 43,
-                    durationMins: 40,
-                    description: 'Essential manicure with sugar scrub hand massage and Shellac polish. ($5 extra for shellac removal)'
-                },
-                {
-                    name: 'Deluxe Manicure',
-                    duration: 'Approx. 40 mins',
-                    price: '$38',
-                    priceNum: 38,
-                    durationMins: 40,
-                    description: 'Warm hand soak, nail trim, shape, buff, cuticle clean, sugar scrub, paraffin, hand massage follow by polish application.'
-                },
-                {
-                    name: 'Deluxe Manicure with Shellac',
-                    duration: 'Approx. 50 mins',
-                    price: '$53',
-                    priceNum: 53,
-                    durationMins: 50,
-                    description: 'Deluxe manicure with warm paraffin treatment, massage, and Shellac polish. ($5 extra for shellac removal)'
-                }
-            ]
+            keywords: ['manicure']
         },
         {
             id: 'pedicures',
             title: 'Pedicures',
             subtitle: 'Foot spas, callus care, warm paraffin & foot massages',
             icon: 'bi-gem',
-            services: [
-                {
-                    name: 'Express Pedicure',
-                    duration: 'Approx. 25 mins',
-                    price: '$34',
-                    priceNum: 34,
-                    durationMins: 25,
-                    description: 'Warm spa soak, nail trim, shape, buff, cuticle clean, heels rub follow by polish application.'
-                },
-                {
-                    name: 'Express Pedicure with Shellac',
-                    duration: 'Approx. 35 mins',
-                    price: '$49',
-                    priceNum: 49,
-                    durationMins: 35,
-                    description: 'Express pedicure with Shellac gel application. ($5 extra for shellac removal)'
-                },
-                {
-                    name: 'Essential Pedicure',
-                    duration: 'Approx. 40 mins',
-                    price: '$40',
-                    priceNum: 40,
-                    durationMins: 40,
-                    description: 'Warm spa soak, nail trim, shape, buff, cuticle clean, heels rub, callus remove, sugar scrub, foot massage follow by polish application.'
-                },
-                {
-                    name: 'Essential Pedicure with Shellac',
-                    duration: 'Approx. 50 mins',
-                    price: '$55',
-                    priceNum: 55,
-                    durationMins: 50,
-                    description: 'Essential pedicure with callus removal, scrub, foot massage & Shellac polish. ($5 extra for shellac removal)'
-                },
-                {
-                    name: 'Deluxe Pedicure',
-                    duration: 'Approx. 50 mins',
-                    price: '$52',
-                    priceNum: 52,
-                    durationMins: 50,
-                    description: 'Warm spa soak, nail trim & shape, buff, cuticle clean, heels rub, callus remove, sugar scrub, paraffin, feet massage, follow by polish application.'
-                },
-                {
-                    name: 'Deluxe Pedicure with Shellac',
-                    duration: 'Approx. 60 mins',
-                    price: '$67',
-                    priceNum: 67,
-                    durationMins: 60,
-                    description: 'Deluxe spa pedicure with warm paraffin wrap, foot massage, and Shellac polish. ($5 extra for shellac removal)'
-                }
-            ]
+            keywords: ['pedicure']
         },
         {
             id: 'combos',
             title: 'Combo',
             subtitle: 'Mani-pedi duos, packages & full-service combination treatments',
             icon: 'bi-intersect',
-            services: [
-                {
-                    name: 'Express Pedicure-Manicure Combo',
-                    duration: 'Approx. 50 mins',
-                    price: '$52',
-                    priceNum: 52,
-                    durationMins: 50,
-                    description: 'Complete express manicure and express pedicure combo.'
-                },
-                {
-                    name: 'Essential Pedicure-Manicure Combo',
-                    duration: 'Approx. 70 mins',
-                    price: '$63',
-                    priceNum: 63,
-                    durationMins: 70,
-                    description: 'Essential manicure and pedicure combo with scrub and massage.'
-                },
-                {
-                    name: 'Deluxe Pedicure-Manicure Combo',
-                    duration: 'Approx. 90 mins',
-                    price: '$85',
-                    priceNum: 85,
-                    durationMins: 90,
-                    description: 'Full luxury deluxe manicure and pedicure combo with paraffin treatment and extended massage.'
-                },
-                {
-                    name: 'Shellac Add-On for Hands or Feet to Any Combo',
-                    duration: 'Approx. 15 mins',
-                    price: '$15',
-                    priceNum: 15,
-                    durationMins: 15,
-                    description: 'Shellac upgrade addition for hands or feet to any combination service.'
-                }
-            ]
+            keywords: ['combo']
         },
         {
             id: 'kids',
             title: 'Kids',
             subtitle: 'Gentle, fun manicures and pedicures for little ones (10 & under)',
             icon: 'bi-balloon-heart-fill',
-            services: [
-                {
-                    name: 'Kids Hands & Toes Polish',
-                    duration: 'Approx. 20 mins',
-                    price: '$20',
-                    priceNum: 20,
-                    durationMins: 20,
-                    description: 'Fun polish application on little hands and toes.'
-                },
-                {
-                    name: 'Kids Manicure',
-                    duration: 'Approx. 20 mins',
-                    price: '$18',
-                    priceNum: 18,
-                    durationMins: 20,
-                    description: 'Gentle hand soak, light shaping, massage, and choice of polish.'
-                },
-                {
-                    name: 'Kids Pedicure',
-                    duration: 'Approx. 25 mins',
-                    price: '$25',
-                    priceNum: 25,
-                    durationMins: 25,
-                    description: 'Gentle foot soak, light nail trim/shape, lotion, and choice of polish.'
-                },
-                {
-                    name: 'Kids Pedicure-Manicure Combo',
-                    duration: 'Approx. 40 mins',
-                    price: '$40',
-                    priceNum: 40,
-                    durationMins: 40,
-                    description: 'Full pampering mani-pedi duo for kids 10 and under.'
-                }
-            ]
+            keywords: ['kid', 'kids']
         },
         {
             id: 'nail-enhancement',
             title: 'Nail Enhancement & Art',
             subtitle: 'Bio Sculpture Gel, Dipping Powder, Extensions & Art',
             icon: 'bi-stars',
-            services: [
-                {
-                    name: 'Shellac Polish Change',
-                    duration: 'Approx. 25 mins',
-                    price: '$27',
-                    priceNum: 27,
-                    durationMins: 25,
-                    description: 'Shape, buff, and Shellac application. ($5 extra for shellac removal)'
-                },
-                {
-                    name: 'Bio Sculpture Gel New Set (with Plastic Tips Extension)',
-                    duration: 'Approx. 75 mins',
-                    price: '$65 & Up',
-                    priceNum: 65,
-                    durationMins: 75,
-                    description: 'Healthy Bio Sculpture Gel full set with plastic tips extension.'
-                },
-                {
-                    name: 'Bio Sculpture Gel New Set (with Sculpting Extension)',
-                    duration: 'Approx. 90 mins',
-                    price: '$80 & Up',
-                    priceNum: 80,
-                    durationMins: 90,
-                    description: 'Custom hand-sculpted Bio Sculpture Gel extensions.'
-                },
-                {
-                    name: 'Bio Sculpture Gel New Set (No Extension)',
-                    duration: 'Approx. 60 mins',
-                    price: '$50',
-                    priceNum: 50,
-                    durationMins: 60,
-                    description: 'Bio Sculpture Gel overlay on natural nails.'
-                },
-                {
-                    name: 'Bio Sculpture Gel Refill',
-                    duration: 'Approx. 60 mins',
-                    price: '$50 & Up',
-                    priceNum: 50,
-                    durationMins: 60,
-                    description: 'Refill maintenance for Bio Sculpture Gel sets.'
-                },
-                {
-                    name: 'Gel Powder New Set (with Shellac Color)',
-                    duration: 'Approx. 75 mins',
-                    price: '$65 & Up',
-                    priceNum: 65,
-                    durationMins: 75,
-                    description: 'Full set gel powder extensions with choice of vibrant Shellac color.'
-                },
-                {
-                    name: 'Gel Powder Refill (with Shellac Color)',
-                    duration: 'Approx. 60 mins',
-                    price: '$50 & Up',
-                    priceNum: 50,
-                    durationMins: 60,
-                    description: 'Refill for gel powder with new Shellac color.'
-                },
-                {
-                    name: 'Dipping Powder New Set with Extension',
-                    duration: 'Approx. 75 mins',
-                    price: '$65 & Up',
-                    priceNum: 65,
-                    durationMins: 75,
-                    description: 'Dipping powder full set with extension tips.'
-                },
-                {
-                    name: 'Dipping Powder New Set with No Extension',
-                    duration: 'Approx. 50 mins',
-                    price: '$50',
-                    priceNum: 50,
-                    durationMins: 50,
-                    description: 'Dipping powder overlay on natural nails.'
-                },
-                {
-                    name: 'Nail Polish Change for Hands',
-                    duration: 'Approx. 15 mins',
-                    price: '$14',
-                    priceNum: 14,
-                    durationMins: 15,
-                    description: 'Quick reshape and fresh regular polish application on hands.'
-                },
-                {
-                    name: 'Nail Polish Change for Feet',
-                    duration: 'Approx. 15 mins',
-                    price: '$18',
-                    priceNum: 18,
-                    durationMins: 15,
-                    description: 'Quick reshape and fresh regular polish application on toes.'
-                },
-                {
-                    name: 'Nail Art Design',
-                    duration: 'Approx. 20 mins',
-                    price: '$5 & Up',
-                    priceNum: 5,
-                    durationMins: 20,
-                    description: 'Custom hand-painted designs, accents, or gems.'
-                },
-                {
-                    name: 'Hand Paint French Tip Add-On',
-                    duration: 'Approx. 15 mins',
-                    price: '$10 & Up',
-                    priceNum: 10,
-                    durationMins: 15,
-                    description: 'Classic or custom hand-painted crisp French tips.'
-                },
-                {
-                    name: 'Ombre Airbrush French Tip Add-On',
-                    duration: 'Approx. 20 mins',
-                    price: '$15',
-                    priceNum: 15,
-                    durationMins: 20,
-                    description: 'Smooth gradient airbrushed French ombre effect.'
-                },
-                {
-                    name: 'Chrome Finish Add-On',
-                    duration: 'Approx. 15 mins',
-                    price: '$10 & Up',
-                    priceNum: 10,
-                    durationMins: 15,
-                    description: 'Mirror chrome, glazed donut, or iridescent metallic powder overlay.'
-                },
-                {
-                    name: 'Nail Cut for Hands',
-                    duration: 'Approx. 10 mins',
-                    price: '$8 & Up',
-                    priceNum: 8,
-                    durationMins: 10,
-                    description: 'Hand nail trim, reshape, and clean.'
-                },
-                {
-                    name: 'Nail Cut for Toes',
-                    duration: 'Approx. 15 mins',
-                    price: '$12',
-                    priceNum: 12,
-                    durationMins: 15,
-                    description: 'Toe nail trim and edge filing.'
-                },
-                {
-                    name: 'Nail Repair',
-                    duration: 'Approx. 15 mins',
-                    price: '$10 & Up',
-                    priceNum: 10,
-                    durationMins: 15,
-                    description: 'Individual nail fix for broken, cracked, or split nails.'
-                },
-                {
-                    name: 'Cuticle Trim',
-                    duration: 'Approx. 15 mins',
-                    price: '$12',
-                    priceNum: 12,
-                    durationMins: 15,
-                    description: 'Gentle cuticle softening, pushback, and precise clean-up.'
-                },
-                {
-                    name: 'Paraffin Treatment (Hands/Feet)',
-                    duration: 'Approx. 15 mins',
-                    price: '$12 / $14',
-                    priceNum: 14,
-                    durationMins: 15,
-                    description: 'Warm soothing paraffin wax bath for hands ($12) or feet ($14).'
-                },
-                {
-                    name: 'Shellac Removal Take Off',
-                    duration: 'Approx. 15 mins',
-                    price: '$15',
-                    priceNum: 15,
-                    durationMins: 15,
-                    description: 'Gentle, non-damaging Shellac polish removal.'
-                },
-                {
-                    name: 'Bio Gel Take Off',
-                    duration: 'Approx. 20 mins',
-                    price: '$20',
-                    priceNum: 20,
-                    durationMins: 20,
-                    description: 'Safe soak-off and clean removal of Bio Sculpture Gel.'
-                },
-                {
-                    name: 'Acrylic / Dipping Powder Take Off',
-                    duration: 'Approx. 25 mins',
-                    price: '$25',
-                    priceNum: 25,
-                    durationMins: 25,
-                    description: 'Complete removal of acrylic or dipping powder extensions.'
-                }
-            ]
+            keywords: ['bio sculpture', 'gel powder', 'dipping powder', 'nail art', 'french tip', 'ombre', 'chrome', 'cuticle', 'paraffin', 'take off', 'polish change', 'nail cut', 'nail repair', 'shellac']
         },
         {
             id: 'body-massage',
             title: 'Body Massage',
             subtitle: 'Hot Stone therapy & full body tension relief',
             icon: 'bi-heart-pulse-fill',
-            services: [
-                {
-                    name: 'Hot Stone Therapy Massage',
-                    duration: 'Approx. 1 hr 15 mins',
-                    price: '$110',
-                    priceNum: 110,
-                    durationMins: 75,
-                    description: 'Soothing basalt hot stones placed along tension points to melt away muscle fatigue and stress.'
-                },
-                {
-                    name: 'Professional Relaxing Massage (Non RMT) Full Body',
-                    duration: 'Approx. 1 hour',
-                    price: '$90',
-                    priceNum: 90,
-                    durationMins: 60,
-                    description: 'Full body restorative relaxation massage focused on peace and overall well-being.'
-                },
-                {
-                    name: 'Hand / Foot / Shoulder Massage (10 mins)',
-                    duration: '10 mins',
-                    price: '$17',
-                    priceNum: 17,
-                    durationMins: 10,
-                    description: 'Targeted express massage for hands, feet, or shoulders.'
-                },
-                {
-                    name: 'Hand / Foot / Shoulder Massage (15 mins)',
-                    duration: '15 mins',
-                    price: '$25',
-                    priceNum: 25,
-                    durationMins: 15,
-                    description: 'Invigorating 15-minute tension relief massage.'
-                },
-                {
-                    name: 'Hand / Foot / Shoulder Massage (1/2 hour)',
-                    duration: '30 mins',
-                    price: '$45',
-                    priceNum: 45,
-                    durationMins: 30,
-                    description: 'Deep therapeutic 30-minute focus on hands, feet, or shoulder muscles.'
-                }
-            ]
+            keywords: ['massage', 'hot stone']
         },
         {
             id: 'waxing',
             title: 'Waxing & Combos',
             subtitle: 'Smooth, clean hair removal for face, body & combos',
             icon: 'bi-feather',
-            services: [
-                { name: 'Eyebrows Waxing', duration: '15 mins', price: '$14 & Up', priceNum: 14, durationMins: 15, description: 'Precise brow shaping and waxing.' },
-                { name: 'Upper Lip Waxing', duration: '10 mins', price: '$8', priceNum: 8, durationMins: 10, description: 'Gentle upper lip hair removal.' },
-                { name: 'Chin Waxing', duration: '10 mins', price: '$8', priceNum: 8, durationMins: 10, description: 'Quick chin waxing.' },
-                { name: 'Side Burns Waxing', duration: '10 mins', price: '$12', priceNum: 12, durationMins: 10, description: 'Clean sideburn line definition.' },
-                { name: 'Ears Waxing', duration: '10 mins', price: '$12', priceNum: 12, durationMins: 10, description: 'Ear hair removal.' },
-                { name: 'Jaw Line Waxing', duration: '10 mins', price: '$12', priceNum: 12, durationMins: 10, description: 'Jaw line hair removal.' },
-                { name: 'Neck Waxing', duration: '15 mins', price: '$15', priceNum: 15, durationMins: 15, description: 'Smooth neck wax.' },
-                { name: 'Full Face Waxing', duration: '30 mins', price: '$35', priceNum: 35, durationMins: 30, description: 'Complete full face waxing including brows, lip, chin, and cheeks.' },
-                { name: 'Underarms Waxing', duration: '15 mins', price: '$15', priceNum: 15, durationMins: 15, description: 'Quick and gentle underarm waxing.' },
-                { name: 'Shoulders Waxing', duration: '15 mins', price: '$20', priceNum: 20, durationMins: 15, description: 'Shoulder hair removal.' },
-                { name: 'Chest Waxing', duration: '20 mins', price: '$30', priceNum: 30, durationMins: 20, description: 'Smooth chest waxing.' },
-                { name: 'Stomach Waxing', duration: '15 mins', price: '$15', priceNum: 15, durationMins: 15, description: 'Stomach hair removal.' },
-                { name: 'Full Back Waxing', duration: '30 mins', price: '$45', priceNum: 45, durationMins: 30, description: 'Complete upper and lower back waxing.' },
-                { name: 'Half Arms Waxing', duration: '20 mins', price: '$20', priceNum: 20, durationMins: 20, description: 'Forearm or upper arm wax.' },
-                { name: 'Full Arms Waxing', duration: '30 mins', price: '$30', priceNum: 30, durationMins: 30, description: 'Entire arm hair removal.' },
-                { name: 'Half Legs Waxing', duration: '25 mins', price: '$30', priceNum: 30, durationMins: 25, description: 'Lower or upper legs wax.' },
-                { name: 'Full Legs Waxing', duration: '40 mins', price: '$45', priceNum: 45, durationMins: 40, description: 'Complete leg waxing.' },
-                { name: 'Bikini Lines Waxing', duration: '20 mins', price: '$25 & Up', priceNum: 25, durationMins: 20, description: 'Clean bikini line tidy-up.' },
-                { name: 'Brazilian Waxing', duration: '30 mins', price: '$35 & Up', priceNum: 35, durationMins: 30, description: 'Complete Brazilian waxing.' },
-                { name: 'Toes Waxing', duration: '10 mins', price: '$10', priceNum: 10, durationMins: 10, description: 'Toe hair removal.' },
-                { name: 'Knuckles Waxing', duration: '10 mins', price: '$10', priceNum: 10, durationMins: 10, description: 'Finger knuckles waxing.' },
-                { name: 'Half Legs & Bikini Lines Combo', duration: '35 mins', price: '$50 & Up', priceNum: 50, durationMins: 35, description: 'Half legs wax paired with bikini line.' },
-                { name: 'Full Legs & Bikini Lines Combo', duration: '45 mins', price: '$65 & Up', priceNum: 65, durationMins: 45, description: 'Full legs waxing paired with bikini line.' },
-                { name: 'Half Legs & Brazilian Combo', duration: '45 mins', price: '$60 & Up', priceNum: 60, durationMins: 45, description: 'Half legs waxing paired with Brazilian.' },
-                { name: 'Full Legs & Brazilian Combo', duration: '55 mins', price: '$75 & Up', priceNum: 75, durationMins: 55, description: 'Full legs waxing paired with full Brazilian.' },
-                { name: 'Full Body Wax', duration: '90 mins', price: '$160', priceNum: 160, durationMins: 90, description: 'All-inclusive full body smooth waxing service.' }
-            ]
+            keywords: ['wax', 'waxing']
         },
         {
             id: 'facial',
             title: 'Facial Treatments (Babor®)',
             subtitle: 'Award-winning Babor® skincare hydration & collagen',
             icon: 'bi-flower1',
-            services: [
-                {
-                    name: 'Express Facial',
-                    duration: 'Approx. 40 mins',
-                    price: '$85',
-                    priceNum: 85,
-                    durationMins: 40,
-                    description: 'Fast refreshing cleansing, gentle exfoliation, and replenishing hydration.'
-                },
-                {
-                    name: 'Hydra & Plump Facial',
-                    duration: 'Approx. 60 mins',
-                    price: '$110',
-                    priceNum: 110,
-                    durationMins: 60,
-                    description: 'This high performance treatment repairs moisture deficits in the skin, leaving the skin thoroughly hydrated, plump and smooth.'
-                },
-                {
-                    name: 'Calm & Soothe Facial',
-                    duration: 'Approx. 60 mins',
-                    price: '$110',
-                    priceNum: 110,
-                    durationMins: 60,
-                    description: 'Specially designed for extremely dry sensitive skin, rosacea and dermatitis. Skin feels instantly soothed, less irritated and deeply hydrated.'
-                },
-                {
-                    name: 'Collagen Infusion Facial',
-                    duration: 'Approx. 1 hr 15 mins',
-                    price: '$130',
-                    priceNum: 130,
-                    durationMins: 75,
-                    description: 'Plump and densify your skin with collagen boosting therapy. Ultra-potent hyaluronic acid and collagen plump skin from the inside out while smoothing lines.'
-                }
-            ]
+            keywords: ['facial', 'babor']
         },
         {
             id: 'specialty-services',
             title: 'Specialty Services',
             subtitle: 'Eye lash and brow definition tinting treatments',
             icon: 'bi-eye-fill',
-            services: [
-                {
-                    name: 'Eyelash Tinting',
-                    duration: 'Approx. 20 mins',
-                    price: '$17',
-                    priceNum: 17,
-                    durationMins: 20,
-                    description: 'Long-lasting semi-permanent lash tinting for dark, rich lashes.'
-                },
-                {
-                    name: 'Eyebrow Tinting',
-                    duration: 'Approx. 15 mins',
-                    price: '$17',
-                    priceNum: 17,
-                    durationMins: 15,
-                    description: 'Custom tinted eyebrows to naturally define and frame your eyes.'
-                }
-            ]
+            keywords: ['tinting', 'tint']
         },
         {
             id: 'gift-packages',
             title: 'Gift Packages',
             subtitle: 'Curated luxury spa experiences for Him & Her',
             icon: 'bi-gift-fill',
-            services: [
-                {
-                    name: 'Rejuvenation for Him/Her',
-                    duration: 'Approx. 2.5 hrs',
-                    price: '$165',
-                    priceNum: 165,
-                    durationMins: 150,
-                    description: 'Hydra & Plump Facial paired with Essential Manicure & Pedicure for the ultimate head-to-toe refresh.'
-                },
-                {
-                    name: 'Executive for Him/Her',
-                    duration: 'Approx. 2.5 hrs',
-                    price: '$147',
-                    priceNum: 147,
-                    durationMins: 150,
-                    description: 'Essential Manicure & Pedicure followed by a 60-Minute Relaxing Body Massage.'
-                }
-            ]
+            keywords: ['rejuvenation', 'executive', 'package']
         }
     ];
+
+    function escapeHtml(value) {
+        return String(value == null ? '' : value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function formatPrice(price) {
+        const num = Number(price || 0);
+        if (isNaN(num)) return '$0';
+        return Number.isInteger(num) ? `$${num}` : `$${num.toFixed(2)}`;
+    }
+
+    function formatDuration(mins) {
+        const m = parseInt(mins, 10) || 45;
+        return `${m} mins`;
+    }
+
+    function getAuthToken() {
+        return localStorage.getItem('accessToken') || localStorage.getItem('token');
+    }
+
+    function getTenantHeaders(includeAuth = false) {
+        const urlParams = new URLSearchParams(window.location.search);
+        const tenantParam = urlParams.get('tenant');
+        const headers = {};
+        if (tenantParam) headers['X-Tenant-ID'] = tenantParam;
+        if (includeAuth) {
+            const token = getAuthToken();
+            if (token) headers['Authorization'] = 'Bearer ' + token;
+        }
+        return headers;
+    }
+
+    function showStatusBanner(message, type = 'success') {
+        const banner = document.getElementById('servicesStatusBanner');
+        if (!banner) return;
+        banner.className = `alert alert-${type} rounded-4 shadow-sm mb-4`;
+        banner.textContent = message;
+        banner.classList.remove('d-none');
+        if (statusBannerTimeout) clearTimeout(statusBannerTimeout);
+        statusBannerTimeout = setTimeout(() => {
+            banner.classList.add('d-none');
+        }, 4000);
+    }
+
+    function showModalError(message) {
+        const el = document.getElementById('serviceModalError');
+        if (!el) return;
+        if (!message) {
+            el.classList.add('d-none');
+            el.textContent = '';
+        } else {
+            el.textContent = message;
+            el.classList.remove('d-none');
+        }
+    }
 
     function parseJwt(token) {
         try {
@@ -833,7 +446,7 @@
     document.addEventListener('DOMContentLoaded', () => {
         serviceModalInstance = new bootstrap.Modal(document.getElementById('serviceModal'));
 
-        const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
+        const token = getAuthToken();
         const username = localStorage.getItem('username');
 
         const authNav = document.getElementById('authNav');
@@ -844,8 +457,9 @@
 
         if (token && decodedToken) {
             const activeUser = username || decodedToken.sub || decodedToken.username || 'Client';
-            const role = decodedToken.role || decodedToken.authorities || (decodedToken.roles ? decodedToken.roles[0] : 'ROLE_USER');
-            isAdminUser = (role === 'ROLE_ADMIN' || role === 'ADMIN');
+            const rawRole = decodedToken.role || decodedToken.authorities || (decodedToken.roles ? decodedToken.roles[0] : 'ROLE_USER');
+            const normalizedRole = String(Array.isArray(rawRole) ? (rawRole[0] || '') : (rawRole || '')).toUpperCase();
+            isAdminUser = (normalizedRole === 'ROLE_ADMIN' || normalizedRole === 'ADMIN');
 
             if (userBadge && usernameDisplay) {
                 usernameDisplay.textContent = activeUser;
@@ -896,40 +510,92 @@
             }
         }
 
-        renderCategoryCards();
         fetchBackendServices();
     });
 
-    // Render 1 big card for each category section
+    function categorizeServices(services) {
+        const grouped = {};
+        serviceCategoryConfigs.forEach(cat => { grouped[cat.id] = []; });
+
+        (services || []).forEach(srv => {
+            const nameLower = (srv.name || '').toLowerCase();
+
+            if (nameLower.includes('combo')) {
+                grouped['combos'].push(srv);
+                return;
+            }
+            if (nameLower.includes('kid') || nameLower.includes('kids')) {
+                grouped['kids'].push(srv);
+                return;
+            }
+
+            let matched = false;
+            for (const cat of serviceCategoryConfigs) {
+                if (cat.id === 'combos' || cat.id === 'kids') continue;
+                if (cat.keywords.some(kw => nameLower.includes(kw))) {
+                    grouped[cat.id].push(srv);
+                    matched = true;
+                    break;
+                }
+            }
+            if (!matched) {
+                grouped['manicures'].push(srv);
+            }
+        });
+
+        return grouped;
+    }
+
+    // Render 1 big card for each category section from live database services
     function renderCategoryCards() {
         const container = document.getElementById('categoriesContainer');
         container.innerHTML = '';
 
-        serviceCategories.forEach((cat, index) => {
-            const count = cat.services.length;
+        if (!backendServices || backendServices.length === 0) {
+            container.innerHTML = `
+                <div class="col-12 text-center py-5 text-muted">
+                    <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                    <div>No services are currently listed.</div>
+                </div>
+            `;
+            return;
+        }
+
+        const grouped = categorizeServices(backendServices);
+
+        serviceCategoryConfigs.forEach((cat) => {
+            const catServices = grouped[cat.id] || [];
+            if (catServices.length === 0) return;
+
+            const count = catServices.length;
             const collapseId = `collapseCat_${cat.id}`;
             const cardId = `categoryCard_${cat.id}`;
-            // Open first two categories (Manicures & Pedicures) by default
-            const isOpenDefault = index < 2;
+            const isOpen = openCategoryIds.has(cat.id);
 
             let servicesListHtml = '';
-            cat.services.forEach(srv => {
-                const safeName = srv.name.replace(/'/g, "\\'");
+            catServices.forEach(srv => {
+                const editableClass = isAdminUser ? 'admin-editable' : '';
+                const rowClickAttr = isAdminUser ? `onclick="openEditServiceModal(${srv.id})" title="Click to edit or delete service"` : '';
+                const editBadgeHtml = isAdminUser
+                    ? `<span class="admin-edit-pill"><i class="bi bi-pencil-fill me-1"></i>Edit</span>`
+                    : '';
+
                 servicesListHtml += `
-                    <div class="service-item-row d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+                    <div class="service-item-row ${editableClass} d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3" ${rowClickAttr}>
                         <div class="flex-grow-1">
-                            <div class="d-flex align-items-center gap-2 mb-1">
-                                <h6 class="fw-bold text-dark mb-0">${srv.name}</h6>
+                            <div class="d-flex align-items-center flex-wrap gap-2 mb-1">
+                                <h6 class="fw-bold text-dark mb-0">${escapeHtml(srv.name)}</h6>
                                 <span class="badge bg-light text-secondary border rounded-pill">
-                                    <i class="bi bi-clock me-1"></i>${srv.duration}
+                                    <i class="bi bi-clock me-1"></i>${escapeHtml(formatDuration(srv.durationMinutes))}
                                 </span>
+                                ${editBadgeHtml}
                             </div>
-                            <p class="text-muted small mb-0">${srv.description || ''}</p>
+                            <p class="text-muted small mb-0">${escapeHtml(srv.description || '')}</p>
                         </div>
                         <div class="d-flex align-items-center justify-content-between justify-content-md-end gap-3 flex-shrink-0">
-                            <span class="service-price-tag">${srv.price}</span>
+                            <span class="service-price-tag">${escapeHtml(formatPrice(srv.price))}</span>
                             <button class="btn btn-pink btn-sm rounded-pill px-3 py-1 fw-semibold"
-                                    onclick="bookServiceDirectly('${safeName}', ${srv.priceNum}, ${srv.durationMins}, '${(srv.description || '').replace(/'/g, "\\'")}')">
+                                    onclick="event.stopPropagation(); bookServiceDirectly(${srv.id})">
                                 <i class="bi bi-calendar-check me-1"></i>Book
                             </button>
                         </div>
@@ -940,24 +606,24 @@
             const col = document.createElement('div');
             col.className = 'col-12';
             col.innerHTML = `
-                <div class="category-card shadow-sm ${isOpenDefault ? 'is-open' : ''}" id="${cardId}">
+                <div class="category-card shadow-sm ${isOpen ? 'is-open' : ''}" id="${cardId}">
                     <div class="category-card-header d-flex justify-content-between align-items-center"
                          data-bs-toggle="collapse"
                          data-bs-target="#${collapseId}"
-                         aria-expanded="${isOpenDefault ? 'true' : 'false'}"
+                         aria-expanded="${isOpen ? 'true' : 'false'}"
                          onclick="toggleCardState('${cat.id}')">
                         <div class="d-flex align-items-center gap-3">
                             <div class="category-icon">
                                 <i class="bi ${cat.icon}"></i>
                             </div>
                             <div>
-                                <h4 class="fw-bold text-dark mb-1 d-flex align-items-center gap-2">
-                                    ${cat.title}
+                                <h4 class="fw-bold text-dark mb-1 d-flex align-items-center gap-2 flex-wrap">
+                                    ${escapeHtml(cat.title)}
                                     <span class="badge bg-danger-subtle text-pink border border-danger-subtle rounded-pill fs-6 px-2 py-1">
-                                        ${count} items
+                                        ${count} ${count === 1 ? 'item' : 'items'}
                                     </span>
                                 </h4>
-                                <p class="text-muted small mb-0">${cat.subtitle}</p>
+                                <p class="text-muted small mb-0">${escapeHtml(cat.subtitle)}</p>
                             </div>
                         </div>
                         <div class="d-flex align-items-center gap-2">
@@ -966,7 +632,7 @@
                         </div>
                     </div>
 
-                    <div class="collapse ${isOpenDefault ? 'show' : ''}" id="${collapseId}">
+                    <div class="collapse ${isOpen ? 'show' : ''}" id="${collapseId}">
                         <div class="category-card-body border-top">
                             ${servicesListHtml}
                         </div>
@@ -985,118 +651,201 @@
             const collapseEl = document.getElementById(`collapseCat_${catId}`);
             if (collapseEl && collapseEl.classList.contains('show')) {
                 card.classList.add('is-open');
+                openCategoryIds.add(catId);
             } else {
                 card.classList.remove('is-open');
+                openCategoryIds.delete(catId);
             }
         }, 300);
     }
 
     async function fetchBackendServices() {
+        const container = document.getElementById('categoriesContainer');
         try {
-            const urlParams = new URLSearchParams(window.location.search);
-            const tenantParam = urlParams.get('tenant');
-            const headers = {};
-            if (tenantParam) headers['X-Tenant-ID'] = tenantParam;
-            const res = await fetch('/api/services', { headers });
-            if (res.ok) {
-                backendServices = await res.json();
-            }
+            const res = await fetch('/api/services', { headers: getTenantHeaders(false) });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            backendServices = await res.json();
+            renderCategoryCards();
         } catch (e) {
-            console.error('Error prefetching backend services:', e);
+            console.error('Error fetching backend services:', e);
+            container.innerHTML = `
+                <div class="col-12 text-center py-5">
+                    <div class="text-danger fw-semibold mb-2">Could not load services from the server.</div>
+                    <button class="btn btn-outline-pink btn-sm rounded-pill px-3" onclick="fetchBackendServices()">
+                        <i class="bi bi-arrow-clockwise me-1"></i>Retry
+                    </button>
+                </div>
+            `;
         }
     }
 
-    async function bookServiceDirectly(serviceName, priceNum, durationMins, description) {
-        localStorage.setItem('selectedDesign', serviceName);
+    function bookServiceDirectly(serviceId) {
+        const srv = backendServices.find(s => Number(s.id) === Number(serviceId));
+        if (srv && srv.name) {
+            localStorage.setItem('selectedDesign', srv.name);
+        }
+
         const urlParams = new URLSearchParams(window.location.search);
         const tenantParam = urlParams.get('tenant');
-
-        let targetServiceId = null;
-        let existing = backendServices.find(s => s.name.toLowerCase() === serviceName.toLowerCase());
-        if (existing) {
-            targetServiceId = existing.id;
-        } else {
-            try {
-                const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
-                const headers = { 'Content-Type': 'application/json' };
-                if (token) headers['Authorization'] = 'Bearer ' + token;
-                if (tenantParam) headers['X-Tenant-ID'] = tenantParam;
-
-                const createRes = await fetch('/api/services', {
-                    method: 'POST',
-                    headers: headers,
-                    body: JSON.stringify({
-                        name: serviceName,
-                        price: priceNum,
-                        durationMinutes: durationMins,
-                        description: description
-                    })
-                });
-                if (createRes.ok) {
-                    const created = await createRes.json();
-                    targetServiceId = created.id;
-                }
-            } catch (err) {
-                console.warn('Could not auto-sync service to backend:', err);
-            }
-        }
-
         const outParams = new URLSearchParams();
-        if (targetServiceId) {
-            outParams.set('serviceId', targetServiceId);
-        } else {
-            outParams.set('service', serviceName);
-        }
-        if (tenantParam) {
-            outParams.set('tenant', tenantParam);
-        }
-        const queryString = outParams.toString();
-        window.location.href = '/book' + (queryString ? '?' + queryString : '');
+        outParams.set('serviceId', serviceId);
+        if (tenantParam) outParams.set('tenant', tenantParam);
+
+        window.location.href = '/book?' + outParams.toString();
     }
 
     function openAddServiceModal() {
+        if (!isAdminUser) return;
+        showModalError('');
         document.getElementById('serviceId').value = '';
         document.getElementById('serviceName').value = '';
         document.getElementById('servicePrice').value = '';
         document.getElementById('serviceDuration').value = '45';
         document.getElementById('serviceDescription').value = '';
-        document.getElementById('serviceModalTitle').innerText = 'Add New Service';
+        document.getElementById('serviceModalTitle').textContent = 'Add New Service';
+        document.getElementById('deleteServiceBtn').classList.add('d-none');
+        document.getElementById('saveServiceBtn').textContent = 'Add Service';
+        serviceModalInstance.show();
+    }
+
+    function openEditServiceModal(serviceId) {
+        if (!isAdminUser) return;
+        const srv = backendServices.find(s => Number(s.id) === Number(serviceId));
+        if (!srv) return;
+
+        showModalError('');
+        document.getElementById('serviceId').value = srv.id;
+        document.getElementById('serviceName').value = srv.name || '';
+        document.getElementById('serviceDuration').value = srv.durationMinutes != null ? srv.durationMinutes : 45;
+        document.getElementById('servicePrice').value = srv.price != null ? srv.price : 0;
+        document.getElementById('serviceDescription').value = srv.description || '';
+
+        document.getElementById('serviceModalTitle').textContent = 'Edit Service';
+        document.getElementById('deleteServiceBtn').classList.remove('d-none');
+        document.getElementById('saveServiceBtn').textContent = 'Update';
         serviceModalInstance.show();
     }
 
     async function saveService() {
-        const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
+        if (!isAdminUser) return;
+        showModalError('');
+
+        const serviceId = document.getElementById('serviceId').value.trim();
+        const isEdit = Boolean(serviceId);
         const name = document.getElementById('serviceName').value.trim();
         const price = parseFloat(document.getElementById('servicePrice').value);
-        const durationMinutes = parseInt(document.getElementById('serviceDuration').value) || 45;
+        const durationMinutes = parseInt(document.getElementById('serviceDuration').value, 10);
         const description = document.getElementById('serviceDescription').value.trim();
 
-        if (!name || isNaN(price)) {
-            alert('Please enter a valid Service Name and Price.');
+        if (!name) {
+            showModalError('Please enter a service name.');
+            return;
+        }
+        if (isNaN(price) || price < 0) {
+            showModalError('Please enter a valid cost ($0 or higher).');
+            return;
+        }
+        if (isNaN(durationMinutes) || durationMinutes < 5) {
+            showModalError('Please enter a valid duration (at least 5 minutes).');
             return;
         }
 
+        const saveBtn = document.getElementById('saveServiceBtn');
+        const deleteBtn = document.getElementById('deleteServiceBtn');
+        const originalText = saveBtn.textContent;
+        saveBtn.disabled = true;
+        deleteBtn.disabled = true;
+        saveBtn.textContent = isEdit ? 'Updating...' : 'Saving...';
+
         try {
-            const response = await fetch('/api/services', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + token
-                },
+            const endpoint = isEdit ? `/api/services/${encodeURIComponent(serviceId)}` : '/api/services';
+            const method = isEdit ? 'PUT' : 'POST';
+            const headers = {
+                ...getTenantHeaders(true),
+                'Content-Type': 'application/json'
+            };
+
+            const response = await fetch(endpoint, {
+                method,
+                headers,
                 body: JSON.stringify({ name, price, durationMinutes, description })
             });
 
             if (response.ok) {
-                alert(`Service "${name}" saved successfully!`);
                 serviceModalInstance.hide();
+                showStatusBanner(
+                    isEdit ? `Updated "${name}" successfully.` : `Added "${name}" successfully.`,
+                    'success'
+                );
                 await fetchBackendServices();
             } else {
-                const text = await response.text();
-                alert('Failed to save service: ' + text);
+                let errMsg = 'Failed to save service.';
+                try {
+                    const data = await response.json();
+                    if (data && data.message) errMsg = data.message;
+                } catch (_) {
+                    const txt = await response.text();
+                    if (txt) errMsg = txt;
+                }
+                showModalError(errMsg);
             }
         } catch (err) {
-            console.error('Error saving custom service:', err);
-            alert('Server connection error.');
+            console.error('Error saving service:', err);
+            showModalError('Server connection error. Please try again.');
+        } finally {
+            saveBtn.disabled = false;
+            deleteBtn.disabled = false;
+            saveBtn.textContent = originalText;
+        }
+    }
+
+    async function deleteCurrentService() {
+        if (!isAdminUser) return;
+        showModalError('');
+
+        const serviceId = document.getElementById('serviceId').value.trim();
+        const name = document.getElementById('serviceName').value.trim() || 'this service';
+        if (!serviceId) return;
+
+        if (!confirm(`Delete "${name}"? This cannot be undone.`)) {
+            return;
+        }
+
+        const saveBtn = document.getElementById('saveServiceBtn');
+        const deleteBtn = document.getElementById('deleteServiceBtn');
+        const originalDeleteHtml = deleteBtn.innerHTML;
+        saveBtn.disabled = true;
+        deleteBtn.disabled = true;
+        deleteBtn.textContent = 'Deleting...';
+
+        try {
+            const response = await fetch(`/api/services/${encodeURIComponent(serviceId)}`, {
+                method: 'DELETE',
+                headers: getTenantHeaders(true)
+            });
+
+            if (response.ok) {
+                serviceModalInstance.hide();
+                showStatusBanner(`Deleted "${name}" successfully.`, 'warning');
+                await fetchBackendServices();
+            } else {
+                let errMsg = 'Failed to delete service.';
+                try {
+                    const data = await response.json();
+                    if (data && data.message) errMsg = data.message;
+                } catch (_) {
+                    const txt = await response.text();
+                    if (txt) errMsg = txt;
+                }
+                showModalError(errMsg);
+            }
+        } catch (err) {
+            console.error('Error deleting service:', err);
+            showModalError('Server connection error. Please try again.');
+        } finally {
+            saveBtn.disabled = false;
+            deleteBtn.disabled = false;
+            deleteBtn.innerHTML = originalDeleteHtml;
         }
     }
 
